@@ -26,7 +26,7 @@ class APIService: ObservableObject {
 
     var baseURL: String = "https://oura-backend-jkt-763614853578.asia-southeast2.run.app/api/v1"
     var authToken: String? = nil
-    var useMock: Bool = true
+    var useMock: Bool = false
     var onUnauthorized: (() -> Void)? = nil
 
     private var session: URLSession = .shared
@@ -543,6 +543,8 @@ class APIService: ObservableObject {
         let raw: BackendProductionBatchItem = try await patch(path: "/production-batches/\(batchId)/items/\(itemId)", body: UpdateBatchItemRequest(qtyActual: qtyActual))
         let sizeMap = try await fetchSizeToProductMap()
         let entry = raw.productSizeId.flatMap { sizeMap[$0] }
+        let hppFabricRaw = raw.hppFabric ?? 0
+        let effectiveHppFabric = hppFabricRaw > 0 ? hppFabricRaw : (raw.fabricCostPerPiece ?? 0)
         return ProductionBatchItem(
             id: raw.id,
             productionBatchId: batchId,
@@ -552,7 +554,7 @@ class APIService: ObservableObject {
             patternSpecId: raw.patternSpecId,
             qtyActual: raw.qtyActual,
             qtySuggested: raw.qtySuggested,
-            hppFabric: raw.hppFabric ?? 0,
+            hppFabric: effectiveHppFabric,
             hppPooledMaterial: raw.hppPooledMaterial ?? 0,
             hppHardware: raw.hppHardware ?? 0,
             hppLabor: raw.hppLabor ?? 0,
