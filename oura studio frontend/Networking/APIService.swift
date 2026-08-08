@@ -525,12 +525,12 @@ class APIService: ObservableObject {
             patternSpecId: raw.patternSpecId,
             qtyActual: raw.qtyActual,
             qtySuggested: raw.qtySuggested,
-            hppFabric: raw.hppFabric,
-            hppPooledMaterial: raw.hppPooledMaterial,
-            hppHardware: raw.hppHardware,
-            hppLabor: raw.hppLabor,
-            hppOverhead: raw.hppOverhead,
-            hppTotal: raw.hppTotal
+            hppFabric: raw.hppFabric ?? 0,
+            hppPooledMaterial: raw.hppPooledMaterial ?? 0,
+            hppHardware: raw.hppHardware ?? 0,
+            hppLabor: raw.hppLabor ?? 0,
+            hppOverhead: raw.hppOverhead ?? 0,
+            hppTotal: raw.hppTotal ?? 0
         )
     }
 
@@ -561,7 +561,9 @@ class APIService: ObservableObject {
             let items = batch.items.map { item in
                 let entry = sizeMap[item.productSizeId]
                 // hpp_* fields are 0 in draft — use fabric_cost_per_piece as hppFabric estimate
-                let effectiveHppFabric = item.hppFabric > 0 ? item.hppFabric : item.fabricCostPerPiece
+                let hppFabricRaw = item.hppFabric ?? 0
+                let fabricCost   = item.fabricCostPerPiece ?? 0
+                let effectiveHppFabric = hppFabricRaw > 0 ? hppFabricRaw : fabricCost
                 return ProductionBatchItem(
                     id: item.id,
                     productionBatchId: batch.id,
@@ -572,11 +574,11 @@ class APIService: ObservableObject {
                     qtyActual: item.qtyActual,
                     qtySuggested: item.qtySuggested,
                     hppFabric: effectiveHppFabric,
-                    hppPooledMaterial: item.hppPooledMaterial,
-                    hppHardware: item.hppHardware,
-                    hppLabor: item.hppLabor,
-                    hppOverhead: item.hppOverhead,
-                    hppTotal: item.hppTotal
+                    hppPooledMaterial: item.hppPooledMaterial ?? 0,
+                    hppHardware: item.hppHardware ?? 0,
+                    hppLabor: item.hppLabor ?? 0,
+                    hppOverhead: item.hppOverhead ?? 0,
+                    hppTotal: item.hppTotal ?? 0
                 )
             }
             return ProductionBatch(

@@ -46,7 +46,7 @@ struct ProductionBatchItem: Codable, Identifiable {
     let productSizeId: UUID
     let productName: String
     let sizeLabel: String
-    let patternSpecId: UUID
+    let patternSpecId: UUID?
     var qtyActual: Int
     let qtySuggested: Int?
     let hppFabric: Double
@@ -95,17 +95,17 @@ struct CreateProductionBatchRequest: Codable {
 struct BackendProductionBatchItem: Codable, Identifiable {
     let id: UUID
     let productSizeId: UUID
-    let patternSpecId: UUID
+    let patternSpecId: UUID?
     let qtyActual: Int
     let qtySuggested: Int?
     // fabricCostPerPiece is available even in draft; hpp_* fields are only non-zero after confirmation
-    let fabricCostPerPiece: Double
-    let hppFabric: Double
-    let hppPooledMaterial: Double
-    let hppHardware: Double
-    let hppLabor: Double
-    let hppOverhead: Double
-    let hppTotal: Double
+    let fabricCostPerPiece: Double?
+    let hppFabric: Double?
+    let hppPooledMaterial: Double?
+    let hppHardware: Double?
+    let hppLabor: Double?
+    let hppOverhead: Double?
+    let hppTotal: Double?
 
     enum CodingKeys: String, CodingKey {
         case id
