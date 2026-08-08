@@ -43,7 +43,7 @@ struct ProductionBatch: Codable, Identifiable {
 struct ProductionBatchItem: Codable, Identifiable {
     let id: UUID
     let productionBatchId: UUID
-    let productSizeId: UUID
+    let productSizeId: UUID?
     let productName: String
     let sizeLabel: String
     let patternSpecId: UUID?
@@ -94,7 +94,7 @@ struct CreateProductionBatchRequest: Codable {
 
 struct BackendProductionBatchItem: Codable, Identifiable {
     let id: UUID
-    let productSizeId: UUID
+    let productSizeId: UUID?
     let patternSpecId: UUID?
     let qtyActual: Int
     let qtySuggested: Int?

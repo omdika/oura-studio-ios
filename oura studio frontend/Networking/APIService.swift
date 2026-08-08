@@ -542,7 +542,7 @@ class APIService: ObservableObject {
         if useMock { return try await MockAPIService.shared.updateBatchItem(batchId: batchId, itemId: itemId, qtyActual: qtyActual) }
         let raw: BackendProductionBatchItem = try await patch(path: "/production-batches/\(batchId)/items/\(itemId)", body: UpdateBatchItemRequest(qtyActual: qtyActual))
         let sizeMap = try await fetchSizeToProductMap()
-        let entry = sizeMap[raw.productSizeId]
+        let entry = raw.productSizeId.flatMap { sizeMap[$0] }
         return ProductionBatchItem(
             id: raw.id,
             productionBatchId: batchId,
@@ -585,7 +585,7 @@ class APIService: ObservableObject {
         let sizeMap = raw.flatMap { $0.items }.isEmpty ? [:] : try await fetchSizeToProductMap()
         return raw.map { batch in
             let items = batch.items.map { item in
-                let entry = sizeMap[item.productSizeId]
+                let entry = item.productSizeId.flatMap { sizeMap[$0] }
                 // hpp_* fields are 0 in draft — use fabric_cost_per_piece as hppFabric estimate
                 let hppFabricRaw = item.hppFabric ?? 0
                 let fabricCost   = item.fabricCostPerPiece ?? 0
