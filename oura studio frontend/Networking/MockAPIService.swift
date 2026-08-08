@@ -159,27 +159,32 @@ class MockAPIService {
                                   productName: "Scrunchie", sizeLabel: "M", fabricVariantName: "Satin Pelangi",
                                   reorderMinQty: 20, isArchived: false, currentStockQty: 0,
                                   productionStockQty: 0, manualStockQty: 0,
-                                  latestHppBreakdown: nil, sellingPrice: 22_000, marginPct: nil),
+                                  latestHppBreakdown: HPPBreakdown(fabric: 3_400, pooledMaterial: 350, hardware: 120, labor: 2_800, overhead: 600, total: 7_270),
+                                  sellingPrice: 22_000, marginPct: 0.67),
                 ProductSizeDetail(id: sizeScrunXS, productId: prodScrunchieId, productSku: "SCRUNCHIE",
                                   productName: "Scrunchie", sizeLabel: "M", fabricVariantName: "Waffle Merah",
                                   reorderMinQty: 20, isArchived: false, currentStockQty: 0,
                                   productionStockQty: 0, manualStockQty: 0,
-                                  latestHppBreakdown: nil, sellingPrice: 20_000, marginPct: nil),
+                                  latestHppBreakdown: HPPBreakdown(fabric: 2_900, pooledMaterial: 300, hardware: 100, labor: 2_800, overhead: 550, total: 6_650),
+                                  sellingPrice: 20_000, marginPct: 0.67),
                 ProductSizeDetail(id: sizeScrunL, productId: prodScrunchieId, productSku: "SCRUNCHIE",
                                   productName: "Scrunchie", sizeLabel: "L", fabricVariantName: "Satin Pelangi",
                                   reorderMinQty: 15, isArchived: false, currentStockQty: 0,
                                   productionStockQty: 0, manualStockQty: 0,
-                                  latestHppBreakdown: nil, sellingPrice: 25_000, marginPct: nil),
+                                  latestHppBreakdown: HPPBreakdown(fabric: 4_200, pooledMaterial: 400, hardware: 150, labor: 3_360, overhead: 700, total: 8_810),
+                                  sellingPrice: 25_000, marginPct: 0.65),
                 ProductSizeDetail(id: sizeScrunS, productId: prodScrunchieId, productSku: "SCRUNCHIE",
                                   productName: "Scrunchie", sizeLabel: "L", fabricVariantName: "Waffle Merah",
                                   reorderMinQty: 10, isArchived: false, currentStockQty: 0,
                                   productionStockQty: 0, manualStockQty: 0,
-                                  latestHppBreakdown: nil, sellingPrice: 24_000, marginPct: nil),
+                                  latestHppBreakdown: HPPBreakdown(fabric: 3_600, pooledMaterial: 350, hardware: 130, labor: 3_360, overhead: 650, total: 8_090),
+                                  sellingPrice: 24_000, marginPct: 0.66),
                 ProductSizeDetail(id: sizeScrunXL, productId: prodScrunchieId, productSku: "SCRUNCHIE",
                                   productName: "Scrunchie", sizeLabel: "L", fabricVariantName: "Silk Putih",
                                   reorderMinQty: 10, isArchived: false, currentStockQty: 0,
                                   productionStockQty: 0, manualStockQty: 0,
-                                  latestHppBreakdown: nil, sellingPrice: 26_000, marginPct: nil),
+                                  latestHppBreakdown: HPPBreakdown(fabric: 5_100, pooledMaterial: 400, hardware: 150, labor: 3_360, overhead: 700, total: 9_710),
+                                  sellingPrice: 26_000, marginPct: 0.63),
             ],
         ]
 
@@ -890,6 +895,8 @@ class MockAPIService {
                     let cost = _materials.first(where: { $0.id == comp.materialId })?.currentAvgCost ?? 0
                     return sum + cost * comp.qtyPerUnit
                 }
+                let latestHpp = _productSizes.values.flatMap { $0 }
+                    .first(where: { $0.id == layoutItem.productSizeId })?.latestHppBreakdown
                 batchItems.append(ProductionBatchItem(
                     id: UUID(), productionBatchId: batchId,
                     productSizeId: layoutItem.productSizeId,
@@ -901,7 +908,8 @@ class MockAPIService {
                     hppFabric: hppFabric, hppPooledMaterial: hppPooled,
                     hppHardware: hppHardware, hppLabor: hppLabor,
                     hppOverhead: hppOverhead,
-                    hppTotal: hppFabric + hppPooled + hppHardware + hppLabor + hppOverhead
+                    hppTotal: hppFabric + hppPooled + hppHardware + hppLabor + hppOverhead,
+                    latestHppBreakdown: latestHpp
                 ))
             }
         }

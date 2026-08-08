@@ -26,7 +26,7 @@ class APIService: ObservableObject {
 
     var baseURL: String = "https://oura-backend-jkt-763614853578.asia-southeast2.run.app/api/v1"
     var authToken: String? = nil
-    var useMock: Bool = false
+    var useMock: Bool = true
     var onUnauthorized: (() -> Void)? = nil
 
     private var session: URLSession = .shared
@@ -557,7 +557,8 @@ class APIService: ObservableObject {
             hppHardware: raw.hppHardware ?? 0,
             hppLabor: raw.hppLabor ?? 0,
             hppOverhead: raw.hppOverhead ?? 0,
-            hppTotal: raw.hppTotal ?? 0
+            hppTotal: raw.hppTotal ?? 0,
+            latestHppBreakdown: entry?.size.latestHppBreakdown
         )
     }
 

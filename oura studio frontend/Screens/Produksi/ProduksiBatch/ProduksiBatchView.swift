@@ -222,6 +222,17 @@ private struct BatchCard: View {
     let onDelete: () -> Void
     let onUpdateItem: (ProductionBatchItem, Int) -> Void
 
+    @State private var hppItemId: UUID? = nil
+
+    private var hppFocusItem: ProductionBatchItem? {
+        let withHpp = batch.items.filter { $0.latestHppBreakdown != nil }
+        guard !withHpp.isEmpty else { return nil }
+        if let focused = hppItemId, let item = withHpp.first(where: { $0.id == focused }) {
+            return item
+        }
+        return withHpp.first
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             // Header
@@ -248,10 +259,20 @@ private struct BatchCard: View {
                 Divider().overlay(OuraTheme.Colors.separator)
 
                 ForEach(batch.items) { item in
-                    BatchItemRow(item: item, onUpdate: { qty in onUpdateItem(item, qty) })
+                    BatchItemRow(
+                        item: item,
+                        isHppSelected: hppFocusItem?.id == item.id && item.latestHppBreakdown != nil,
+                        onUpdate: { qty in onUpdateItem(item, qty) },
+                        onSelectHpp: item.latestHppBreakdown != nil ? { hppItemId = item.id } : nil
+                    )
                     if item.id != batch.items.last?.id {
                         Divider().padding(.leading, 16).overlay(OuraTheme.Colors.separator)
                     }
+                }
+
+                if let focus = hppFocusItem, let hpp = focus.latestHppBreakdown {
+                    Divider().overlay(OuraTheme.Colors.separator)
+                    hppRincian(sizeLabel: focus.sizeLabel, hpp: hpp)
                 }
 
                 Divider().overlay(OuraTheme.Colors.separator)
@@ -269,7 +290,7 @@ private struct BatchCard: View {
                     .buttonStyle(.plain)
 
                     Button(action: onConfirm) {
-                        Text("Konfirmasi Produksi")
+                        Text("Konfirmasi & Tambah ke Stok")
                             .font(.system(size: 14, weight: .semibold))
                             .foregroundStyle(.white)
                             .frame(maxWidth: .infinity)
@@ -285,21 +306,94 @@ private struct BatchCard: View {
             }
         }
         .ouraCard(OuraTheme.Radius.card)
+        .onChange(of: isExpanded) { _, expanded in
+            if expanded { hppItemId = nil }
+        }
+    }
+
+    // MARK: - HPP Rincian
+
+    private func hppRincian(sizeLabel: String, hpp: HPPBreakdown) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 4) {
+                Text("RINCIAN HPP")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(OuraTheme.Colors.textTertiary)
+                Text("·")
+                    .font(.system(size: 11))
+                    .foregroundStyle(OuraTheme.Colors.textTertiary)
+                Text(sizeLabel.uppercased())
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(OuraTheme.Colors.accent)
+            }
+            .padding(.horizontal, OuraTheme.Spacing.cardPad)
+            .padding(.top, 12)
+            .padding(.bottom, 6)
+
+            VStack(spacing: 0) {
+                hppRow("Kain (fabric)", value: hpp.fabric, dot: Color(red: 0.24, green: 0.52, blue: 0.95))
+                hppRow("Bahan Pooled", value: hpp.pooledMaterial, dot: Color(red: 0.58, green: 0.35, blue: 0.85))
+                hppRow("Hardware", value: hpp.hardware, dot: Color(red: 0.95, green: 0.75, blue: 0.20))
+                hppRow("Tenaga Kerja", value: hpp.labor, dot: Color(red: 0.95, green: 0.48, blue: 0.22))
+                hppRow("Overhead", value: hpp.overhead, dot: OuraTheme.Colors.textTertiary)
+            }
+            .padding(.horizontal, OuraTheme.Spacing.cardPad)
+
+            Divider()
+                .overlay(OuraTheme.Colors.separator)
+                .padding(.horizontal, OuraTheme.Spacing.cardPad)
+                .padding(.top, 8)
+
+            HStack {
+                Text("HPP Total")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(OuraTheme.Colors.textPrimary)
+                Spacer()
+                Text(hpp.total.rupiahFormatted)
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(OuraTheme.Colors.accent)
+            }
+            .padding(.horizontal, OuraTheme.Spacing.cardPad)
+            .padding(.vertical, 10)
+        }
+    }
+
+    private func hppRow(_ label: String, value: Double, dot: Color) -> some View {
+        HStack(spacing: 8) {
+            Circle().fill(dot).frame(width: 7, height: 7)
+            Text(label)
+                .font(.system(size: 13))
+                .foregroundStyle(OuraTheme.Colors.textSecondary)
+            Spacer()
+            Text(value.rupiahFormatted)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(OuraTheme.Colors.textPrimary)
+        }
+        .padding(.vertical, 5)
     }
 }
 
 private struct BatchItemRow: View {
     let item: ProductionBatchItem
+    let isHppSelected: Bool
     let onUpdate: (Int) -> Void
+    let onSelectHpp: (() -> Void)?
 
     @State private var qtyText: String = ""
 
     var body: some View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
-                Text(item.sizeLabel)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(OuraTheme.Colors.textPrimary)
+                HStack(spacing: 6) {
+                    Text(item.sizeLabel)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(OuraTheme.Colors.textPrimary)
+                    if isHppSelected {
+                        Circle()
+                            .fill(OuraTheme.Colors.accent)
+                            .frame(width: 6, height: 6)
+                    }
+                }
                 HStack(spacing: 4) {
                     if item.hppTotal > 0 {
                         Text("HPP \(item.hppTotal.rupiahFormatted)/pcs")
@@ -360,6 +454,8 @@ private struct BatchItemRow: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
+        .contentShape(Rectangle())
+        .onTapGesture { onSelectHpp?() }
         .onAppear { qtyText = "\(item.qtyActual)" }
     }
 }
