@@ -129,7 +129,7 @@ struct BerandaView: View {
                     Spacer()
                     statPill(
                         icon: "chart.line.uptrend.xyaxis",
-                        label: String(format: "%.0f%% margin", dashboard?.avgMarginPct ?? 0)
+                        label: String(format: "%.0f%% margin", (dashboard?.avgMarginPct ?? 0) as Double)
                     )
                 }
             }

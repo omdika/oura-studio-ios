@@ -14,7 +14,7 @@ enum APIError: LocalizedError {
         case .invalidURL:             return "URL tidak valid"
         case .unauthorized:           return "Sesi kadaluarsa. Silakan masuk kembali."
         case .serverError(_, let m):  return m
-        case .decodingError(let e):   return "Gagal membaca respons: \(e.localizedDescription)"
+        case .decodingError(let e):   return "Decode error: \(e.localizedDescription)"
         case .networkError(let e):    return "Koneksi gagal: \(e.localizedDescription)"
         case .conflict(let m):        return m
         }
@@ -94,16 +94,45 @@ class APIService: ObservableObject {
         catch { throw APIError.networkError(error) }
     }
 
+    // Central decode with detailed console logging on failure.
+    private func loggedDecode<T: Decodable>(_ type: T.Type, from data: Data, path: String) throws -> T {
+        do {
+            return try decoder.decode(type, from: data)
+        } catch let e as DecodingError {
+            let raw = String(data: data, encoding: .utf8) ?? "<non-utf8>"
+            var detail = ""
+            switch e {
+            case .keyNotFound(let key, let ctx):
+                detail = "keyNotFound '\(key.stringValue)' at [\(ctx.codingPath.map(\.stringValue).joined(separator: "."))]"
+            case .valueNotFound(let t, let ctx):
+                detail = "valueNotFound \(t) at [\(ctx.codingPath.map(\.stringValue).joined(separator: "."))]"
+            case .typeMismatch(let t, let ctx):
+                detail = "typeMismatch expected \(t) at [\(ctx.codingPath.map(\.stringValue).joined(separator: "."))]"
+            case .dataCorrupted(let ctx):
+                detail = "dataCorrupted: \(ctx.debugDescription)"
+            @unknown default:
+                detail = "\(e)"
+            }
+            print("🔴 [API] DecodingError \(path) → \(type): \(detail)")
+            print("🔴 [API] Raw response: \(raw.prefix(800))")
+            throw APIError.decodingError(NSError(
+                domain: "APIDecoding",
+                code: 0,
+                userInfo: [NSLocalizedDescriptionKey: detail]
+            ))
+        } catch {
+            throw APIError.decodingError(error)
+        }
+    }
+
     private func get<T: Decodable>(path: String) async throws -> T {
         let data = try await execute("GET", path: path)
-        do { return try decoder.decode(T.self, from: data) }
-        catch { throw APIError.decodingError(error) }
+        return try loggedDecode(T.self, from: data, path: path)
     }
 
     private func post<B: Encodable, T: Decodable>(path: String, body: B) async throws -> T {
         let data = try await execute("POST", path: path, bodyData: try encoder.encode(body))
-        do { return try decoder.decode(T.self, from: data) }
-        catch { throw APIError.decodingError(error) }
+        return try loggedDecode(T.self, from: data, path: path)
     }
 
     private func postVoid<B: Encodable>(path: String, body: B) async throws {
@@ -112,8 +141,7 @@ class APIService: ObservableObject {
 
     private func postNoBody<T: Decodable>(path: String) async throws -> T {
         let data = try await execute("POST", path: path)
-        do { return try decoder.decode(T.self, from: data) }
-        catch { throw APIError.decodingError(error) }
+        return try loggedDecode(T.self, from: data, path: path)
     }
 
     private func postNoBodyVoid(path: String) async throws {
@@ -122,8 +150,7 @@ class APIService: ObservableObject {
 
     private func patch<B: Encodable, T: Decodable>(path: String, body: B) async throws -> T {
         let data = try await execute("PATCH", path: path, bodyData: try encoder.encode(body))
-        do { return try decoder.decode(T.self, from: data) }
-        catch { throw APIError.decodingError(error) }
+        return try loggedDecode(T.self, from: data, path: path)
     }
 
     private func delete(path: String) async throws {

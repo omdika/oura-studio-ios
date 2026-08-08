@@ -297,7 +297,7 @@ struct ProdukVariantRow: View {
                     }
                     if let margin = size.marginPct {
                         Text("·").foregroundStyle(OuraTheme.Colors.textTertiary)
-                        Text(String(format: "%.0f%% margin", margin * 100))
+                        Text(String(format: "%.0f%% margin", margin * 100 as Double))
                             .font(.system(size: 12))
                             .foregroundStyle(margin >= 0.3 ? OuraTheme.Colors.greenAccent : OuraTheme.Colors.warningText)
                     }
