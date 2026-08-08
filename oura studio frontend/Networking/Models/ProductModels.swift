@@ -40,16 +40,24 @@ struct ProductSizeBasic: Codable, Identifiable {
     let sellingPrice: Double?
     let isArchived: Bool
     let currentStockQty: Int
+    let productionStockQty: Int?
+    let manualStockQty: Int?
+    let latestHppBreakdown: HPPBreakdown?
+    let marginPct: Double?
 
     enum CodingKeys: String, CodingKey {
         case id
-        case productId         = "product_id"
-        case sizeLabel         = "size_label"
-        case fabricVariantName = "fabric_variant_name"
-        case reorderMinQty     = "reorder_min_qty"
-        case sellingPrice      = "selling_price"
-        case isArchived        = "is_archived"
-        case currentStockQty   = "current_stock_qty"
+        case productId           = "product_id"
+        case sizeLabel           = "size_label"
+        case fabricVariantName   = "fabric_variant_name"
+        case reorderMinQty       = "reorder_min_qty"
+        case sellingPrice        = "selling_price"
+        case isArchived          = "is_archived"
+        case currentStockQty     = "current_stock_qty"
+        case productionStockQty  = "production_stock_qty"
+        case manualStockQty      = "manual_stock_qty"
+        case latestHppBreakdown  = "latest_hpp_breakdown"
+        case marginPct           = "margin_pct"
     }
 }
 

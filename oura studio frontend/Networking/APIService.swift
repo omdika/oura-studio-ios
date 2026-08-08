@@ -336,11 +336,11 @@ class APIService: ObservableObject {
             reorderMinQty: basic.reorderMinQty,
             isArchived: basic.isArchived,
             currentStockQty: basic.currentStockQty,
-            productionStockQty: 0,
-            manualStockQty: 0,
-            latestHppBreakdown: nil,
+            productionStockQty: basic.productionStockQty ?? 0,
+            manualStockQty: basic.manualStockQty ?? 0,
+            latestHppBreakdown: basic.latestHppBreakdown,
             sellingPrice: basic.sellingPrice,
-            marginPct: nil
+            marginPct: basic.marginPct
         )
     }
 
