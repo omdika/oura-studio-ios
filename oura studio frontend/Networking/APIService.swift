@@ -534,10 +534,9 @@ class APIService: ObservableObject {
         )
     }
 
-    func confirmBatch(id: UUID) async throws -> ProductionBatch {
+    func confirmBatch(id: UUID) async throws {
         if useMock { return try await MockAPIService.shared.confirmBatch(id: id) }
-        let raw: BackendProductionBatch = try await postNoBody(path: "/production-batches/\(id)/confirm")
-        return try await enrichProductionBatches([raw])[0]
+        try await postNoBodyVoid(path: "/production-batches/\(id)/confirm")
     }
 
     func getProductionBatch(id: UUID) async throws -> ProductionBatch {

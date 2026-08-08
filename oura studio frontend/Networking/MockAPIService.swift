@@ -926,7 +926,7 @@ class MockAPIService {
         return _productionBatches[bIdx].items[iIdx]
     }
 
-    func confirmBatch(id: UUID) async throws -> ProductionBatch {
+    func confirmBatch(id: UUID) async throws {
         await delay()
         guard let idx = _productionBatches.firstIndex(where: { $0.id == id }) else {
             throw APIError.serverError(404, "Batch tidak ditemukan")
@@ -983,7 +983,6 @@ class MockAPIService {
             }
         }
 
-        return confirmed
     }
 
     func getProductionBatch(id: UUID) async throws -> ProductionBatch {

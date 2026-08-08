@@ -173,7 +173,7 @@ struct ProduksiBatchView: View {
 
     private func confirm(_ batch: ProductionBatch) async {
         do {
-            _ = try await api.confirmBatch(id: batch.id)
+            try await api.confirmBatch(id: batch.id)
             await load()
         } catch {
             errorMsg = error.localizedDescription
