@@ -278,7 +278,7 @@ struct ProdukVariantRow: View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
-                    Text(size.fabricVariantName ?? size.sizeLabel)
+                    Text([size.fabricVariantName, size.sizeLabel].compactMap { $0 }.joined(separator: " · "))
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(OuraTheme.Colors.textPrimary)
                     if size.isLowStock {
@@ -334,6 +334,9 @@ struct ProdukSizeGroupView: View {
     @State private var errorMsg: String?
 
     private var totalStock: Int { variants.reduce(0) { $0 + $1.currentStockQty } }
+    // Only show variants that have an explicit fabric — null-fabric sizes are placeholder records
+    // that look confusing in this view (they render as "L | 0 pcs" inside the "L" group page).
+    private var displayedVariants: [ProductSizeDetail] { variants.filter { $0.fabricVariantName != nil } }
 
     var body: some View {
         ScrollView {
@@ -386,7 +389,7 @@ struct ProdukSizeGroupView: View {
             }
             Divider().overlay(OuraTheme.Colors.separator)
             HStack {
-                groupInfoCell("Varian Kain", value: "\(variants.count)")
+                groupInfoCell("Varian Kain", value: "\(displayedVariants.count)")
                 Spacer()
                 groupInfoCell("Total Stok", value: "\(totalStock) pcs")
             }
@@ -424,7 +427,7 @@ struct ProdukSizeGroupView: View {
 
             if isLoading {
                 ProgressView().frame(maxWidth: .infinity).padding()
-            } else if variants.isEmpty {
+            } else if displayedVariants.isEmpty {
                 Text("Belum ada varian kain")
                     .font(.system(size: 14))
                     .foregroundStyle(OuraTheme.Colors.textTertiary)
@@ -434,7 +437,7 @@ struct ProdukSizeGroupView: View {
                     .padding(.horizontal, OuraTheme.Spacing.horizontal)
             } else {
                 VStack(spacing: 0) {
-                    ForEach(Array(variants.enumerated()), id: \.element.id) { idx, variant in
+                    ForEach(Array(displayedVariants.enumerated()), id: \.element.id) { idx, variant in
                         NavigationLink(destination: ProdukSizeDetailView(productSize: variant)) {
                             ProdukVariantRow(size: variant)
                         }
@@ -446,7 +449,7 @@ struct ProdukSizeGroupView: View {
                                 Label("Arsip", systemImage: "archivebox")
                             }
                         }
-                        if idx < variants.count - 1 {
+                        if idx < displayedVariants.count - 1 {
                             Divider()
                                 .padding(.leading, 16)
                                 .overlay(OuraTheme.Colors.separator)
