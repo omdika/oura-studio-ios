@@ -604,7 +604,8 @@ class APIService: ObservableObject {
                     hppHardware: item.hppHardware ?? 0,
                     hppLabor: item.hppLabor ?? 0,
                     hppOverhead: item.hppOverhead ?? 0,
-                    hppTotal: item.hppTotal ?? 0
+                    hppTotal: item.hppTotal ?? 0,
+                    latestHppBreakdown: entry?.size.latestHppBreakdown
                 )
             }
             return ProductionBatch(

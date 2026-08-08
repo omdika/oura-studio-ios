@@ -55,6 +55,8 @@ struct ProductionBatchItem: Codable, Identifiable {
     let hppLabor: Double
     let hppOverhead: Double
     let hppTotal: Double
+    // Enriched client-side from ProductSizeBasic — not decoded from backend JSON
+    var latestHppBreakdown: HPPBreakdown? = nil
 
     enum CodingKeys: String, CodingKey {
         case id
