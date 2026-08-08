@@ -1,0 +1,365 @@
+import SwiftUI
+
+struct BahanDetailView: View {
+    @EnvironmentObject private var api: APIService
+    @Environment(\.dismiss) private var dismiss
+
+    let material: Material
+
+    @State private var purchases: [MaterialPurchase] = []
+    @State private var usageEntries: [MaterialUsageEntry] = []
+    @State private var allProducts: [Product] = []
+    @State private var isLoading = true
+    @State private var showTambah = false
+    @State private var editingPurchase: MaterialPurchase? = nil
+    @State private var navigatingProduct: Product? = nil
+
+    // MARK: - Derived
+
+    private var avgCostLabel: String {
+        let val = material.currentAvgCost
+        let unit = material.category == .fabric ? "/m" : "/\(material.usageUnit)"
+        return "avg \(val.rupiahFormatted)\(unit)"
+    }
+
+    private var stockMovements: [StockMovement] {
+        var moves: [StockMovement] = []
+        for p in purchases {
+            moves.append(StockMovement(
+                date: p.purchasedAt,
+                description: "Pembelian\(p.supplierName.map { " dari \($0)" } ?? "")",
+                delta: "+\(purchaseQtyDisplay(p))",
+                isPositive: true,
+                productSku: nil
+            ))
+        }
+        for u in usageEntries {
+            moves.append(StockMovement(
+                date: u.date,
+                description: u.description,
+                delta: String(format: "-%.0f cm", u.deductedCm),
+                isPositive: false,
+                productSku: u.productSku
+            ))
+        }
+        return moves.sorted { $0.date < $1.date }
+    }
+
+    private func purchaseQtyDisplay(_ p: MaterialPurchase) -> String {
+        if let l = p.lengthCm, let w = p.widthCm {
+            return String(format: "%.0f × %.0f cm", w, l)
+        }
+        if let q = p.qty { return String(format: "%g \(material.purchaseUnit)", q) }
+        return "-"
+    }
+
+    // MARK: - Body
+
+    var body: some View {
+        VStack(spacing: 0) {
+            detailTopBar
+            Divider().overlay(OuraTheme.Colors.separator)
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    HStack {
+                        OuraTag(text: material.category.displayName, color: categoryColor, bg: categoryBg)
+                        Spacer()
+                    }
+                    .padding(.horizontal, OuraTheme.Spacing.horizontal)
+                    .padding(.top, 16)
+                    .padding(.bottom, 20)
+
+                    addButton
+                        .padding(.horizontal, OuraTheme.Spacing.horizontal)
+                        .padding(.bottom, 24)
+
+                    purchasesSection
+                        .padding(.horizontal, OuraTheme.Spacing.horizontal)
+                        .padding(.bottom, 24)
+
+                    if !stockMovements.isEmpty {
+                        pergerakanStokSection
+                            .padding(.horizontal, OuraTheme.Spacing.horizontal)
+                            .padding(.bottom, 32)
+                    }
+                }
+            }
+        }
+        .background(OuraTheme.Colors.background)
+        .toolbar(.hidden, for: .navigationBar)
+        .task { await loadPurchases() }
+        .sheet(isPresented: $showTambah, onDismiss: { Task { await loadPurchases() } }) {
+            TambahPembelianSheet(preselectedMaterial: material)
+        }
+        .sheet(item: $editingPurchase) { purchase in
+            EditPembelianSheet(
+                material: material,
+                purchase: purchase,
+                onUpdated: { updated in
+                    if let idx = purchases.firstIndex(where: { $0.id == updated.id }) {
+                        purchases[idx] = updated
+                    }
+                },
+                onDeleted: { [purchaseId = purchase.id] in
+                    purchases.removeAll { $0.id == purchaseId }
+                }
+            )
+        }
+        .sheet(item: $navigatingProduct) { product in
+            ProdukDetailView(product: product)
+                .environmentObject(api)
+        }
+    }
+
+    // MARK: - Top bar
+
+    private var detailTopBar: some View {
+        HStack(spacing: 12) {
+            Button { dismiss() } label: {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(OuraTheme.Colors.accent)
+                    .frame(width: 34, height: 34)
+                    .background(OuraTheme.Colors.accentLight)
+                    .clipShape(Circle())
+            }
+            .buttonStyle(.plain)
+
+            Text(material.name)
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(OuraTheme.Colors.textPrimary)
+                .lineLimit(1)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            Text(avgCostLabel)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(OuraTheme.Colors.accent)
+                .padding(.horizontal, 9)
+                .padding(.vertical, 5)
+                .background(OuraTheme.Colors.accentLight)
+                .clipShape(Capsule())
+        }
+        .padding(.horizontal, OuraTheme.Spacing.horizontal)
+        .padding(.vertical, 10)
+        .background(OuraTheme.Colors.background)
+    }
+
+    // MARK: - Add button (outlined pill)
+
+    private var addButton: some View {
+        Button { showTambah = true } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "plus")
+                    .font(.system(size: 13, weight: .semibold))
+                Text("Tambah Pembelian")
+                    .font(.system(size: 14, weight: .semibold))
+            }
+            .foregroundStyle(OuraTheme.Colors.accent)
+            .padding(.horizontal, 18)
+            .padding(.vertical, 9)
+            .overlay(
+                Capsule()
+                    .stroke(OuraTheme.Colors.accent, lineWidth: 1.5)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - Purchases section
+
+    private var purchasesSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            OuraSectionHeader(title: "Riwayat Pembelian")
+
+            if isLoading {
+                ProgressView()
+                    .frame(maxWidth: .infinity)
+                    .padding()
+            } else if purchases.isEmpty {
+                Text("Belum ada pembelian tercatat")
+                    .font(.system(size: 14))
+                    .foregroundStyle(OuraTheme.Colors.textTertiary)
+                    .padding()
+                    .frame(maxWidth: .infinity)
+                    .ouraCard()
+            } else {
+                VStack(spacing: 0) {
+                    ForEach(Array(purchases.enumerated()), id: \.element.id) { idx, purchase in
+                        Button { editingPurchase = purchase } label: {
+                            PurchaseRow(purchase: purchase, material: material)
+                        }
+                        .buttonStyle(.plain)
+                        if idx < purchases.count - 1 {
+                            Divider()
+                                .padding(.leading, 16)
+                                .overlay(OuraTheme.Colors.separator)
+                        }
+                    }
+                }
+                .ouraCard()
+            }
+        }
+    }
+
+    // MARK: - Pergerakan Stok section
+
+    private var pergerakanStokSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            OuraSectionHeader(title: "Pergerakan Stok")
+
+            VStack(spacing: 0) {
+                ForEach(Array(stockMovements.enumerated()), id: \.offset) { idx, move in
+                    movementRow(move)
+                    if idx < stockMovements.count - 1 {
+                        Divider()
+                            .padding(.leading, 16)
+                            .overlay(OuraTheme.Colors.separator)
+                    }
+                }
+            }
+            .ouraCard()
+        }
+    }
+
+    private func movementRow(_ move: StockMovement) -> some View {
+        let content = HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(move.description)
+                    .font(.system(size: 14))
+                    .foregroundStyle(OuraTheme.Colors.textPrimary)
+                Text(move.date, style: .date)
+                    .font(.system(size: 12))
+                    .foregroundStyle(OuraTheme.Colors.textTertiary)
+            }
+            Spacer()
+            Text(move.delta)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(move.isPositive ? OuraTheme.Colors.greenAccent : OuraTheme.Colors.dangerText)
+            if move.productSku != nil {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(OuraTheme.Colors.textTertiary)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 13)
+
+        return Group {
+            if let sku = move.productSku,
+               let product = allProducts.first(where: { $0.sku == sku }) {
+                Button { navigatingProduct = product } label: { content }
+                    .buttonStyle(.plain)
+            } else {
+                content
+            }
+        }
+    }
+
+    // MARK: - Helpers
+
+    private var categoryColor: Color {
+        switch material.category {
+        case .fabric:    return OuraTheme.Colors.blueAccent
+        case .thread:    return OuraTheme.Colors.greenAccent
+        case .hardware:  return OuraTheme.Colors.warningText
+        case .packaging: return OuraTheme.Colors.purple
+        }
+    }
+
+    private var categoryBg: Color {
+        switch material.category {
+        case .fabric:    return OuraTheme.Colors.blueBg
+        case .thread:    return OuraTheme.Colors.greenBg
+        case .hardware:  return OuraTheme.Colors.warningBg
+        case .packaging: return OuraTheme.Colors.purpleBg
+        }
+    }
+
+    private func loadPurchases() async {
+        isLoading = true
+        async let purchasesTask = api.getPurchases(materialId: material.id)
+        async let usageTask     = api.getMaterialUsage(materialId: material.id)
+        async let productsTask  = api.getProducts()
+        purchases    = (try? await purchasesTask) ?? []
+        usageEntries = (try? await usageTask) ?? []
+        allProducts  = (try? await productsTask) ?? []
+        isLoading = false
+    }
+}
+
+// MARK: - Stock movement model (local, derived from purchases)
+
+private struct StockMovement {
+    let date: Date
+    let description: String
+    let delta: String
+    let isPositive: Bool
+    let productSku: String?
+}
+
+// MARK: - Purchase row
+
+private struct PurchaseRow: View {
+    let purchase: MaterialPurchase
+    let material: Material
+
+    private var dateLabel: String {
+        let fmt = DateFormatter()
+        fmt.locale = Locale(identifier: "id_ID")
+        fmt.dateFormat = "d MMM yyyy"
+        return fmt.string(from: purchase.purchasedAt)
+    }
+
+    private var dimensionLabel: String {
+        if let l = purchase.lengthCm, let w = purchase.widthCm {
+            return String(format: "%.0f × %.0f cm", w, l)
+        }
+        if let q = purchase.qty { return String(format: "%g \(material.purchaseUnit)", q) }
+        return "-"
+    }
+
+    var body: some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 5) {
+                Text(dateLabel)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(OuraTheme.Colors.textPrimary)
+                HStack(spacing: 4) {
+                    if let sup = purchase.supplierName {
+                        Text(sup)
+                            .font(.system(size: 12))
+                            .foregroundStyle(OuraTheme.Colors.textSecondary)
+                        Text("·")
+                            .foregroundStyle(OuraTheme.Colors.textTertiary)
+                    }
+                    Text(dimensionLabel)
+                        .font(.system(size: 12))
+                        .foregroundStyle(OuraTheme.Colors.textSecondary)
+                    if let label = purchase.packageLabel {
+                        Text("·")
+                            .foregroundStyle(OuraTheme.Colors.textTertiary)
+                        Text(label)
+                            .font(.system(size: 12))
+                            .foregroundStyle(OuraTheme.Colors.textSecondary)
+                    }
+                }
+            }
+            Spacer()
+            VStack(alignment: .trailing, spacing: 5) {
+                Text(purchase.totalCost.rupiahFormatted)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(OuraTheme.Colors.textPrimary)
+                if purchase.isConsumed {
+                    OuraTag(
+                        text: "Sudah dipakai",
+                        color: OuraTheme.Colors.textTertiary,
+                        bg: OuraTheme.Colors.border
+                    )
+                }
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 13)
+    }
+}

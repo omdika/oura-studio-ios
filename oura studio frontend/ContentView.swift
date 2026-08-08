@@ -1,24 +1,20 @@
-//
-//  ContentView.swift
-//  oura studio frontend
-//
-//  Created by handika on 29/07/26.
-//
-
 import SwiftUI
 
 struct ContentView: View {
-    var body: some View {
-        VStack {
-            Image(systemName: "globe")
-                .imageScale(.large)
-                .foregroundStyle(.tint)
-            Text("Hello, world!")
-        }
-        .padding()
-    }
-}
+    @EnvironmentObject private var appState: AppState
 
-#Preview {
-    ContentView()
+    var body: some View {
+        Group {
+            if appState.isCheckingAuth {
+                ProgressView()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(OuraTheme.Colors.background)
+            } else if appState.isAuthenticated {
+                MainTabView()
+            } else {
+                LoginView()
+            }
+        }
+        .animation(.easeInOut(duration: 0.25), value: appState.isAuthenticated)
+    }
 }

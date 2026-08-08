@@ -6,6 +6,11 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		262AB44F301A07A10064A438 /* .claude in Resources */ = {isa = PBXBuildFile; fileRef = 262AB44E301A07A10064A438 /* .claude */; };
+		262AB451301A07A90064A438 /* doc in Resources */ = {isa = PBXBuildFile; fileRef = 262AB450301A07A90064A438 /* doc */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		262AB420301A072C0064A438 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -27,6 +32,8 @@
 		262AB412301A072A0064A438 /* oura studio frontend.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "oura studio frontend.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		262AB41F301A072C0064A438 /* oura studio frontendTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "oura studio frontendTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		262AB429301A072C0064A438 /* oura studio frontendUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "oura studio frontendUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		262AB44E301A07A10064A438 /* .claude */ = {isa = PBXFileReference; lastKnownFileType = folder; path = .claude; sourceTree = "<group>"; };
+		262AB450301A07A90064A438 /* doc */ = {isa = PBXFileReference; lastKnownFileType = folder; path = doc; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -75,6 +82,8 @@
 		262AB409301A072A0064A438 = {
 			isa = PBXGroup;
 			children = (
+				262AB450301A07A90064A438 /* doc */,
+				262AB44E301A07A10064A438 /* .claude */,
 				262AB414301A072A0064A438 /* oura studio frontend */,
 				262AB422301A072C0064A438 /* oura studio frontendTests */,
 				262AB42C301A072C0064A438 /* oura studio frontendUITests */,
@@ -212,6 +221,8 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				262AB451301A07A90064A438 /* doc in Resources */,
+				262AB44F301A07A10064A438 /* .claude in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
