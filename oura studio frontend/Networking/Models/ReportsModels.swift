@@ -133,11 +133,12 @@ struct DashboardSummary: Codable {
     let todayProfit: Double
     let todayOrderCount: Int
     let todayUnitsSold: Int
-    let monthRevenue: Double
-    let monthOrders: Int
-    let monthUnitsSold: Int
-    let monthBatchesConfirmed: Int
-    let avgMarginPct: Double
+    // Backend may omit month-level stats — treated as optional until implemented
+    let monthRevenue: Double?
+    let monthOrders: Int?
+    let monthUnitsSold: Int?
+    let monthBatchesConfirmed: Int?
+    let avgMarginPct: Double?
     let lowStockAlerts: [LowStockAlert]
 
     enum CodingKeys: String, CodingKey {
