@@ -22,6 +22,13 @@ struct BahanDetailView: View {
         return "avg \(val.rupiahFormatted)\(unit)"
     }
 
+    private var totalRemainingCm: Double? {
+        guard !isLoading, !purchases.isEmpty else { return nil }
+        let withRemaining = purchases.compactMap { $0.remainingLengthCm }
+        guard !withRemaining.isEmpty else { return nil }
+        return withRemaining.reduce(0, +)
+    }
+
     private var stockMovements: [StockMovement] {
         var moves: [StockMovement] = []
         for p in purchases {
@@ -65,6 +72,16 @@ struct BahanDetailView: View {
                     HStack {
                         OuraTag(text: material.category.displayName, color: categoryColor, bg: categoryBg)
                         Spacer()
+                        if let sisa = totalRemainingCm {
+                            let sisaLabel = String(format: "Sisa %.0f cm", sisa)
+                            Text(sisaLabel)
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(sisa > 0 ? OuraTheme.Colors.greenAccent : OuraTheme.Colors.dangerText)
+                                .padding(.horizontal, 9)
+                                .padding(.vertical, 5)
+                                .background(sisa > 0 ? OuraTheme.Colors.greenBg : OuraTheme.Colors.dangerBg)
+                                .clipShape(Capsule())
+                        }
                     }
                     .padding(.horizontal, OuraTheme.Spacing.horizontal)
                     .padding(.top, 16)
@@ -319,6 +336,22 @@ private struct PurchaseRow: View {
         return "-"
     }
 
+    @ViewBuilder
+    private var remainingStatusTag: some View {
+        if let remaining = purchase.remainingLengthCm, let length = purchase.lengthCm {
+            if remaining <= 0 {
+                OuraTag(text: "Habis", color: OuraTheme.Colors.dangerText, bg: OuraTheme.Colors.dangerBg)
+            } else if remaining < length {
+                OuraTag(
+                    text: String(format: "Sisa %.0f cm", remaining),
+                    color: OuraTheme.Colors.warningText,
+                    bg: OuraTheme.Colors.warningBg
+                )
+            }
+            // remaining == length → belum terpakai, tidak perlu tag
+        }
+    }
+
     var body: some View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 5) {
@@ -350,13 +383,7 @@ private struct PurchaseRow: View {
                 Text(purchase.totalCost.rupiahFormatted)
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(OuraTheme.Colors.textPrimary)
-                if purchase.isConsumed {
-                    OuraTag(
-                        text: "Sudah dipakai",
-                        color: OuraTheme.Colors.textTertiary,
-                        bg: OuraTheme.Colors.border
-                    )
-                }
+                remainingStatusTag
             }
         }
         .padding(.horizontal, 16)

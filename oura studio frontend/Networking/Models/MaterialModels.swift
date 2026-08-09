@@ -137,6 +137,13 @@ struct MaterialPurchase: Codable, Identifiable {
         return false
     }
 
+    var isFullyConsumed: Bool {
+        if let remaining = remainingLengthCm { return remaining <= 0 }
+        return false
+    }
+
+    var isPartiallyConsumed: Bool { isConsumed && !isFullyConsumed }
+
     var unitCost: Double {
         if let length = lengthCm, let width = widthCm, length > 0, width > 0 {
             return totalCost / length
