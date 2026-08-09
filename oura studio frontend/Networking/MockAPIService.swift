@@ -246,8 +246,8 @@ class MockAPIService {
         typealias RawItem = (UUID, String, String, Int, Double, Double)
         func makeOrder(_ id: UUID, _ inv: String, _ daysAgo: Int, _ rawItems: [RawItem]) -> SalesOrder {
             let items = rawItems.map { (sizeId, name, label, qty, price, hpp) in
-                SalesOrderItem(id: UUID(), salesOrderId: id,
-                               productSizeId: sizeId, productName: name, sizeLabel: label,
+                SalesOrderItem(id: UUID(), productSizeId: sizeId,
+                               salesOrderId: id, productName: name, sizeLabel: label,
                                qty: qty, unitPrice: price, discount: 0,
                                unitHppSnapshot: hpp, lineProfit: (price - hpp) * Double(qty))
             }
@@ -1214,10 +1214,10 @@ class MockAPIService {
             let hpp = sizeDetail?.latestHppBreakdown?.total ?? 0
             let effectivePrice = item.unitPrice - (item.discount ?? 0)
             let profit = (effectivePrice - hpp) * Double(item.qty)
-            return SalesOrderItem(id: UUID(), salesOrderId: UUID(),
-                                  productSizeId: item.productSizeId,
-                                  productName: sizeDetail?.productName ?? "",
-                                  sizeLabel: sizeDetail?.sizeLabel ?? "",
+            return SalesOrderItem(id: UUID(), productSizeId: item.productSizeId,
+                                  salesOrderId: UUID(),
+                                  productName: sizeDetail?.productName,
+                                  sizeLabel: sizeDetail?.sizeLabel,
                                   qty: item.qty, unitPrice: item.unitPrice,
                                   discount: item.discount ?? 0,
                                   unitHppSnapshot: hpp, lineProfit: profit)
@@ -1330,10 +1330,10 @@ class MockAPIService {
         let startOfMonth = cal.date(from: cal.dateComponents([.year, .month], from: Date())) ?? Date()
         let todayOrders = _salesOrders.filter { cal.isDateInToday($0.soldAt) }
         let monthOrders = _salesOrders.filter { $0.soldAt >= startOfMonth }
-        let todayRevenue = todayOrders.reduce(0.0) { $0 + $1.totalRevenue }
-        let todayProfit = todayOrders.reduce(0.0) { $0 + $1.totalProfit }
+        let todayRevenue = todayOrders.reduce(0.0) { $0 + $1.displayRevenue }
+        let todayProfit = todayOrders.reduce(0.0) { $0 + $1.displayProfit }
         let todayUnits = todayOrders.flatMap { $0.items }.reduce(0) { $0 + $1.qty }
-        let monthRevenue = monthOrders.reduce(0.0) { $0 + $1.totalRevenue }
+        let monthRevenue = monthOrders.reduce(0.0) { $0 + $1.displayRevenue }
         let monthUnits = monthOrders.flatMap { $0.items }.reduce(0) { $0 + $1.qty }
         let allSizes = _productSizes.values.flatMap { $0 }
         let avgMargin = allSizes.compactMap { $0.marginPct }.reduce(0.0, +) / Double(max(1, allSizes.compactMap { $0.marginPct }.count))
@@ -1363,8 +1363,8 @@ class MockAPIService {
         for order in _salesOrders where order.status != "cancelled" {
             let day = cal.startOfDay(for: order.soldAt)
             guard day >= startDay && day <= endDay else { continue }
-            revenueByDay[day, default: 0] += order.totalRevenue
-            profitByDay[day,  default: 0] += order.totalProfit
+            revenueByDay[day, default: 0] += order.displayRevenue
+            profitByDay[day,  default: 0] += order.displayProfit
             countByDay[day,   default: 0] += 1
         }
 

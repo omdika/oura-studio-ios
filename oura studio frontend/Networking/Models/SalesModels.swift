@@ -25,8 +25,9 @@ struct SalesOrder: Codable, Identifiable {
     let status: String
     let soldAt: Date
     let items: [SalesOrderItem]
-    let totalRevenue: Double
-    let totalProfit: Double
+    // Backend may omit these — fall back to computing from items
+    let totalRevenue: Double?
+    let totalProfit: Double?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -43,14 +44,18 @@ struct SalesOrder: Codable, Identifiable {
 
     var isCancelled: Bool { status == "cancelled" }
     var isPaid: Bool { status == "paid" }
+
+    var displayRevenue: Double { totalRevenue ?? items.reduce(0) { $0 + $1.lineRevenue } }
+    var displayProfit: Double { totalProfit ?? items.reduce(0) { $0 + $1.lineProfit } }
 }
 
 struct SalesOrderItem: Codable, Identifiable {
     let id: UUID
-    let salesOrderId: UUID
     let productSizeId: UUID
-    let productName: String
-    let sizeLabel: String
+    // Backend omits these — enriched client-side or shown as fallback
+    var salesOrderId: UUID? = nil
+    var productName: String? = nil
+    var sizeLabel: String? = nil
     let qty: Int
     let unitPrice: Double
     let discount: Double
@@ -59,10 +64,8 @@ struct SalesOrderItem: Codable, Identifiable {
 
     enum CodingKeys: String, CodingKey {
         case id
-        case salesOrderId = "sales_order_id"
         case productSizeId = "product_size_id"
-        case productName = "product_name"
-        case sizeLabel = "size_label"
+        // salesOrderId, productName, sizeLabel intentionally omitted — not in backend response
         case qty
         case unitPrice = "unit_price"
         case discount

@@ -165,7 +165,7 @@ private struct OrderRow: View {
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 4) {
-                Text(order.totalRevenue.rupiahFormatted)
+                Text(order.displayRevenue.rupiahFormatted)
                     .font(.system(size: 14, weight: .bold))
                     .foregroundStyle(OuraTheme.Colors.textPrimary)
                 Image(systemName: "chevron.right")
@@ -239,7 +239,7 @@ private struct EditPenjualanSheet: View {
                     ForEach(order.items) { item in
                         HStack(spacing: 12) {
                             VStack(alignment: .leading, spacing: 3) {
-                                Text("\(item.productName) · \(item.sizeLabel)")
+                                Text("\(item.productName ?? "Produk") · \(item.sizeLabel ?? "-")")
                                     .font(.system(size: 14))
                                     .foregroundStyle(OuraTheme.Colors.textPrimary)
                                 HStack(spacing: 4) {
@@ -265,7 +265,7 @@ private struct EditPenjualanSheet: View {
                   footer: {
                       HStack {
                           Spacer()
-                          Text("Total: \(order.totalRevenue.rupiahFormatted)")
+                          Text("Total: \(order.displayRevenue.rupiahFormatted)")
                               .font(.system(size: 13, weight: .semibold))
                               .foregroundStyle(OuraTheme.Colors.textPrimary)
                       }
