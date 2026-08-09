@@ -7,8 +7,10 @@ struct ProdukSizeGroup: Identifiable {
     let variants: [ProductSizeDetail]
     public var id: String { sizeLabel }
     var totalStock: Int { variants.reduce(0) { $0 + $1.currentStockQty } }
-    var isAnyHabis: Bool { variants.contains { $0.currentStockQty == 0 } }
-    var isAnyMenipis: Bool { variants.contains { $0.isLowStock && $0.currentStockQty > 0 } }
+    // Variants shown in UI — excludes null-fabric placeholder records
+    var displayVariants: [ProductSizeDetail] { variants.filter { $0.fabricVariantName != nil } }
+    var isAnyHabis: Bool { displayVariants.contains { $0.currentStockQty == 0 } }
+    var isAnyMenipis: Bool { displayVariants.contains { $0.isLowStock && $0.currentStockQty > 0 } }
 }
 
 func makeSizeGroups(from sizes: [ProductSizeDetail]) -> [ProdukSizeGroup] {
@@ -248,9 +250,9 @@ private struct SizeGroupRow: View {
                                 bg: OuraTheme.Colors.warningBg)
                     }
                 }
-                Text(group.variants.count == 1
-                     ? (group.variants.first?.fabricVariantName ?? "1 varian")
-                     : "\(group.variants.count) varian kain")
+                Text(group.displayVariants.count == 1
+                     ? (group.displayVariants.first?.fabricVariantName ?? "1 varian")
+                     : "\(group.displayVariants.count) varian kain")
                     .font(.system(size: 12))
                     .foregroundStyle(OuraTheme.Colors.textSecondary)
             }
