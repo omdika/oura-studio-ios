@@ -112,9 +112,10 @@ private struct ProductGroupRow: View {
         let variants: [ProductSizeDetail]
         var id: String { sizeLabel }
         var totalStock: Int { variants.reduce(0) { $0 + $1.currentStockQty } }
-        var isAnyHabis: Bool { variants.contains { $0.currentStockQty == 0 } }
-        var isAnyMenipis: Bool { variants.contains { $0.isLowStock && $0.currentStockQty > 0 } }
-        var lowestPrice: Double? { variants.compactMap { $0.sellingPrice }.min() }
+        var displayVariants: [ProductSizeDetail] { variants.filter { $0.fabricVariantName != nil } }
+        var isAnyHabis: Bool { displayVariants.contains { $0.currentStockQty == 0 } }
+        var isAnyMenipis: Bool { displayVariants.contains { $0.isLowStock && $0.currentStockQty > 0 } }
+        var lowestPrice: Double? { displayVariants.compactMap { $0.sellingPrice }.min() }
     }
 
     private var groups: [SizeGroup] {
@@ -179,8 +180,8 @@ private struct ProductGroupRow: View {
                                                 color: OuraTheme.Colors.warningText,
                                                 bg: OuraTheme.Colors.warningBg)
                                     }
-                                    if group.variants.count > 1 {
-                                        Text("\(group.variants.count) varian")
+                                    if group.displayVariants.count > 1 {
+                                        Text("\(group.displayVariants.count) varian")
                                             .font(.system(size: 11))
                                             .foregroundStyle(OuraTheme.Colors.textTertiary)
                                     }
