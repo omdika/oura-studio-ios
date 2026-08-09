@@ -16,12 +16,14 @@ struct TambahPenjualanSheet: View {
     @State private var showProductPicker = false
     @State private var isSaving = false
     @State private var errorMsg: String?
+    @State private var stockAdjustTarget: SaleItem? = nil
 
     private struct SaleItem: Identifiable {
         let id = UUID()
         var sizeId: UUID
-        var displayName: String     // e.g. "Scrunchie · M · Satin Pelangi"
-        var maxQty: Int             // currentStockQty — hard cap
+        var productSku: String
+        var displayName: String
+        var maxQty: Int
         var qty: Double? = 1
         var unitPrice: Double? = nil
         var discount: Double? = nil
@@ -38,12 +40,14 @@ struct TambahPenjualanSheet: View {
 
     private var canSave: Bool {
         !items.isEmpty &&
-        items.allSatisfy { (Int($0.qty ?? 0)) > 0 && ($0.unitPrice ?? 0) > 0 }
+        items.allSatisfy {
+            let qty = Int($0.qty ?? 0)
+            return qty > 0 && qty <= $0.maxQty && ($0.unitPrice ?? 0) > 0
+        }
     }
 
     var body: some View {
         let content = Form {
-            // Info penjualan
             Section {
                 TextField("Nama pelanggan (opsional)", text: $customerName)
                     .listRowBackground(OuraTheme.Colors.surfaceCard)
@@ -77,7 +81,6 @@ struct TambahPenjualanSheet: View {
             } header: { OuraSectionHeader(title: "Info Penjualan") }
             .listSectionSeparator(.hidden)
 
-            // Produk dijual
             Section {
                 if items.isEmpty {
                     Text("Belum ada produk ditambahkan.")
@@ -100,7 +103,6 @@ struct TambahPenjualanSheet: View {
             } header: { OuraSectionHeader(title: "Produk Dijual") }
             .listSectionSeparator(.hidden)
 
-            // Total
             if totalRevenue > 0 {
                 Section {
                     HStack {
@@ -136,6 +138,7 @@ struct TambahPenjualanSheet: View {
             ) { size in
                 items.append(SaleItem(
                     sizeId: size.id,
+                    productSku: size.productSku,
                     displayName: "\(size.productName) · \(size.displayLabel)",
                     maxQty: size.currentStockQty,
                     qty: 1,
@@ -143,6 +146,19 @@ struct TambahPenjualanSheet: View {
                     discount: nil
                 ))
             }
+        }
+        .sheet(item: $stockAdjustTarget) { target in
+            QuickAdjustStokSheet(
+                sizeId: target.sizeId,
+                productSku: target.productSku,
+                displayName: target.displayName,
+                currentStock: target.maxQty
+            ) { newQty in
+                if let idx = items.firstIndex(where: { $0.id == target.id }) {
+                    items[idx].maxQty = newQty
+                }
+            }
+            .environmentObject(api)
         }
 
         NavigationStack {
@@ -165,7 +181,6 @@ struct TambahPenjualanSheet: View {
     @ViewBuilder
     private func itemCard(item: Binding<SaleItem>) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            // Header: name + remove button
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(item.wrappedValue.displayName)
@@ -187,12 +202,10 @@ struct TambahPenjualanSheet: View {
                         .font(.system(size: 20))
                         .foregroundStyle(OuraTheme.Colors.textTertiary)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.borderless)
             }
 
-            // Qty + Harga Satuan + Diskon — one aligned row, same label+box structure throughout
             HStack(alignment: .top, spacing: 10) {
-                // Qty column — matches CurrencyInputField visual exactly
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Qty")
                         .font(.system(size: 13, weight: .medium))
@@ -208,13 +221,13 @@ struct TambahPenjualanSheet: View {
                                 .frame(width: 26, height: 40)
                                 .contentShape(Rectangle())
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.borderless)
 
                         TextField("", text: Binding(
                             get: { item.wrappedValue.qty.map { "\(Int($0))" } ?? "" },
                             set: { str in
                                 if let v = Int(str), v > 0 {
-                                    item.wrappedValue.qty = Double(min(v, item.wrappedValue.maxQty))
+                                    item.wrappedValue.qty = Double(v)
                                 } else if str.isEmpty {
                                     item.wrappedValue.qty = nil
                                 }
@@ -228,7 +241,7 @@ struct TambahPenjualanSheet: View {
 
                         Button {
                             let cur = Int(item.wrappedValue.qty ?? 0)
-                            if cur < item.wrappedValue.maxQty { item.wrappedValue.qty = Double(cur + 1) }
+                            item.wrappedValue.qty = Double(cur + 1)
                         } label: {
                             Image(systemName: "chevron.up")
                                 .font(.system(size: 10, weight: .semibold))
@@ -236,7 +249,7 @@ struct TambahPenjualanSheet: View {
                                 .frame(width: 26, height: 40)
                                 .contentShape(Rectangle())
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.borderless)
                     }
                     .background(OuraTheme.Colors.surfaceSheet)
                     .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.medium))
@@ -250,6 +263,29 @@ struct TambahPenjualanSheet: View {
                 CurrencyInputField(label: "Harga Satuan", value: item.unitPrice)
                 CurrencyInputField(label: "Diskon", value: item.discount)
                     .frame(maxWidth: 100)
+            }
+
+            // Over-stock warning
+            if let qty = item.wrappedValue.qty, Int(qty) > item.wrappedValue.maxQty {
+                HStack(spacing: 6) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 11))
+                        .foregroundStyle(OuraTheme.Colors.warningText)
+                    Text("Stok tidak cukup (tersedia \(item.wrappedValue.maxQty) pcs)")
+                        .font(.system(size: 12))
+                        .foregroundStyle(OuraTheme.Colors.warningText)
+                    Spacer()
+                    Button("Tambah Stok") {
+                        stockAdjustTarget = item.wrappedValue
+                    }
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(OuraTheme.Colors.accent)
+                    .buttonStyle(.borderless)
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 7)
+                .background(OuraTheme.Colors.warningBg)
+                .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.small))
             }
         }
         .listRowBackground(OuraTheme.Colors.surfaceCard)
@@ -291,6 +327,94 @@ struct TambahPenjualanSheet: View {
     }
 }
 
+// MARK: - Quick stock adjustment sheet
+
+private struct QuickAdjustStokSheet: View {
+    @EnvironmentObject private var api: APIService
+    @Environment(\.dismiss) private var dismiss
+
+    let sizeId: UUID
+    let productSku: String
+    let displayName: String
+    let currentStock: Int
+    let onSuccess: (Int) -> Void
+
+    @State private var addQty: Double? = nil
+    @State private var isSaving = false
+    @State private var errorMsg: String? = nil
+
+    private var addQtyInt: Int { Int(addQty ?? 0) }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    LabeledContent("Produk", value: displayName)
+                        .listRowBackground(OuraTheme.Colors.surfaceCard)
+                    LabeledContent("Stok saat ini") {
+                        Text("\(currentStock) pcs")
+                            .foregroundStyle(OuraTheme.Colors.textPrimary)
+                    }
+                    .listRowBackground(OuraTheme.Colors.surfaceCard)
+                } header: { OuraSectionHeader(title: "Info Stok") }
+
+                Section {
+                    NumericInputField(label: "Jumlah yang ditambah (pcs)", value: $addQty)
+                        .listRowBackground(OuraTheme.Colors.surfaceCard)
+                        .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
+                } header: { OuraSectionHeader(title: "Tambah Stok") }
+                  footer: {
+                      if addQtyInt > 0 {
+                          Text("Stok baru: \(currentStock + addQtyInt) pcs")
+                              .font(.system(size: 12))
+                              .foregroundStyle(OuraTheme.Colors.textSecondary)
+                      }
+                  }
+
+                if let err = errorMsg {
+                    Section {
+                        Text(err)
+                            .font(.system(size: 13))
+                            .foregroundStyle(OuraTheme.Colors.dangerText)
+                            .listRowBackground(OuraTheme.Colors.dangerBg)
+                    }
+                }
+            }
+            .scrollContentBackground(.hidden)
+            .background(OuraTheme.Colors.background)
+            .navigationTitle("Tambah Stok")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Batal") { dismiss() }.foregroundStyle(OuraTheme.Colors.accent)
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Simpan") { Task { await save() } }
+                        .foregroundStyle(addQtyInt > 0 && !isSaving ? OuraTheme.Colors.accent : OuraTheme.Colors.textDisabled)
+                        .disabled(addQtyInt <= 0 || isSaving)
+                }
+            }
+        }
+        .presentationDetents([.medium])
+    }
+
+    private func save() async {
+        guard addQtyInt > 0 else { return }
+        isSaving = true; errorMsg = nil; defer { isSaving = false }
+        do {
+            let updated = try await api.adjustStock(
+                sku: productSku,
+                sizeId: sizeId,
+                qty: addQtyInt,
+                reason: "sales_adjustment"
+            )
+            onSuccess(updated.currentStockQty)
+            dismiss()
+        } catch let e as APIError { errorMsg = e.errorDescription }
+        catch { errorMsg = error.localizedDescription }
+    }
+}
+
 // MARK: - Product picker bottom sheet
 
 private struct ProductPickerSheet: View {
@@ -325,7 +449,6 @@ private struct ProductPickerSheet: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                // Search bar
                 HStack(spacing: 8) {
                     Image(systemName: "magnifyingglass")
                         .font(.system(size: 14))
