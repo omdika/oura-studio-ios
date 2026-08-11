@@ -4,36 +4,44 @@ struct ResepEditorView: View {
     @EnvironmentObject private var api: APIService
     @Environment(\.dismiss) private var dismiss
 
-    let spec: PatternSpec
+    let specs: [PatternSpec]
     var onUpdate: (() -> Void)?
 
-    @State private var currentSpec: PatternSpec
+    @State private var currentSpecs: [PatternSpec]
     @State private var isEditing = false
     @State private var showVersionHistory = false
     @State private var showDeleteAlert = false
     @State private var isSaving = false
     @State private var errorMsg: String?
 
-    // Fabric edit state — mirrors TambahResepSheet pattern
+    // Fabric edit state
     @State private var allMaterials: [Material] = []
+    @State private var allSizes: [ProductSizeDetail] = []
     @State private var editFabricIds: [UUID] = []
     @State private var fabricLengths: [UUID: Double] = [:]
     @State private var fabricWidths: [UUID: Double] = [:]
     @State private var fabricRotations: [UUID: Bool] = [:]
+    @State private var gabungkanResep: Bool = true
     @State private var editLaborMinutes: Double?
 
     // Component edit state
     @State private var editComponentIds: [UUID] = []
     @State private var componentQtys: [UUID: Double] = [:]
 
-    init(spec: PatternSpec, onUpdate: (() -> Void)? = nil) {
-        self.spec = spec
+    init(specs: [PatternSpec], onUpdate: (() -> Void)? = nil) {
+        self.specs = specs
         self.onUpdate = onUpdate
-        self._currentSpec = State(initialValue: spec)
+        self._currentSpecs = State(initialValue: specs)
     }
 
+    private var representative: PatternSpec { currentSpecs[0] }
+    private var groupIsInPlaceEdit: Bool { currentSpecs.allSatisfy { $0.isInPlaceEdit } }
+    private var groupCanDelete: Bool { currentSpecs.allSatisfy { $0.canDelete } }
+    private var allCurrentFabrics: [PatternFabric] { currentSpecs.flatMap { $0.fabrics } }
+
     private var canSave: Bool {
-        editFabricIds.allSatisfy { id in (fabricLengths[id] ?? 0) > 0 && (fabricWidths[id] ?? 0) > 0 }
+        !editFabricIds.isEmpty
+            && editFabricIds.allSatisfy { id in (fabricLengths[id] ?? 0) > 0 && (fabricWidths[id] ?? 0) > 0 }
             && editComponentIds.allSatisfy { id in (componentQtys[id] ?? 0) > 0 }
             && (editLaborMinutes ?? 0) > 0
     }
@@ -65,7 +73,7 @@ struct ResepEditorView: View {
                     }
                     .buttonStyle(.plain)
 
-                    if currentSpec.canDelete {
+                    if groupCanDelete {
                         Button { showDeleteAlert = true } label: {
                             HStack {
                                 Spacer()
@@ -96,10 +104,14 @@ struct ResepEditorView: View {
         .background(OuraTheme.Colors.background)
         .toolbar(.hidden, for: .navigationBar)
         .navigationDestination(isPresented: $showVersionHistory) {
-            ResepVersionHistoryView(productSizeId: spec.productSizeId, productName: spec.productName, sizeLabel: spec.sizeLabel)
+            ResepVersionHistoryView(
+                productSizeId: representative.productSizeId,
+                productName: representative.productName,
+                sizeLabel: representative.sizeLabel
+            )
         }
         .alert("Hapus Resep?", isPresented: $showDeleteAlert) {
-            Button("Hapus", role: .destructive) { Task { await deleteSpec() } }
+            Button("Hapus", role: .destructive) { Task { await deleteSpecs() } }
             Button("Batal", role: .cancel) {}
         } message: {
             Text("Resep ini belum dipakai di produksi manapun dan akan dihapus permanen.")
@@ -108,7 +120,7 @@ struct ResepEditorView: View {
     }
 
     private var saveButtonLabel: String {
-        currentSpec.isInPlaceEdit ? "Simpan Perubahan" : "Simpan Versi Baru"
+        groupIsInPlaceEdit ? "Simpan Perubahan" : "Simpan Versi Baru"
     }
 
     // MARK: - Top bar
@@ -125,7 +137,7 @@ struct ResepEditorView: View {
             }
             .buttonStyle(.plain)
 
-            Text("\(spec.productName) · \(spec.sizeLabel)")
+            Text("\(representative.productName) · \(representative.sizeLabel)")
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(OuraTheme.Colors.textPrimary)
                 .lineLimit(1)
@@ -158,7 +170,7 @@ struct ResepEditorView: View {
                     .foregroundStyle(OuraTheme.Colors.textTertiary)
                     .textCase(.uppercase)
                 Spacer()
-                if !currentSpec.isActive {
+                if !representative.isActive {
                     OuraTag(text: "Tidak Aktif", color: OuraTheme.Colors.textTertiary, bg: OuraTheme.Colors.border)
                 }
             }
@@ -166,11 +178,10 @@ struct ResepEditorView: View {
             Divider().overlay(OuraTheme.Colors.separator)
 
             if isEditing {
-                if !currentSpec.isInPlaceEdit {
+                if !groupIsInPlaceEdit {
                     versioningNotice
                 }
 
-                // Fabric multi-select — same pattern as TambahResepSheet
                 let availableFabrics = allMaterials.filter { $0.category == .fabric && !$0.isArchived }
                 TokenizedMultiSelectField(
                     label: "Kain yang Digunakan",
@@ -182,6 +193,23 @@ struct ResepEditorView: View {
                     for id in newIds where fabricRotations[id] == nil {
                         fabricRotations[id] = true
                     }
+                    if newIds.count < 2 { gabungkanResep = true }
+                }
+
+                if editFabricIds.count >= 2 {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Toggle("Gabungkan dalam satu resep", isOn: $gabungkanResep)
+                            .tint(OuraTheme.Colors.accent)
+                            .font(.system(size: 14))
+                        Text(gabungkanResep
+                            ? "Semua kain masuk ke satu resep untuk ukuran \(representative.sizeLabel). Tidak membuat varian produk terpisah."
+                            : "Setiap kain jadi resep sendiri-sendiri, masing-masing dengan varian produk tersendiri.")
+                            .font(.system(size: 12))
+                            .foregroundStyle(OuraTheme.Colors.textTertiary)
+                    }
+                    .padding(12)
+                    .background(gabungkanResep ? OuraTheme.Colors.accentLight : OuraTheme.Colors.surfaceCard)
+                    .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.medium))
                 }
 
                 ForEach(editFabricIds, id: \.self) { fabId in
@@ -222,28 +250,29 @@ struct ResepEditorView: View {
                 NumericInputField(label: "Estimasi Kerja (menit)", value: $editLaborMinutes, unit: "min")
 
             } else {
-                // Display mode — uses currentSpec so it reflects the latest saved state
-                if currentSpec.fabrics.isEmpty {
+                // Display mode — show all fabrics from all specs in the group
+                if allCurrentFabrics.isEmpty {
                     infoRow("Kain", value: "Tanpa Kain")
                 } else {
-                    ForEach(currentSpec.fabrics) { fabric in
+                    ForEach(allCurrentFabrics) { fabric in
                         infoRow("Kain", value: fabric.materialName)
                         infoRow("Dimensi", value: String(format: "%.0f × %.0f cm", fabric.cutLengthCm, fabric.cutWidthCm))
                         infoRow("Rotasi", value: fabric.rotationAllowed ? "Diizinkan" : "Tidak")
-                        if fabric.id != currentSpec.fabrics.last?.id {
+                        if fabric.id != allCurrentFabrics.last?.id {
                             Divider().overlay(OuraTheme.Colors.separator).padding(.vertical, 2)
                         }
                     }
                 }
-                infoRow("Est. Kerja", value: String(format: "%.0f menit", currentSpec.estLaborMinutes))
+                infoRow("Est. Kerja", value: String(format: "%.0f menit", representative.estLaborMinutes))
             }
 
             Divider().overlay(OuraTheme.Colors.separator)
-            infoRow("Aktif Sejak", value: currentSpec.effectiveFrom.formatted(.dateTime.day().month().year()))
-            if let to = currentSpec.effectiveTo {
+            infoRow("Aktif Sejak", value: representative.effectiveFrom.formatted(.dateTime.day().month().year()))
+            if let to = representative.effectiveTo {
                 infoRow("Berlaku Hingga", value: to.formatted(.dateTime.day().month().year()))
             }
-            infoRow("Dipakai di", value: "\(currentSpec.usedInBatchCount) produksi")
+            let totalUsed = currentSpecs.map { $0.usedInBatchCount }.max() ?? 0
+            infoRow("Dipakai di", value: "\(totalUsed) produksi")
         }
         .padding(OuraTheme.Spacing.cardPad)
         .ouraCard()
@@ -259,7 +288,8 @@ struct ResepEditorView: View {
                 Text("Versi Baru Akan Dibuat")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(OuraTheme.Colors.blueAccent)
-                Text("Resep ini aktif sejak \(currentSpec.effectiveFrom.formatted(.dateTime.day().month().year())) dan sudah dipakai di \(currentSpec.usedInBatchCount) produksi. Batch sebelumnya tetap memakai biaya versi lama.")
+                let maxUsed = currentSpecs.map { $0.usedInBatchCount }.max() ?? 0
+                Text("Resep ini aktif sejak \(representative.effectiveFrom.formatted(.dateTime.day().month().year())) dan sudah dipakai di \(maxUsed) produksi. Batch sebelumnya tetap memakai biaya versi lama.")
                     .font(.system(size: 12))
                     .foregroundStyle(OuraTheme.Colors.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -304,12 +334,12 @@ struct ResepEditorView: View {
                     )
                 }
             } else {
-                if currentSpec.components.isEmpty {
+                if representative.components.isEmpty {
                     Text("Tidak ada komponen tambahan")
                         .font(.system(size: 13))
                         .foregroundStyle(OuraTheme.Colors.textTertiary)
                 } else {
-                    ForEach(currentSpec.components) { comp in
+                    ForEach(representative.components) { comp in
                         let unit = allMaterials.first { $0.id == comp.materialId }?.usageUnit ?? "pcs"
                         HStack {
                             Text(comp.materialName)
@@ -321,7 +351,7 @@ struct ResepEditorView: View {
                                 .foregroundStyle(OuraTheme.Colors.textSecondary)
                         }
                         .padding(.vertical, 2)
-                        if comp.id != currentSpec.components.last?.id {
+                        if comp.id != representative.components.last?.id {
                             Divider().overlay(OuraTheme.Colors.separator)
                         }
                     }
@@ -347,22 +377,30 @@ struct ResepEditorView: View {
     // MARK: - Actions
 
     private func startEdit() {
-        // Pre-populate from currentSpec so repeated edits reflect the last saved state
-        editFabricIds   = currentSpec.fabrics.map { $0.materialId }
-        fabricLengths   = Dictionary(uniqueKeysWithValues: currentSpec.fabrics.map { ($0.materialId, $0.cutLengthCm) })
-        fabricWidths    = Dictionary(uniqueKeysWithValues: currentSpec.fabrics.map { ($0.materialId, $0.cutWidthCm) })
-        fabricRotations = Dictionary(uniqueKeysWithValues: currentSpec.fabrics.map { ($0.materialId, $0.rotationAllowed) })
-        editLaborMinutes = currentSpec.estLaborMinutes
+        // Pre-populate from all specs in the group (each spec carries exactly one fabric)
+        editFabricIds = currentSpecs.compactMap { $0.fabrics.first?.materialId }
+        fabricLengths = Dictionary(uniqueKeysWithValues: currentSpecs.compactMap { spec -> (UUID, Double)? in
+            guard let fab = spec.fabrics.first else { return nil }
+            return (fab.materialId, fab.cutLengthCm)
+        })
+        fabricWidths = Dictionary(uniqueKeysWithValues: currentSpecs.compactMap { spec -> (UUID, Double)? in
+            guard let fab = spec.fabrics.first else { return nil }
+            return (fab.materialId, fab.cutWidthCm)
+        })
+        fabricRotations = Dictionary(uniqueKeysWithValues: currentSpecs.compactMap { spec -> (UUID, Bool)? in
+            guard let fab = spec.fabrics.first else { return nil }
+            return (fab.materialId, fab.rotationAllowed)
+        })
+        gabungkanResep   = true
+        editLaborMinutes = representative.estLaborMinutes
 
-        // Pre-populate component state
-        editComponentIds = currentSpec.components.map { $0.materialId }
-        componentQtys    = Dictionary(uniqueKeysWithValues: currentSpec.components.map { ($0.materialId, $0.qtyPerUnit) })
+        editComponentIds = representative.components.map { $0.materialId }
+        componentQtys    = Dictionary(uniqueKeysWithValues: representative.components.map { ($0.materialId, $0.qtyPerUnit) })
 
         withAnimation { isEditing = true }
     }
 
     private func saveEdits() async {
-        // Validate: each selected fabric must have both dimensions > 0
         let incomplFabrics = editFabricIds.filter { id in
             (fabricLengths[id] ?? 0) <= 0 || (fabricWidths[id] ?? 0) <= 0
         }
@@ -374,7 +412,6 @@ struct ResepEditorView: View {
             return
         }
 
-        // Validate: each selected component must have qty > 0
         let incomplComps = editComponentIds.filter { id in (componentQtys[id] ?? 0) <= 0 }
         if !incomplComps.isEmpty {
             let names = incomplComps
@@ -387,26 +424,88 @@ struct ResepEditorView: View {
         isSaving = true
         errorMsg = nil
         defer { isSaving = false }
+
         do {
-            let fabricInputs = editFabricIds.map { fabId in
-                CreatePatternSpecRequest.FabricInput(
-                    materialId: fabId,
-                    cutLengthCm: fabricLengths[fabId] ?? 0,
-                    cutWidthCm: fabricWidths[fabId] ?? 0,
-                    rotationAllowed: fabricRotations[fabId] ?? true
-                )
+            guard !editFabricIds.isEmpty else {
+                throw APIError.serverError(400, "Pilih setidaknya satu kain untuk resep ini.")
             }
             let compInputs = editComponentIds.map { matId in
                 CreatePatternSpecRequest.ComponentInput(materialId: matId, qtyPerUnit: componentQtys[matId] ?? 0)
             }
-            let req = CreatePatternSpecRequest(
-                productSizeId: currentSpec.productSizeId,
-                fabrics: fabricInputs,
-                estLaborMinutes: editLaborMinutes ?? currentSpec.estLaborMinutes,
-                components: compInputs
-            )
-            let updated = try await api.createOrUpdatePatternSpec(req)
-            currentSpec = updated
+
+            // Specs for fabrics that were removed during edit — delete if unused
+            let newFabricIdSet = Set(editFabricIds)
+            let specsToDelete = currentSpecs.filter { spec in
+                guard let fabId = spec.fabrics.first?.materialId else { return false }
+                return !newFabricIdSet.contains(fabId)
+            }
+
+            var savedSpecs: [PatternSpec] = []
+
+            if gabungkanResep || editFabricIds.count <= 1 {
+                // Gabungkan: all fabrics share the same productSizeId
+                for fabId in editFabricIds {
+                    let fabricInput = CreatePatternSpecRequest.FabricInput(
+                        materialId: fabId,
+                        cutLengthCm: fabricLengths[fabId] ?? 0,
+                        cutWidthCm: fabricWidths[fabId] ?? 0,
+                        rotationAllowed: fabricRotations[fabId] ?? true
+                    )
+                    let req = CreatePatternSpecRequest(
+                        productSizeId: representative.productSizeId,
+                        fabrics: [fabricInput],
+                        estLaborMinutes: editLaborMinutes ?? representative.estLaborMinutes,
+                        components: compInputs
+                    )
+                    let updated = try await api.createOrUpdatePatternSpec(req)
+                    savedSpecs.append(updated)
+                }
+            } else {
+                // Pisah: each fabric gets its own ProductSize with fabricVariantName
+                let baseProductId = allSizes.first { $0.id == representative.productSizeId }?.productId
+                for fabId in editFabricIds {
+                    guard let fabric = allMaterials.first(where: { $0.id == fabId }) else { continue }
+
+                    let targetSizeId: UUID
+                    if let existing = allSizes.first(where: {
+                        $0.productId == baseProductId &&
+                        $0.sizeLabel == representative.sizeLabel &&
+                        $0.fabricVariantName == fabric.name
+                    }) {
+                        targetSizeId = existing.id
+                    } else {
+                        let created = try await api.createProductSize(
+                            sku: representative.productSku,
+                            sizeLabel: representative.sizeLabel,
+                            fabricVariantName: fabric.name
+                        )
+                        allSizes.append(created)
+                        targetSizeId = created.id
+                    }
+
+                    let fabricInput = CreatePatternSpecRequest.FabricInput(
+                        materialId: fabId,
+                        cutLengthCm: fabricLengths[fabId] ?? 0,
+                        cutWidthCm: fabricWidths[fabId] ?? 0,
+                        rotationAllowed: fabricRotations[fabId] ?? true
+                    )
+                    let req = CreatePatternSpecRequest(
+                        productSizeId: targetSizeId,
+                        fabrics: [fabricInput],
+                        estLaborMinutes: editLaborMinutes ?? representative.estLaborMinutes,
+                        components: compInputs
+                    )
+                    let updated = try await api.createOrUpdatePatternSpec(req)
+                    savedSpecs.append(updated)
+                }
+            }
+
+            // Delete specs whose fabric was removed (only if unused in production)
+            for spec in specsToDelete where spec.canDelete {
+                try? await api.deletePatternSpec(id: spec.id)
+            }
+
+            if !savedSpecs.isEmpty { currentSpecs = savedSpecs }
             onUpdate?()
             withAnimation { isEditing = false }
         } catch let e as APIError {
@@ -416,9 +515,11 @@ struct ResepEditorView: View {
         }
     }
 
-    private func deleteSpec() async {
+    private func deleteSpecs() async {
         do {
-            try await api.deletePatternSpec(id: currentSpec.id)
+            for spec in currentSpecs {
+                try await api.deletePatternSpec(id: spec.id)
+            }
             onUpdate?()
             dismiss()
         } catch let e as APIError {
@@ -429,6 +530,9 @@ struct ResepEditorView: View {
     }
 
     private func loadMaterials() async {
-        allMaterials = (try? await api.getMaterials()) ?? []
+        async let mats  = api.getMaterials()
+        async let sizes = api.getAllProductSizes()
+        allMaterials = (try? await mats)  ?? []
+        allSizes     = (try? await sizes) ?? []
     }
 }

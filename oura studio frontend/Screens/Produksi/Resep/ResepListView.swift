@@ -1,5 +1,25 @@
 import SwiftUI
 
+// All PatternSpecs sharing the same productSizeId (gabungkan group, or single-fabric pisah spec)
+struct SpecGroup: Identifiable {
+    let productSizeId: UUID
+    let specs: [PatternSpec]
+
+    var id: UUID { productSizeId }
+    var sizeLabel: String { specs[0].sizeLabel }
+    var productName: String { specs[0].productName }
+    var productSku: String { specs[0].productSku }
+    var estLaborMinutes: Double { specs[0].estLaborMinutes }
+    var maxUsedInBatchCount: Int { specs.map { $0.usedInBatchCount }.max() ?? 0 }
+
+    var isSingleFabric: Bool { specs.count == 1 && specs[0].fabrics.count <= 1 }
+    var firstFabric: PatternFabric? { specs.flatMap { $0.fabrics }.first }
+    var allFabricNames: String {
+        let names = specs.flatMap { $0.fabrics }.map { $0.materialName }
+        return names.isEmpty ? "Tanpa Kain" : names.joined(separator: " · ")
+    }
+}
+
 struct ResepListView: View {
     @EnvironmentObject private var api: APIService
 
@@ -9,7 +29,7 @@ struct ResepListView: View {
     @State private var searchText: String = ""
     @State private var showTambah = false
 
-    private var grouped: [(product: String, specs: [PatternSpec])] {
+    private var grouped: [(product: String, groups: [SpecGroup])] {
         let filtered = searchText.isEmpty
             ? specs.filter { $0.isActive }
             : specs.filter { $0.isActive && (
@@ -18,9 +38,13 @@ struct ResepListView: View {
                 $0.fabricMaterialName.localizedCaseInsensitiveContains(searchText)
             )}
 
-        let dict = Dictionary(grouping: filtered, by: { $0.productName })
-        return dict.sorted { $0.key < $1.key }
-               .map { (product: $0.key, specs: $0.value.sorted { $0.sizeLabel < $1.sizeLabel }) }
+        let byProduct = Dictionary(grouping: filtered, by: { $0.productName })
+        return byProduct.sorted { $0.key < $1.key }.map { entry in
+            let specGroups = Dictionary(grouping: entry.value, by: { $0.productSizeId })
+                .map { SpecGroup(productSizeId: $0.key, specs: $0.value) }
+                .sorted { $0.sizeLabel < $1.sizeLabel }
+            return (product: entry.key, groups: specGroups)
+        }
     }
 
     var body: some View {
@@ -105,9 +129,12 @@ struct ResepListView: View {
         List {
             ForEach(grouped, id: \.product) { group in
                 Section {
-                    ForEach(group.specs) { spec in
-                        NavigationLink(destination: ResepEditorView(spec: spec, onUpdate: { Task { await load() } })) {
-                            ResepRow(spec: spec)
+                    ForEach(group.groups) { specGroup in
+                        NavigationLink(destination: ResepEditorView(
+                            specs: specGroup.specs,
+                            onUpdate: { Task { await load() } }
+                        )) {
+                            ResepRow(group: specGroup)
                         }
                         .listRowBackground(OuraTheme.Colors.surfaceCard)
                         .listRowInsets(EdgeInsets(top: 12, leading: 16, bottom: 12, trailing: 16))
@@ -182,28 +209,31 @@ struct ResepListView: View {
 // MARK: - Row
 
 private struct ResepRow: View {
-    let spec: PatternSpec
+    let group: SpecGroup
 
     var body: some View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 5) {
                 HStack(spacing: 6) {
-                    Text(spec.sizeLabel)
+                    Text(group.sizeLabel)
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(OuraTheme.Colors.textPrimary)
-                    OuraTag(text: String(format: "%.0f×%.0f cm", spec.cutLengthCm, spec.cutWidthCm))
+                    // Show dimension tag only for single-fabric rows (pisah)
+                    if group.isSingleFabric, let fab = group.firstFabric {
+                        OuraTag(text: String(format: "%.0f×%.0f cm", fab.cutLengthCm, fab.cutWidthCm))
+                    }
                 }
-                Text(spec.fabricMaterialName)
+                Text(group.allFabricNames)
                     .font(.system(size: 12))
                     .foregroundStyle(OuraTheme.Colors.textSecondary)
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 3) {
-                Text("\(spec.estLaborMinutes, specifier: "%.0f") min")
+                Text("\(group.estLaborMinutes, specifier: "%.0f") min")
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(OuraTheme.Colors.textTertiary)
-                if spec.usedInBatchCount > 0 {
-                    Text("\(spec.usedInBatchCount)× dipakai")
+                if group.maxUsedInBatchCount > 0 {
+                    Text("\(group.maxUsedInBatchCount)× dipakai")
                         .font(.system(size: 11))
                         .foregroundStyle(OuraTheme.Colors.textTertiary)
                 }

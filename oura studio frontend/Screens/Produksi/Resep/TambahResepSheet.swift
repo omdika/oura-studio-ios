@@ -401,22 +401,25 @@ struct TambahResepSheet: View {
 
         do {
             if selectedFabricIds.isEmpty || gabungkanResep {
-                // ── Gabungkan: all fabrics → ONE spec on the base size (no fabricVariantName split)
-                let fabricInputs = selectedFabricIds.map { fabId in
-                    CreatePatternSpecRequest.FabricInput(
+                // ── Gabungkan: one PatternSpec per fabric, all linked to base size (no fabricVariantName)
+                guard !selectedFabricIds.isEmpty else {
+                    throw APIError.serverError(400, "Pilih setidaknya satu kain untuk resep ini.")
+                }
+                for fabId in selectedFabricIds {
+                    let fabricInput = CreatePatternSpecRequest.FabricInput(
                         materialId: fabId,
                         cutLengthCm: fabricLengths[fabId] ?? 0,
                         cutWidthCm: fabricWidths[fabId] ?? 0,
                         rotationAllowed: fabricRotations[fabId] ?? true
                     )
+                    let req = CreatePatternSpecRequest(
+                        productSizeId: size.id,
+                        fabrics: [fabricInput],
+                        estLaborMinutes: laborMinutes ?? 0,
+                        components: components
+                    )
+                    _ = try await api.createOrUpdatePatternSpec(req)
                 }
-                let req = CreatePatternSpecRequest(
-                    productSizeId: size.id,
-                    fabrics: fabricInputs,
-                    estLaborMinutes: laborMinutes ?? 0,
-                    components: components
-                )
-                _ = try await api.createOrUpdatePatternSpec(req)
             } else {
                 // ── Pisah: one spec per fabric, each linked to its own (sizeLabel + fabricVariantName) size
                 for fabId in selectedFabricIds {
