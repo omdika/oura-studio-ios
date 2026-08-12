@@ -1,5 +1,25 @@
 import SwiftUI
 
+// MARK: — Dari Resep discovery model
+
+private struct ResepProductInfo: Identifiable {
+    let sku: String
+    let name: String
+    let sizes: [ProductSizeDetail]
+
+    var id: String { sku }
+    var totalStock: Int { sizes.reduce(0) { $0 + $1.currentStockQty } }
+    var uniqueSizeLabels: String {
+        var seen = Set<String>()
+        var labels: [String] = []
+        for s in sizes where !seen.contains(s.sizeLabel) {
+            seen.insert(s.sizeLabel)
+            labels.append(s.sizeLabel)
+        }
+        return labels.isEmpty ? "Tanpa ukuran" : labels.joined(separator: " · ")
+    }
+}
+
 struct TambahProdukLengkapSheet: View {
     @EnvironmentObject private var api: APIService
     @Environment(\.dismiss) private var dismiss
@@ -28,6 +48,18 @@ struct TambahProdukLengkapSheet: View {
     @State private var isOnRecipeStep = false
     @State private var isSaving = false
     @State private var errorMsg: String?
+
+    // MARK: — Dari Resep discovery
+    @State private var resepProducts: [ResepProductInfo] = []
+    @State private var isLoadingResep = false
+    @State private var selectedResepProduct: ResepProductInfo? = nil
+    @State private var resepSearchText = ""
+
+    private var filteredResepProducts: [ResepProductInfo] {
+        resepSearchText.isEmpty
+            ? resepProducts
+            : resepProducts.filter { $0.name.localizedCaseInsensitiveContains(resepSearchText) }
+    }
 
     private let presets: [(label: String, sizes: [String])] = [
         ("Free Size", ["Free Size"]),
@@ -63,7 +95,16 @@ struct TambahProdukLengkapSheet: View {
         .background(OuraTheme.Colors.background)
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
-        .task { await loadMaterials() }
+        .task {
+            await loadMaterials()
+            await loadResepProducts()
+        }
+        .sheet(item: $selectedResepProduct) { product in
+            TambahStokDariResepSheet(product: product) {
+                Task { await loadResepProducts() }
+            }
+            .environmentObject(api)
+        }
         .alert("Ukuran Kustom", isPresented: $showCustomSizeAlert) {
             TextField("contoh: 2XL, 32, One Size", text: $customSizeInput)
                 .autocorrectionDisabled()
@@ -120,6 +161,20 @@ struct TambahProdukLengkapSheet: View {
         VStack(spacing: 0) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
+                    dariResepSection
+
+                    if !resepProducts.isEmpty {
+                        HStack(spacing: 8) {
+                            Rectangle().fill(OuraTheme.Colors.separator).frame(height: 0.75)
+                            Text("BUAT PRODUK BARU")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundStyle(OuraTheme.Colors.textTertiary)
+                                .tracking(0.5)
+                                .fixedSize()
+                            Rectangle().fill(OuraTheme.Colors.separator).frame(height: 0.75)
+                        }
+                    }
+
                     sectionLabel("Nama Produk") {
                         TextField("contoh: Scrunchie Mini", text: $productName)
                             .font(.system(size: 15))
@@ -448,6 +503,102 @@ struct TambahProdukLengkapSheet: View {
         }
     }
 
+    // MARK: — Dari Resep Section
+
+    @ViewBuilder
+    private var dariResepSection: some View {
+        if isLoadingResep || !resepProducts.isEmpty {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("DARI RESEP")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(OuraTheme.Colors.textTertiary)
+                    .tracking(0.5)
+
+                if isLoadingResep {
+                    ProgressView()
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                } else {
+                    HStack(spacing: 8) {
+                        Image(systemName: "magnifyingglass")
+                            .foregroundStyle(OuraTheme.Colors.textTertiary)
+                            .font(.system(size: 14))
+                        TextField("Cari produk dari resep...", text: $resepSearchText)
+                            .font(.system(size: 14))
+                            .foregroundStyle(OuraTheme.Colors.textPrimary)
+                            .autocorrectionDisabled()
+                            .textInputAutocapitalization(.never)
+                        if !resepSearchText.isEmpty {
+                            Button { resepSearchText = "" } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .foregroundStyle(OuraTheme.Colors.textTertiary)
+                                    .font(.system(size: 14))
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 9)
+                    .background(OuraTheme.Colors.surfaceCard)
+                    .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.medium))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: OuraTheme.Radius.medium)
+                            .stroke(OuraTheme.Colors.border, lineWidth: 0.75)
+                    )
+
+                    if filteredResepProducts.isEmpty {
+                        Text("Tidak ada produk cocok")
+                            .font(.system(size: 13))
+                            .foregroundStyle(OuraTheme.Colors.textTertiary)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                    } else {
+                        VStack(spacing: 0) {
+                            ForEach(Array(filteredResepProducts.enumerated()), id: \.element.id) { idx, product in
+                                if idx > 0 {
+                                    Divider()
+                                        .overlay(OuraTheme.Colors.separator)
+                                        .padding(.leading, 12)
+                                }
+                                Button { selectedResepProduct = product } label: {
+                                    HStack(spacing: 12) {
+                                        VStack(alignment: .leading, spacing: 3) {
+                                            Text(product.name)
+                                                .font(.system(size: 14, weight: .semibold))
+                                                .foregroundStyle(OuraTheme.Colors.textPrimary)
+                                            Text(product.uniqueSizeLabels)
+                                                .font(.system(size: 12))
+                                                .foregroundStyle(OuraTheme.Colors.textTertiary)
+                                        }
+                                        Spacer()
+                                        if product.totalStock == 0 {
+                                            OuraTag(text: "Belum ada stok", color: OuraTheme.Colors.warningText, bg: OuraTheme.Colors.warningBg)
+                                        } else {
+                                            OuraTag(text: "Stok: \(product.totalStock) pcs")
+                                        }
+                                        Image(systemName: "chevron.right")
+                                            .font(.system(size: 12, weight: .semibold))
+                                            .foregroundStyle(OuraTheme.Colors.textTertiary)
+                                    }
+                                    .padding(12)
+                                    .contentShape(Rectangle())
+                                }
+                                .buttonStyle(.plain)
+                                .opacity(product.totalStock == 0 ? 1.0 : 0.55)
+                            }
+                        }
+                        .background(OuraTheme.Colors.surfaceCard)
+                        .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.medium))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: OuraTheme.Radius.medium)
+                                .stroke(OuraTheme.Colors.border, lineWidth: 1)
+                        )
+                    }
+                }
+            }
+        }
+    }
+
     // MARK: — Helpers
 
     @ViewBuilder
@@ -483,6 +634,27 @@ struct TambahProdukLengkapSheet: View {
         let mats = (try? await api.getMaterials()) ?? []
         allMaterials = mats.filter { !$0.isArchived }
         fabrics = allMaterials.filter { $0.category == .fabric }
+    }
+
+    private func loadResepProducts() async {
+        isLoadingResep = true
+        defer { isLoadingResep = false }
+
+        guard let specs = try? await api.getPatternSpecs() else { return }
+        let activeSpecs = specs.filter { $0.isActive }
+        let uniqueSkus = Array(Set(activeSpecs.map { $0.productSku }))
+
+        var result: [ResepProductInfo] = []
+        for sku in uniqueSkus {
+            let name = activeSpecs.first { $0.productSku == sku }?.productName ?? sku
+            let sizes = (try? await api.getProductSizes(sku: sku)) ?? []
+            result.append(ResepProductInfo(sku: sku, name: name, sizes: sizes.filter { !$0.isArchived }))
+        }
+
+        resepProducts = result.sorted {
+            if ($0.totalStock == 0) != ($1.totalStock == 0) { return $0.totalStock == 0 }
+            return $0.name < $1.name
+        }
     }
 
     // MARK: — Save: product only
@@ -605,6 +777,140 @@ struct TambahProdukLengkapSheet: View {
     }
 }
 
+// MARK: — Tambah Stok Dari Resep Sheet
+
+private struct TambahStokDariResepSheet: View {
+    let product: ResepProductInfo
+    let onDone: () -> Void
+
+    @EnvironmentObject private var api: APIService
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var qtys: [UUID: Int] = [:]
+    @State private var isSaving = false
+    @State private var errorMsg: String?
+
+    private var hasAnyQty: Bool { qtys.values.contains { $0 > 0 } }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Button("Batal") { dismiss() }
+                    .foregroundStyle(OuraTheme.Colors.accent)
+                Spacer()
+                Text("Tambah Stok")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(OuraTheme.Colors.textPrimary)
+                Spacer()
+                Button("Simpan") { Task { await save() } }
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(hasAnyQty && !isSaving ? OuraTheme.Colors.accent : OuraTheme.Colors.textDisabled)
+                    .disabled(!hasAnyQty || isSaving)
+            }
+            .padding(.horizontal, 16).padding(.vertical, 14)
+
+            Divider().overlay(OuraTheme.Colors.separator)
+
+            HStack {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(product.name)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(OuraTheme.Colors.textPrimary)
+                    Text("Masukkan jumlah unit yang ingin ditambahkan ke stok per ukuran.")
+                        .font(.system(size: 12))
+                        .foregroundStyle(OuraTheme.Colors.textTertiary)
+                }
+                Spacer()
+            }
+            .padding(.horizontal, 16).padding(.vertical, 12)
+
+            List {
+                Section {
+                    ForEach(product.sizes) { size in
+                        HStack(spacing: 12) {
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(size.displayLabel)
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundStyle(OuraTheme.Colors.textPrimary)
+                                Text("Stok saat ini: \(size.currentStockQty) pcs")
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(OuraTheme.Colors.textTertiary)
+                            }
+                            Spacer()
+                            HStack(spacing: 10) {
+                                Button {
+                                    let cur = qtys[size.id] ?? 0
+                                    if cur > 0 { qtys[size.id] = cur - 1 }
+                                } label: {
+                                    Image(systemName: "minus")
+                                        .font(.system(size: 13, weight: .bold))
+                                        .foregroundStyle(OuraTheme.Colors.accent)
+                                        .frame(width: 30, height: 30)
+                                        .background(OuraTheme.Colors.accentLight)
+                                        .clipShape(Circle())
+                                }
+                                .buttonStyle(.plain)
+
+                                Text("\(qtys[size.id] ?? 0)")
+                                    .font(.system(size: 16, weight: .semibold))
+                                    .foregroundStyle(OuraTheme.Colors.textPrimary)
+                                    .frame(minWidth: 32)
+                                    .multilineTextAlignment(.center)
+
+                                Button {
+                                    qtys[size.id] = (qtys[size.id] ?? 0) + 1
+                                } label: {
+                                    Image(systemName: "plus")
+                                        .font(.system(size: 13, weight: .bold))
+                                        .foregroundStyle(OuraTheme.Colors.accent)
+                                        .frame(width: 30, height: 30)
+                                        .background(OuraTheme.Colors.accentLight)
+                                        .clipShape(Circle())
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        .listRowBackground(OuraTheme.Colors.surfaceCard)
+                        .listRowInsets(EdgeInsets(top: 12, leading: 16, bottom: 12, trailing: 16))
+                    }
+                }
+                .listSectionSeparatorTint(OuraTheme.Colors.separator)
+            }
+            .listStyle(.insetGrouped)
+            .scrollContentBackground(.hidden)
+            .background(OuraTheme.Colors.background)
+
+            if let err = errorMsg {
+                Text(err)
+                    .font(.system(size: 13))
+                    .foregroundStyle(OuraTheme.Colors.dangerText)
+                    .padding(12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(OuraTheme.Colors.dangerBg)
+            }
+        }
+        .background(OuraTheme.Colors.background)
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
+    }
+
+    private func save() async {
+        isSaving = true
+        defer { isSaving = false }
+        errorMsg = nil
+        do {
+            for (sizeId, qty) in qtys where qty > 0 {
+                let currentStock = product.sizes.first { $0.id == sizeId }?.currentStockQty ?? 0
+                let reason = currentStock == 0 ? "initial" : "adjustment"
+                _ = try await api.adjustStock(sku: product.sku, sizeId: sizeId, qty: qty, reason: reason)
+            }
+            onDone()
+            dismiss()
+        } catch let e as APIError { errorMsg = e.errorDescription }
+        catch { errorMsg = error.localizedDescription }
+    }
+}
+
 // MARK: — TextField style
 
 private extension View {
@@ -617,3 +923,4 @@ private extension View {
             .overlay(RoundedRectangle(cornerRadius: OuraTheme.Radius.medium).stroke(OuraTheme.Colors.border, lineWidth: 1))
     }
 }
+
