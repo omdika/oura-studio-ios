@@ -76,33 +76,49 @@ struct PatternComponent: Codable, Identifiable, Hashable {
     }
 }
 
-// MARK: - Raw backend response (flat format, enriched client-side in APIService)
+// MARK: - Raw backend response (v2.15+: fabrics via join table)
+
+struct BackendPatternFabric: Codable {
+    let id: UUID
+    let materialId: UUID
+    let materialName: String
+    let cutWidthCm: Double
+    let cutHeightCm: Double  // backend "height" = UI "panjang/length"
+    let rotationAllowed: Bool
+    let fabricLabel: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case materialId      = "material_id"
+        case materialName    = "material_name"
+        case cutWidthCm      = "cut_width_cm"
+        case cutHeightCm     = "cut_height_cm"
+        case rotationAllowed = "rotation_allowed"
+        case fabricLabel     = "fabric_label"
+    }
+}
 
 struct BackendPatternSpec: Codable, Identifiable {
     let id: UUID
     let productSizeId: UUID
-    let fabricMaterialId: UUID
-    let cutWidthCm: Double
-    let cutHeightCm: Double
-    let rotationAllowed: Bool
+    let fabrics: [BackendPatternFabric]
     let estLaborMinutes: Double
     let isActive: Bool
     let effectiveFrom: Date
     let effectiveTo: Date?
     let components: [BackendPatternComponent]
+    let usedInBatchCount: Int
 
     enum CodingKeys: String, CodingKey {
         case id
         case productSizeId    = "product_size_id"
-        case fabricMaterialId = "fabric_material_id"
-        case cutWidthCm       = "cut_width_cm"
-        case cutHeightCm      = "cut_height_cm"
-        case rotationAllowed  = "rotation_allowed"
+        case fabrics
         case estLaborMinutes  = "est_labor_minutes"
         case isActive         = "is_active"
         case effectiveFrom    = "effective_from"
         case effectiveTo      = "effective_to"
         case components
+        case usedInBatchCount = "used_in_batch_count"
     }
 }
 
@@ -157,24 +173,33 @@ struct CreatePatternSpecRequest: Codable {
     }
 }
 
-// Backend wire format — flat fields, one fabric per spec
-// Backend uses cut_height_cm for what the UI calls cut_length_cm (the long dimension)
+// Backend wire format — v2.15+: fabrics array replaces flat fields
 struct BackendCreatePatternSpecRequest: Encodable {
     let productSizeId: UUID
-    let fabricMaterialId: UUID
-    let cutWidthCm: Double
-    let cutHeightCm: Double
-    let rotationAllowed: Bool
+    let fabrics: [FabricLayerRequest]
     let estLaborMinutes: Double
     let components: [CreatePatternSpecRequest.ComponentInput]
 
+    struct FabricLayerRequest: Encodable {
+        let materialId: UUID
+        let cutWidthCm: Double
+        let cutHeightCm: Double  // backend "height" = UI "panjang/length"
+        let rotationAllowed: Bool
+        let fabricLabel: String?
+
+        enum CodingKeys: String, CodingKey {
+            case materialId      = "material_id"
+            case cutWidthCm      = "cut_width_cm"
+            case cutHeightCm     = "cut_height_cm"
+            case rotationAllowed = "rotation_allowed"
+            case fabricLabel     = "fabric_label"
+        }
+    }
+
     enum CodingKeys: String, CodingKey {
-        case productSizeId      = "product_size_id"
-        case fabricMaterialId   = "fabric_material_id"
-        case cutWidthCm         = "cut_width_cm"
-        case cutHeightCm        = "cut_height_cm"
-        case rotationAllowed    = "rotation_allowed"
-        case estLaborMinutes    = "est_labor_minutes"
+        case productSizeId   = "product_size_id"
+        case fabrics
+        case estLaborMinutes = "est_labor_minutes"
         case components
     }
 }

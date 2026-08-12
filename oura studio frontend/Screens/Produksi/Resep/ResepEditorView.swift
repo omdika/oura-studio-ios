@@ -16,12 +16,10 @@ struct ResepEditorView: View {
 
     // Fabric edit state
     @State private var allMaterials: [Material] = []
-    @State private var allSizes: [ProductSizeDetail] = []
     @State private var editFabricIds: [UUID] = []
     @State private var fabricLengths: [UUID: Double] = [:]
     @State private var fabricWidths: [UUID: Double] = [:]
     @State private var fabricRotations: [UUID: Bool] = [:]
-    @State private var gabungkanResep: Bool = true
     @State private var editLaborMinutes: Double?
 
     // Component edit state
@@ -193,23 +191,6 @@ struct ResepEditorView: View {
                     for id in newIds where fabricRotations[id] == nil {
                         fabricRotations[id] = true
                     }
-                    if newIds.count < 2 { gabungkanResep = true }
-                }
-
-                if editFabricIds.count >= 2 {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Toggle("Gabungkan dalam satu resep", isOn: $gabungkanResep)
-                            .tint(OuraTheme.Colors.accent)
-                            .font(.system(size: 14))
-                        Text(gabungkanResep
-                            ? "Semua kain masuk ke satu resep untuk ukuran \(representative.sizeLabel). Tidak membuat varian produk terpisah."
-                            : "Setiap kain jadi resep sendiri-sendiri, masing-masing dengan varian produk tersendiri.")
-                            .font(.system(size: 12))
-                            .foregroundStyle(OuraTheme.Colors.textTertiary)
-                    }
-                    .padding(12)
-                    .background(gabungkanResep ? OuraTheme.Colors.accentLight : OuraTheme.Colors.surfaceCard)
-                    .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.medium))
                 }
 
                 ForEach(editFabricIds, id: \.self) { fabId in
@@ -377,26 +358,14 @@ struct ResepEditorView: View {
     // MARK: - Actions
 
     private func startEdit() {
-        // Pre-populate from all specs in the group (each spec carries exactly one fabric)
-        editFabricIds = currentSpecs.compactMap { $0.fabrics.first?.materialId }
-        fabricLengths = Dictionary(uniqueKeysWithValues: currentSpecs.compactMap { spec -> (UUID, Double)? in
-            guard let fab = spec.fabrics.first else { return nil }
-            return (fab.materialId, fab.cutLengthCm)
-        })
-        fabricWidths = Dictionary(uniqueKeysWithValues: currentSpecs.compactMap { spec -> (UUID, Double)? in
-            guard let fab = spec.fabrics.first else { return nil }
-            return (fab.materialId, fab.cutWidthCm)
-        })
-        fabricRotations = Dictionary(uniqueKeysWithValues: currentSpecs.compactMap { spec -> (UUID, Bool)? in
-            guard let fab = spec.fabrics.first else { return nil }
-            return (fab.materialId, fab.rotationAllowed)
-        })
-        gabungkanResep   = true
+        let fabrics = representative.fabrics
+        editFabricIds    = fabrics.map { $0.materialId }
+        fabricLengths    = Dictionary(uniqueKeysWithValues: fabrics.map { ($0.materialId, $0.cutLengthCm) })
+        fabricWidths     = Dictionary(uniqueKeysWithValues: fabrics.map { ($0.materialId, $0.cutWidthCm) })
+        fabricRotations  = Dictionary(uniqueKeysWithValues: fabrics.map { ($0.materialId, $0.rotationAllowed) })
         editLaborMinutes = representative.estLaborMinutes
-
         editComponentIds = representative.components.map { $0.materialId }
         componentQtys    = Dictionary(uniqueKeysWithValues: representative.components.map { ($0.materialId, $0.qtyPerUnit) })
-
         withAnimation { isEditing = true }
     }
 
@@ -432,80 +401,22 @@ struct ResepEditorView: View {
             let compInputs = editComponentIds.map { matId in
                 CreatePatternSpecRequest.ComponentInput(materialId: matId, qtyPerUnit: componentQtys[matId] ?? 0)
             }
-
-            // Specs for fabrics that were removed during edit — delete if unused
-            let newFabricIdSet = Set(editFabricIds)
-            let specsToDelete = currentSpecs.filter { spec in
-                guard let fabId = spec.fabrics.first?.materialId else { return false }
-                return !newFabricIdSet.contains(fabId)
+            let fabricInputs = editFabricIds.map { fabId in
+                CreatePatternSpecRequest.FabricInput(
+                    materialId: fabId,
+                    cutLengthCm: fabricLengths[fabId] ?? 0,
+                    cutWidthCm: fabricWidths[fabId] ?? 0,
+                    rotationAllowed: fabricRotations[fabId] ?? true
+                )
             }
-
-            var savedSpecs: [PatternSpec] = []
-
-            if gabungkanResep || editFabricIds.count <= 1 {
-                // Gabungkan: all fabrics share the same productSizeId
-                for fabId in editFabricIds {
-                    let fabricInput = CreatePatternSpecRequest.FabricInput(
-                        materialId: fabId,
-                        cutLengthCm: fabricLengths[fabId] ?? 0,
-                        cutWidthCm: fabricWidths[fabId] ?? 0,
-                        rotationAllowed: fabricRotations[fabId] ?? true
-                    )
-                    let req = CreatePatternSpecRequest(
-                        productSizeId: representative.productSizeId,
-                        fabrics: [fabricInput],
-                        estLaborMinutes: editLaborMinutes ?? representative.estLaborMinutes,
-                        components: compInputs
-                    )
-                    let updated = try await api.createOrUpdatePatternSpec(req)
-                    savedSpecs.append(updated)
-                }
-            } else {
-                // Pisah: each fabric gets its own ProductSize with fabricVariantName
-                let baseProductId = allSizes.first { $0.id == representative.productSizeId }?.productId
-                for fabId in editFabricIds {
-                    guard let fabric = allMaterials.first(where: { $0.id == fabId }) else { continue }
-
-                    let targetSizeId: UUID
-                    if let existing = allSizes.first(where: {
-                        $0.productId == baseProductId &&
-                        $0.sizeLabel == representative.sizeLabel &&
-                        $0.fabricVariantName == fabric.name
-                    }) {
-                        targetSizeId = existing.id
-                    } else {
-                        let created = try await api.createProductSize(
-                            sku: representative.productSku,
-                            sizeLabel: representative.sizeLabel,
-                            fabricVariantName: fabric.name
-                        )
-                        allSizes.append(created)
-                        targetSizeId = created.id
-                    }
-
-                    let fabricInput = CreatePatternSpecRequest.FabricInput(
-                        materialId: fabId,
-                        cutLengthCm: fabricLengths[fabId] ?? 0,
-                        cutWidthCm: fabricWidths[fabId] ?? 0,
-                        rotationAllowed: fabricRotations[fabId] ?? true
-                    )
-                    let req = CreatePatternSpecRequest(
-                        productSizeId: targetSizeId,
-                        fabrics: [fabricInput],
-                        estLaborMinutes: editLaborMinutes ?? representative.estLaborMinutes,
-                        components: compInputs
-                    )
-                    let updated = try await api.createOrUpdatePatternSpec(req)
-                    savedSpecs.append(updated)
-                }
-            }
-
-            // Delete specs whose fabric was removed (only if unused in production)
-            for spec in specsToDelete where spec.canDelete {
-                try? await api.deletePatternSpec(id: spec.id)
-            }
-
-            if !savedSpecs.isEmpty { currentSpecs = savedSpecs }
+            let req = CreatePatternSpecRequest(
+                productSizeId: representative.productSizeId,
+                fabrics: fabricInputs,
+                estLaborMinutes: editLaborMinutes ?? representative.estLaborMinutes,
+                components: compInputs
+            )
+            let updated = try await api.createOrUpdatePatternSpec(req)
+            currentSpecs = [updated]
             onUpdate?()
             withAnimation { isEditing = false }
         } catch let e as APIError {
@@ -530,9 +441,6 @@ struct ResepEditorView: View {
     }
 
     private func loadMaterials() async {
-        async let mats  = api.getMaterials()
-        async let sizes = api.getAllProductSizes()
-        allMaterials = (try? await mats)  ?? []
-        allSizes     = (try? await sizes) ?? []
+        allMaterials = (try? await api.getMaterials()) ?? []
     }
 }

@@ -366,19 +366,21 @@ class APIService: ObservableObject {
     func createOrUpdatePatternSpec(_ req: CreatePatternSpecRequest) async throws -> PatternSpec {
         if useMock { return try await MockAPIService.shared.createOrUpdatePatternSpec(req) }
 
-        // Backend only supports one fabric per spec. Use the first selected fabric.
-        // The UI already handles multi-fabric by calling this once per fabric (split mode)
-        // or using the first fabric in merge mode.
-        guard let fabric = req.fabrics.first else {
+        guard !req.fabrics.isEmpty else {
             throw APIError.serverError(400, "Pilih setidaknya satu kain untuk resep ini")
         }
 
         let backendReq = BackendCreatePatternSpecRequest(
             productSizeId: req.productSizeId,
-            fabricMaterialId: fabric.materialId,
-            cutWidthCm: fabric.cutWidthCm,
-            cutHeightCm: fabric.cutLengthCm,   // UI calls it "panjang", backend calls it "height"
-            rotationAllowed: fabric.rotationAllowed,
+            fabrics: req.fabrics.map { f in
+                BackendCreatePatternSpecRequest.FabricLayerRequest(
+                    materialId: f.materialId,
+                    cutWidthCm: f.cutWidthCm,
+                    cutHeightCm: f.cutLengthCm,  // UI "panjang" = backend "height"
+                    rotationAllowed: f.rotationAllowed,
+                    fabricLabel: nil
+                )
+            },
             estLaborMinutes: req.estLaborMinutes,
             components: req.components
         )
@@ -425,8 +427,9 @@ class APIService: ObservableObject {
         return sizeToProduct
     }
 
-    // Joins raw backend specs with products/sizes/materials to produce fully-enriched PatternSpec objects.
+    // Joins raw backend specs with products/sizes to produce fully-enriched PatternSpec objects.
     // Backend /products/{sku}/sizes returns a flat format (ProductSizeBasic), not the full ProductSizeDetail.
+    // v2.15+: material names come embedded in each BackendPatternFabric; separate materials fetch only needed for components.
     private func enrichPatternSpecs(_ raw: [BackendPatternSpec]) async throws -> [PatternSpec] {
         guard !raw.isEmpty else { return [] }
 
@@ -439,14 +442,16 @@ class APIService: ObservableObject {
         return raw.compactMap { spec in
             guard let entry = sizeToProduct[spec.productSizeId] else { return nil }
 
-            let fabric = PatternFabric(
-                id: spec.fabricMaterialId,
-                materialId: spec.fabricMaterialId,
-                materialName: matNames[spec.fabricMaterialId] ?? "Kain",
-                cutLengthCm: spec.cutHeightCm,
-                cutWidthCm: spec.cutWidthCm,
-                rotationAllowed: spec.rotationAllowed
-            )
+            let fabrics = spec.fabrics.map { f in
+                PatternFabric(
+                    id: f.id,
+                    materialId: f.materialId,
+                    materialName: f.materialName,
+                    cutLengthCm: f.cutHeightCm,  // backend "height" = UI "panjang/length"
+                    cutWidthCm: f.cutWidthCm,
+                    rotationAllowed: f.rotationAllowed
+                )
+            }
 
             let comps = spec.components.map { c in
                 PatternComponent(
@@ -464,13 +469,13 @@ class APIService: ObservableObject {
                 productName: entry.product.name,
                 productSku: entry.product.sku,
                 sizeLabel: entry.size.sizeLabel,
-                fabrics: [fabric],
+                fabrics: fabrics,
                 estLaborMinutes: spec.estLaborMinutes,
                 isActive: spec.isActive,
                 effectiveFrom: spec.effectiveFrom,
                 effectiveTo: spec.effectiveTo,
                 components: comps,
-                usedInBatchCount: 0
+                usedInBatchCount: spec.usedInBatchCount
             )
         }
     }
