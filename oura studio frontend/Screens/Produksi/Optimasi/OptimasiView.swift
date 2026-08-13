@@ -329,12 +329,6 @@ struct OptimasiView: View {
                 Text("· potong \(fabric.cutLengthCm, specifier: "%.0f")×\(fabric.cutWidthCm, specifier: "%.0f") cm")
                     .font(.system(size: 12))
                     .foregroundStyle(OuraTheme.Colors.textTertiary)
-                Spacer()
-                if rollSelections[fabric.materialId] != nil {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 14))
-                        .foregroundStyle(OuraTheme.Colors.accent)
-                }
             }
 
             // Card: hanya baris roll, tanpa nama kain lagi
