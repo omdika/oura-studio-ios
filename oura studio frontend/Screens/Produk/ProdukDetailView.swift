@@ -7,8 +7,12 @@ struct ProdukSizeGroup: Identifiable {
     let variants: [ProductSizeDetail]
     public var id: String { sizeLabel }
     var totalStock: Int { variants.reduce(0) { $0 + $1.currentStockQty } }
-    // Variants shown in UI — excludes null-fabric placeholder records
-    var displayVariants: [ProductSizeDetail] { variants.filter { $0.fabricVariantName != nil } }
+    // Variants shown in UI. Falls back to null-fabric records when no explicit variants exist
+    // (e.g. multi-fabric products whose ProductSize has fabricVariantName = null).
+    var displayVariants: [ProductSizeDetail] {
+        let withFabric = variants.filter { $0.fabricVariantName != nil }
+        return withFabric.isEmpty ? variants : withFabric
+    }
     var isAnyHabis: Bool { displayVariants.contains { $0.currentStockQty == 0 } }
     var isAnyMenipis: Bool { displayVariants.contains { $0.isLowStock && $0.currentStockQty > 0 } }
 }
@@ -338,7 +342,10 @@ struct ProdukSizeGroupView: View {
     private var totalStock: Int { variants.reduce(0) { $0 + $1.currentStockQty } }
     // Only show variants that have an explicit fabric — null-fabric sizes are placeholder records
     // that look confusing in this view (they render as "L | 0 pcs" inside the "L" group page).
-    private var displayedVariants: [ProductSizeDetail] { variants.filter { $0.fabricVariantName != nil } }
+    private var displayedVariants: [ProductSizeDetail] {
+        let withFabric = variants.filter { $0.fabricVariantName != nil }
+        return withFabric.isEmpty ? variants : withFabric
+    }
 
     var body: some View {
         ScrollView {
