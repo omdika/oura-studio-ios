@@ -31,6 +31,7 @@ struct OptimasiView: View {
     @State private var patternSpecs: [PatternSpec] = []
     @State private var selectedSpec: PatternSpec?
     @State private var rollSelections: [UUID: MaterialPurchase] = [:]   // materialId → chosen roll
+    @State private var targetQty: Int = 1
     @State private var fabricLayoutResults: [FabricLayoutResult] = []
     @State private var isLoading = false
     @State private var isCalculating = false
@@ -265,6 +266,49 @@ struct OptimasiView: View {
                         .multilineTextAlignment(.center)
                 }
 
+                // Target produksi
+                VStack(alignment: .leading, spacing: 6) {
+                    OuraSectionHeader(title: "Target Produksi")
+                    HStack {
+                        Text("Minimal pcs yang ingin diproduksi")
+                            .font(.system(size: 13))
+                            .foregroundStyle(OuraTheme.Colors.textSecondary)
+                        Spacer()
+                        HStack(spacing: 0) {
+                            Button {
+                                if targetQty > 1 { targetQty -= 1 }
+                            } label: {
+                                Image(systemName: "minus")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundStyle(OuraTheme.Colors.accent)
+                                    .frame(width: 34, height: 34)
+                                    .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            Text("\(targetQty)")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(OuraTheme.Colors.textPrimary)
+                                .frame(width: 36)
+                                .multilineTextAlignment(.center)
+                            Button {
+                                targetQty += 1
+                            } label: {
+                                Image(systemName: "plus")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundStyle(OuraTheme.Colors.accent)
+                                    .frame(width: 34, height: 34)
+                                    .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        .background(OuraTheme.Colors.border.opacity(0.5))
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                    }
+                    .padding(OuraTheme.Spacing.cardPad)
+                    .ouraCard()
+                }
+                .padding(.top, 4)
+
                 OuraPrimaryButton(title: isCalculating ? "Menghitung..." : "Hitung Optimasi", isLoading: isCalculating) {
                     Task { await calculateLayouts() }
                 }
@@ -276,12 +320,13 @@ struct OptimasiView: View {
 
     private func rollPickerSection(fabric: PatternFabric) -> some View {
         let rolls = fabricPurchases.filter { $0.material.id == fabric.materialId }
-        return VStack(alignment: .leading, spacing: 0) {
+        return VStack(alignment: .leading, spacing: 6) {
+            // Section label outside card — nama kain + dimensi potong + status pilihan
             HStack(spacing: 6) {
                 Text(fabric.materialName)
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(OuraTheme.Colors.textSecondary)
-                Text("\(fabric.cutLengthCm, specifier: "%.0f")×\(fabric.cutWidthCm, specifier: "%.0f") cm")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(OuraTheme.Colors.textPrimary)
+                Text("· potong \(fabric.cutLengthCm, specifier: "%.0f")×\(fabric.cutWidthCm, specifier: "%.0f") cm")
                     .font(.system(size: 12))
                     .foregroundStyle(OuraTheme.Colors.textTertiary)
                 Spacer()
@@ -291,51 +336,45 @@ struct OptimasiView: View {
                         .foregroundStyle(OuraTheme.Colors.accent)
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.top, 10)
-            .padding(.bottom, 4)
 
-            if rolls.isEmpty {
-                Text("Tidak ada stok gulungan tersedia")
-                    .font(.system(size: 13))
-                    .foregroundStyle(OuraTheme.Colors.textTertiary)
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 12)
-            } else {
-                ForEach(Array(rolls.enumerated()), id: \.element.purchase.id) { idx, item in
-                    rollRow(fabricId: fabric.materialId, material: item.material, purchase: item.purchase)
-                    if idx < rolls.count - 1 {
-                        Divider().padding(.leading, 16).overlay(OuraTheme.Colors.separator)
+            // Card: hanya baris roll, tanpa nama kain lagi
+            VStack(alignment: .leading, spacing: 0) {
+                if rolls.isEmpty {
+                    Text("Tidak ada stok gulungan tersedia")
+                        .font(.system(size: 13))
+                        .foregroundStyle(OuraTheme.Colors.textTertiary)
+                        .padding(16)
+                } else {
+                    ForEach(Array(rolls.enumerated()), id: \.element.purchase.id) { idx, item in
+                        rollRow(fabricId: fabric.materialId, purchase: item.purchase)
+                        if idx < rolls.count - 1 {
+                            Divider().padding(.leading, 16).overlay(OuraTheme.Colors.separator)
+                        }
                     }
                 }
             }
+            .ouraCard()
         }
-        .ouraCard()
     }
 
-    private func rollRow(fabricId: UUID, material: Material, purchase: MaterialPurchase) -> some View {
+    private func rollRow(fabricId: UUID, purchase: MaterialPurchase) -> some View {
         let isSelected = rollSelections[fabricId]?.id == purchase.id
         return Button {
             rollSelections[fabricId] = purchase
         } label: {
             HStack(spacing: 12) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(material.name)
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(OuraTheme.Colors.textPrimary)
-                    HStack(spacing: 6) {
-                        if let l = purchase.lengthCm, let w = purchase.widthCm {
-                            Text("\(w, specifier: "%.0f") × \(l, specifier: "%.0f") cm")
-                                .font(.system(size: 12))
-                                .foregroundStyle(OuraTheme.Colors.textSecondary)
-                        }
-                        if let rem = purchase.remainingLengthCm, let l = purchase.lengthCm {
-                            OuraTag(
-                                text: String(format: "%.0f cm sisa", rem),
-                                color: rem < l * 0.2 ? OuraTheme.Colors.warningText : OuraTheme.Colors.blueAccent,
-                                bg:    rem < l * 0.2 ? OuraTheme.Colors.warningBg  : OuraTheme.Colors.blueBg
-                            )
-                        }
+                HStack(spacing: 8) {
+                    if let l = purchase.lengthCm, let w = purchase.widthCm {
+                        Text("\(w, specifier: "%.0f") × \(l, specifier: "%.0f") cm")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(OuraTheme.Colors.textPrimary)
+                    }
+                    if let rem = purchase.remainingLengthCm, let l = purchase.lengthCm {
+                        OuraTag(
+                            text: String(format: "%.0f cm sisa", rem),
+                            color: rem < l * 0.2 ? OuraTheme.Colors.warningText : OuraTheme.Colors.blueAccent,
+                            bg:    rem < l * 0.2 ? OuraTheme.Colors.warningBg  : OuraTheme.Colors.blueBg
+                        )
                     }
                 }
                 Spacer()
@@ -419,10 +458,17 @@ struct OptimasiView: View {
     private func combinedLayoutCard(_ result: CombinedLayoutResult) -> some View {
         let primaryLayout = result.fabricLayouts.first?.layout
         return VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text(result.strategy.displayName)
-                    .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(OuraTheme.Colors.textPrimary)
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(result.strategy.displayName)
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundStyle(OuraTheme.Colors.textPrimary)
+                    if let spec = selectedSpec {
+                        Text("\(spec.productName) · \(spec.sizeLabel)")
+                            .font(.system(size: 12))
+                            .foregroundStyle(OuraTheme.Colors.textTertiary)
+                    }
+                }
                 Spacer()
                 if let wPct = primaryLayout?.wastePct {
                     Text("\(wPct * 100, specifier: "%.1f")% waste")
@@ -461,7 +507,16 @@ struct OptimasiView: View {
                     }
                 }
             } else {
-                statCell(label: "Total Qty", value: "\(result.bottleneckQty) pcs")
+                HStack(alignment: .bottom) {
+                    statCell(label: "Total Qty", value: "\(result.bottleneckQty) pcs")
+                    Spacer()
+                    if let fabricName = result.fabricLayouts.first?.materialName {
+                        Text(fabricName)
+                            .font(.system(size: 12))
+                            .foregroundStyle(OuraTheme.Colors.textTertiary)
+                            .padding(.bottom, 2)
+                    }
+                }
             }
 
             if let items = primaryLayout?.items {
@@ -539,7 +594,7 @@ struct OptimasiView: View {
         let candidate = OptimizerCandidate(
             productSizeId: spec.productSizeId,
             patternSpecId: spec.id,
-            minQty: nil
+            minQty: targetQty
         )
 
         do {
@@ -604,6 +659,7 @@ struct OptimasiView: View {
         step = .selectSpec
         selectedSpec = nil
         rollSelections = [:]
+        targetQty = 1
         savedBatch = nil
         fabricLayoutResults = []
     }
