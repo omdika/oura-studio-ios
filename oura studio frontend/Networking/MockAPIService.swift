@@ -731,12 +731,19 @@ class MockAPIService {
             // Used for future-reservation so a tall primary rowHeight doesn't over-claim the budget.
             let bestMinLen: Double
         }
+        // Use fabric dimensions matching this roll's material (for multi-fabric products)
+        let rollMaterialId = purchase.materialId
+
         let candInfos: [CandInfo] = req.candidates.compactMap { candidate in
             guard let spec = _patternSpecs.first(where: { $0.id == candidate.patternSpecId }) else { return nil }
-            let cutW = spec.cutWidthCm, cutL = spec.cutLengthCm
-            let normalCols = Int(width / cutW)
-            let normalRows = normalCols > 0 ? Int(length / cutL) : 0
-            let rotCols = spec.rotationAllowed ? Int(width / cutL) : 0
+            let matchedFabric = spec.fabrics.first(where: { $0.materialId == rollMaterialId })
+                ?? spec.fabrics.first
+            let cutW = matchedFabric?.cutWidthCm ?? 0
+            let cutL = matchedFabric?.cutLengthCm ?? 0
+            let rotAllowed = matchedFabric?.rotationAllowed ?? false
+            let normalCols = cutW > 0 ? Int(width / cutW) : 0
+            let normalRows = normalCols > 0 && cutL > 0 ? Int(length / cutL) : 0
+            let rotCols = rotAllowed && cutL > 0 ? Int(width / cutL) : 0
             let rotRows = rotCols > 0 ? Int(length / cutW) : 0
             // At least one orientation must fit ≥1 piece on the full roll
             guard normalCols * normalRows > 0 || rotCols * rotRows > 0 else { return nil }
@@ -869,53 +876,68 @@ class MockAPIService {
 
     // MARK: - Production
 
-    func createProductionBatch(cuttingLayoutId: UUID? = nil) async throws -> ProductionBatch {
+    func createProductionBatch(cuttingLayoutIds: [UUID] = []) async throws -> ProductionBatch {
         await delay()
         let batchId = UUID()
         var batchItems: [ProductionBatchItem] = []
         var strategyName: String? = nil
         var materialName: String? = nil
 
-        if let layoutId = cuttingLayoutId,
-           let layout = _cuttingLayouts.first(where: { $0.id == layoutId }) {
-            strategyName = layout.strategy.flatMap { OptimizerStrategy(rawValue: $0)?.displayName }
-            materialName = layout.materialName
-
-            let laborRate      = _settings.first(where: { $0.key == "labor_rate_per_minute" })?.value ?? 50
+        if !cuttingLayoutIds.isEmpty {
+            let laborRate       = _settings.first(where: { $0.key == "labor_rate_per_minute" })?.value ?? 50
             let overheadPerUnit = _settings.first(where: { $0.key == "default_overhead_per_unit" })?.value ?? 300
-            let pooledThread   = _settings.first(where: { $0.key == "pooled_material_rate:thread" })?.value ?? 500
+            let pooledThread    = _settings.first(where: { $0.key == "pooled_material_rate:thread" })?.value ?? 500
 
-            for layoutItem in layout.items {
-                guard let spec = _patternSpecs.first(where: { $0.id == layoutItem.patternSpecId }) else { continue }
-                let hppFabric   = layoutItem.costPerPiece
-                let hppLabor    = spec.estLaborMinutes * laborRate
-                let hppOverhead = overheadPerUnit
-                let hppPooled   = pooledThread
-                let hppHardware = spec.components.reduce(0.0) { sum, comp in
+            // Collect per-productSizeId entries from all layouts:
+            // each entry records (specId, qty, costPerPiece, productName, sizeLabel)
+            var sizeEntries: [UUID: [(specId: UUID, qty: Int, cost: Double, name: String, size: String)]] = [:]
+
+            for layoutId in cuttingLayoutIds {
+                guard let layout = _cuttingLayouts.first(where: { $0.id == layoutId }) else { continue }
+                if strategyName == nil {
+                    strategyName = layout.strategy.flatMap { OptimizerStrategy(rawValue: $0)?.displayName }
+                    materialName = layout.materialName
+                }
+                for item in layout.items {
+                    let entry = (specId: item.patternSpecId,
+                                 qty: item.qtySuggested,
+                                 cost: item.costPerPiece,
+                                 name: item.productName,
+                                 size: item.sizeLabel)
+                    sizeEntries[item.productSizeId, default: []].append(entry)
+                }
+            }
+
+            // Aggregate: bottleneck qty (MIN), fabric HPP (SUM across layouts)
+            for (sizeId, entries) in sizeEntries {
+                guard let first = entries.first else { continue }
+                let spec        = _patternSpecs.first(where: { $0.id == first.specId })
+                let bottleneck  = entries.map(\.qty).min() ?? 0
+                let fabricCost  = entries.map(\.cost).reduce(0, +)
+                let hppLabor    = (spec?.estLaborMinutes ?? 0) * laborRate
+                let hppHardware = spec?.components.reduce(0.0) { sum, comp in
                     let cost = _materials.first(where: { $0.id == comp.materialId })?.currentAvgCost ?? 0
                     return sum + cost * comp.qtyPerUnit
-                }
-                let latestHpp = _productSizes.values.flatMap { $0 }
-                    .first(where: { $0.id == layoutItem.productSizeId })?.latestHppBreakdown
+                } ?? 0
+                let latestHpp   = _productSizes.values.flatMap { $0 }
+                    .first(where: { $0.id == sizeId })?.latestHppBreakdown
                 batchItems.append(ProductionBatchItem(
                     id: UUID(), productionBatchId: batchId,
-                    productSizeId: layoutItem.productSizeId,
-                    productName: layoutItem.productName,
-                    sizeLabel: layoutItem.sizeLabel,
-                    patternSpecId: layoutItem.patternSpecId,
-                    qtyActual: layoutItem.qtySuggested,
-                    qtySuggested: layoutItem.qtySuggested,
-                    hppFabric: hppFabric, hppPooledMaterial: hppPooled,
-                    hppHardware: hppHardware, hppLabor: hppLabor,
-                    hppOverhead: hppOverhead,
-                    hppTotal: hppFabric + hppPooled + hppHardware + hppLabor + hppOverhead,
+                    productSizeId: sizeId,
+                    productName: first.name, sizeLabel: first.size,
+                    patternSpecId: first.specId,
+                    qtyActual: bottleneck, qtySuggested: bottleneck,
+                    hppFabric: fabricCost,
+                    hppPooledMaterial: pooledThread, hppHardware: hppHardware,
+                    hppLabor: hppLabor, hppOverhead: overheadPerUnit,
+                    hppTotal: fabricCost + pooledThread + hppHardware + hppLabor + overheadPerUnit,
                     latestHppBreakdown: latestHpp
                 ))
             }
         }
         // manual batch (no layout) → empty items, user sets qty manually
 
-        let batch = ProductionBatch(id: batchId, cuttingLayoutId: cuttingLayoutId,
+        let batch = ProductionBatch(id: batchId, cuttingLayoutIds: cuttingLayoutIds,
                                     cuttingLayoutStrategy: strategyName, materialName: materialName,
                                     producedAt: Date(), status: "draft", notes: nil, items: batchItems)
         _productionBatches.append(batch)
@@ -940,7 +962,7 @@ class MockAPIService {
             throw APIError.serverError(404, "Batch tidak ditemukan")
         }
         let old = _productionBatches[idx]
-        let confirmed = ProductionBatch(id: old.id, cuttingLayoutId: old.cuttingLayoutId,
+        let confirmed = ProductionBatch(id: old.id, cuttingLayoutIds: old.cuttingLayoutIds,
                                         cuttingLayoutStrategy: old.cuttingLayoutStrategy,
                                         materialName: old.materialName,
                                         producedAt: old.producedAt, status: "confirmed",

@@ -2,7 +2,8 @@ import Foundation
 
 struct ProductionBatch: Codable, Identifiable {
     let id: UUID
-    let cuttingLayoutId: UUID?
+    let cuttingLayoutIds: [UUID]           // ordered; primary fabric first
+    var cuttingLayoutId: UUID? { cuttingLayoutIds.first }
     let cuttingLayoutStrategy: String?
     let materialName: String?
     let producedAt: Date
@@ -12,10 +13,10 @@ struct ProductionBatch: Codable, Identifiable {
 
     enum CodingKeys: String, CodingKey {
         case id
-        case cuttingLayoutId = "cutting_layout_id"
+        case cuttingLayoutIds      = "cutting_layout_ids"
         case cuttingLayoutStrategy = "cutting_layout_strategy"
-        case materialName = "material_name"
-        case producedAt = "produced_at"
+        case materialName          = "material_name"
+        case producedAt            = "produced_at"
         case status, notes, items
     }
 
@@ -85,10 +86,10 @@ struct UpdateBatchItemRequest: Codable {
 }
 
 struct CreateProductionBatchRequest: Codable {
-    let cuttingLayoutId: UUID?
+    let cuttingLayoutIds: [UUID]
 
     enum CodingKeys: String, CodingKey {
-        case cuttingLayoutId = "cutting_layout_id"
+        case cuttingLayoutIds = "cutting_layout_ids"
     }
 }
 
@@ -127,7 +128,8 @@ struct BackendProductionBatchItem: Codable, Identifiable {
 
 struct BackendProductionBatch: Codable, Identifiable {
     let id: UUID
-    let cuttingLayoutId: UUID?
+    let cuttingLayoutIds: [UUID]    // v2.16+ multi-layout
+    let cuttingLayoutId: UUID?      // backward compat — alias for cuttingLayoutIds.first
     let cuttingLayoutStrategy: String?
     let materialName: String?
     let producedAt: Date
@@ -137,10 +139,27 @@ struct BackendProductionBatch: Codable, Identifiable {
 
     enum CodingKeys: String, CodingKey {
         case id
+        case cuttingLayoutIds      = "cutting_layout_ids"
         case cuttingLayoutId       = "cutting_layout_id"
         case cuttingLayoutStrategy = "cutting_layout_strategy"
         case materialName          = "material_name"
         case producedAt            = "produced_at"
         case status, notes, items
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        let ids = (try? c.decodeIfPresent([UUID].self, forKey: .cuttingLayoutIds)) ?? []
+        let lid = try? c.decodeIfPresent(UUID.self, forKey: .cuttingLayoutId)
+        // Old backend sends only cutting_layout_id — synthesize array for backward compat
+        cuttingLayoutIds = ids.isEmpty && lid != nil ? [lid!] : ids
+        cuttingLayoutId  = lid ?? ids.first
+        cuttingLayoutStrategy = try? c.decodeIfPresent(String.self, forKey: .cuttingLayoutStrategy)
+        materialName = try? c.decodeIfPresent(String.self, forKey: .materialName)
+        producedAt = try c.decode(Date.self, forKey: .producedAt)
+        status = try c.decode(String.self, forKey: .status)
+        notes = try? c.decodeIfPresent(String.self, forKey: .notes)
+        items = (try? c.decode([BackendProductionBatchItem].self, forKey: .items)) ?? []
     }
 }

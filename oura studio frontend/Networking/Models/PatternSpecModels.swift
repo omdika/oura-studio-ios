@@ -12,7 +12,7 @@ struct PatternFabric: Codable, Identifiable {
         case id
         case materialId      = "material_id"
         case materialName    = "material_name"
-        case cutLengthCm     = "cut_length_cm"
+        case cutLengthCm     = "cut_height_cm"
         case cutWidthCm      = "cut_width_cm"
         case rotationAllowed = "rotation_allowed"
     }

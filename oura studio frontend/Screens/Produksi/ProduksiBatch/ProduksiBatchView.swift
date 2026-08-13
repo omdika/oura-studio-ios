@@ -203,7 +203,7 @@ struct ProduksiBatchView: View {
 
     private func createManualBatch() async {
         do {
-            let batch = try await api.createProductionBatch(cuttingLayoutId: nil)
+            let batch = try await api.createProductionBatch(cuttingLayoutIds: [])
             batches.insert(batch, at: 0)
             expandedBatchId = batch.id
         } catch {

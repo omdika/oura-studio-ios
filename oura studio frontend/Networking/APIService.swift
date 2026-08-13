@@ -537,9 +537,9 @@ class APIService: ObservableObject {
 
     // MARK: - Production
 
-    func createProductionBatch(cuttingLayoutId: UUID? = nil) async throws -> ProductionBatch {
-        if useMock { return try await MockAPIService.shared.createProductionBatch(cuttingLayoutId: cuttingLayoutId) }
-        let raw: BackendProductionBatch = try await post(path: "/production-batches", body: CreateProductionBatchRequest(cuttingLayoutId: cuttingLayoutId))
+    func createProductionBatch(cuttingLayoutIds: [UUID] = []) async throws -> ProductionBatch {
+        if useMock { return try await MockAPIService.shared.createProductionBatch(cuttingLayoutIds: cuttingLayoutIds) }
+        let raw: BackendProductionBatch = try await post(path: "/production-batches", body: CreateProductionBatchRequest(cuttingLayoutIds: cuttingLayoutIds))
         return try await enrichProductionBatches([raw])[0]
     }
 
@@ -618,7 +618,7 @@ class APIService: ObservableObject {
             }
             return ProductionBatch(
                 id: batch.id,
-                cuttingLayoutId: batch.cuttingLayoutId,
+                cuttingLayoutIds: batch.cuttingLayoutIds,
                 cuttingLayoutStrategy: batch.cuttingLayoutStrategy,
                 materialName: batch.materialName,
                 producedAt: batch.producedAt,
