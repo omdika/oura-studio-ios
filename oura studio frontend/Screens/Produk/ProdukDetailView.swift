@@ -985,8 +985,14 @@ struct ProdukSizeDetailView: View {
         VStack(alignment: .leading, spacing: 12) {
             OuraSectionHeader(title: "HPP Breakdown")
             hppRow("Kain", value: hpp.fabric, total: hpp.total)
+            if hpp.fabricItems.count > 1 {
+                ForEach(hpp.fabricItems, id: \.name) { hppSubRow($0.name, cost: $0.cost) }
+            }
             hppRow("Material Pool", value: hpp.pooledMaterial, total: hpp.total)
             hppRow("Hardware", value: hpp.hardware, total: hpp.total)
+            if hpp.hardwareItems.count > 1 {
+                ForEach(hpp.hardwareItems, id: \.name) { hppSubRow($0.name, cost: $0.cost) }
+            }
             hppRow("Tenaga Kerja", value: hpp.labor, total: hpp.total)
             hppRow("Overhead", value: hpp.overhead, total: hpp.total)
             Divider().overlay(OuraTheme.Colors.separator)
@@ -1008,6 +1014,19 @@ struct ProdukSizeDetailView: View {
             Text(String(format: "(%.0f%%)", total > 0 ? value / total * 100 : 0))
                 .font(.system(size: 11)).foregroundStyle(OuraTheme.Colors.textTertiary)
                 .frame(width: 44, alignment: .trailing)
+        }
+    }
+
+    private func hppSubRow(_ label: String, cost: Double) -> some View {
+        HStack {
+            Text("· \(label)")
+                .font(.system(size: 12))
+                .foregroundStyle(OuraTheme.Colors.textTertiary)
+                .padding(.leading, 12)
+            Spacer()
+            Text(cost.rupiahFormatted)
+                .font(.system(size: 12))
+                .foregroundStyle(OuraTheme.Colors.textSecondary)
         }
     }
 

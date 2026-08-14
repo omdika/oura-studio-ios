@@ -61,18 +61,49 @@ struct ProductSizeBasic: Codable, Identifiable {
     }
 }
 
+struct HPPLineItem: Codable {
+    let name: String
+    let cost: Double
+}
+
 struct HPPBreakdown: Codable {
     let fabric: Double
+    let fabricItems: [HPPLineItem]
     let pooledMaterial: Double
     let hardware: Double
+    let hardwareItems: [HPPLineItem]
     let labor: Double
     let overhead: Double
     let total: Double
 
     enum CodingKeys: String, CodingKey {
         case fabric
+        case fabricItems    = "fabric_items"
         case pooledMaterial = "pooled_material"
-        case hardware, labor, overhead, total
+        case hardware
+        case hardwareItems  = "hardware_items"
+        case labor, overhead, total
+    }
+
+    init(fabric: Double, fabricItems: [HPPLineItem] = [], pooledMaterial: Double,
+         hardware: Double, hardwareItems: [HPPLineItem] = [],
+         labor: Double, overhead: Double, total: Double) {
+        self.fabric = fabric; self.fabricItems = fabricItems
+        self.pooledMaterial = pooledMaterial
+        self.hardware = hardware; self.hardwareItems = hardwareItems
+        self.labor = labor; self.overhead = overhead; self.total = total
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        fabric         = try c.decode(Double.self, forKey: .fabric)
+        fabricItems    = (try? c.decodeIfPresent([HPPLineItem].self, forKey: .fabricItems)) ?? []
+        pooledMaterial = try c.decode(Double.self, forKey: .pooledMaterial)
+        hardware       = try c.decode(Double.self, forKey: .hardware)
+        hardwareItems  = (try? c.decodeIfPresent([HPPLineItem].self, forKey: .hardwareItems)) ?? []
+        labor          = try c.decode(Double.self, forKey: .labor)
+        overhead       = try c.decode(Double.self, forKey: .overhead)
+        total          = try c.decode(Double.self, forKey: .total)
     }
 }
 
