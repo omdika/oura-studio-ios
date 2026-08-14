@@ -332,8 +332,14 @@ private struct BatchCard: View {
 
             VStack(spacing: 0) {
                 hppRow("Kain (fabric)", value: hpp.fabric, dot: Color(red: 0.24, green: 0.52, blue: 0.95))
+                if hpp.fabricItems.count > 1 {
+                    ForEach(hpp.fabricItems, id: \.name) { hppSubRow($0.name, cost: $0.cost) }
+                }
                 hppRow("Bahan Pooled", value: hpp.pooledMaterial, dot: Color(red: 0.58, green: 0.35, blue: 0.85))
                 hppRow("Hardware", value: hpp.hardware, dot: Color(red: 0.95, green: 0.75, blue: 0.20))
+                if hpp.hardwareItems.count > 1 {
+                    ForEach(hpp.hardwareItems, id: \.name) { hppSubRow($0.name, cost: $0.cost) }
+                }
                 hppRow("Tenaga Kerja", value: hpp.labor, dot: Color(red: 0.95, green: 0.48, blue: 0.22))
                 hppRow("Overhead", value: hpp.overhead, dot: OuraTheme.Colors.textTertiary)
             }
@@ -370,6 +376,20 @@ private struct BatchCard: View {
                 .foregroundStyle(OuraTheme.Colors.textPrimary)
         }
         .padding(.vertical, 5)
+    }
+
+    private func hppSubRow(_ label: String, cost: Double) -> some View {
+        HStack {
+            Text("· \(label)")
+                .font(.system(size: 12))
+                .foregroundStyle(OuraTheme.Colors.textTertiary)
+                .padding(.leading, 15)
+            Spacer()
+            Text(cost.rupiahFormatted)
+                .font(.system(size: 12))
+                .foregroundStyle(OuraTheme.Colors.textSecondary)
+        }
+        .padding(.vertical, 3)
     }
 }
 
