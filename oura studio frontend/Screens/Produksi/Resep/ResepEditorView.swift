@@ -73,16 +73,11 @@ struct ResepEditorView: View {
 
                     if groupCanDelete {
                         Button { showDeleteAlert = true } label: {
-                            HStack {
-                                Spacer()
-                                Text("Hapus Resep Ini")
-                                    .font(.system(size: 15, weight: .semibold))
-                                    .foregroundStyle(OuraTheme.Colors.dangerText)
-                                Spacer()
-                            }
-                            .padding(.vertical, 14)
-                            .background(OuraTheme.Colors.dangerBg)
-                            .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.card))
+                            Text("Hapus Resep Ini")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundStyle(OuraTheme.Colors.dangerText)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 8)
                         }
                         .buttonStyle(.plain)
                     }
@@ -97,6 +92,11 @@ struct ResepEditorView: View {
                 .padding(.horizontal, OuraTheme.Spacing.horizontal)
                 .padding(.top, 12)
                 .padding(.bottom, 32)
+            }
+
+            if isEditing {
+                Divider().overlay(OuraTheme.Colors.separator)
+                saveBottomBar
             }
         }
         .background(OuraTheme.Colors.background)
@@ -121,6 +121,28 @@ struct ResepEditorView: View {
         groupIsInPlaceEdit ? "Simpan Perubahan" : "Simpan Versi Baru"
     }
 
+    private var saveBottomBar: some View {
+        Group {
+            if isSaving {
+                ProgressView()
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 20)
+            } else {
+                Button(saveButtonLabel) { Task { await saveEdits() } }
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(canSave ? .white : OuraTheme.Colors.textDisabled)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 15)
+                    .background(canSave ? OuraTheme.Colors.accent : OuraTheme.Colors.border)
+                    .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.medium))
+                    .disabled(!canSave)
+                    .padding(.horizontal, OuraTheme.Spacing.horizontal)
+            }
+        }
+        .padding(.vertical, 12)
+        .background(OuraTheme.Colors.background)
+    }
+
     // MARK: - Top bar
 
     private var detailTopBar: some View {
@@ -141,16 +163,17 @@ struct ResepEditorView: View {
                 .lineLimit(1)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-            if isSaving {
-                ProgressView().frame(width: 44)
-            } else {
-                Button(isEditing ? saveButtonLabel : "Edit") {
-                    if isEditing { Task { await saveEdits() } }
-                    else { startEdit() }
+            if isEditing {
+                Button("Batalkan") {
+                    errorMsg = nil
+                    withAnimation { isEditing = false }
                 }
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(isEditing && !canSave ? OuraTheme.Colors.textDisabled : OuraTheme.Colors.accent)
-                .disabled(isEditing && !canSave)
+                .font(.system(size: 14))
+                .foregroundStyle(OuraTheme.Colors.textSecondary)
+            } else {
+                Button("Edit") { startEdit() }
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(OuraTheme.Colors.accent)
             }
         }
         .padding(.horizontal, OuraTheme.Spacing.horizontal)
