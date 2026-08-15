@@ -606,7 +606,7 @@ private struct TambahProdukCepatSheet: View {
             .background(OuraTheme.Colors.background)
         }
         .background(OuraTheme.Colors.background)
-        .presentationDetents([.medium, .large])
+        .presentationDetents([.large])
         .presentationDragIndicator(.visible)
         .onAppear {
             productName = initialName

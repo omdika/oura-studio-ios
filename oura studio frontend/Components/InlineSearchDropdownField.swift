@@ -168,5 +168,12 @@ struct InlineSearchDropdownField: View {
                 }
             }
         }
+        .onChange(of: selectedId) { _, newId in
+            if newId != nil {
+                isEditing = false
+                focused = false
+                query = ""
+            }
+        }
     }
 }
