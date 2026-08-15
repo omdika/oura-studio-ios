@@ -31,6 +31,13 @@ class APIService: ObservableObject {
 
     private var session: URLSession = .shared
 
+    private let dateFmt: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "yyyy-MM-dd"
+        return f
+    }()
+
     private lazy var decoder: JSONDecoder = {
         let d = JSONDecoder()
         d.dateDecodingStrategy = .custom { decoder in
@@ -689,8 +696,7 @@ class APIService: ObservableObject {
 
     func getSalesReport(from: Date, to: Date, groupBy: String = "day") async throws -> SalesReport {
         if useMock { return try await MockAPIService.shared.getSalesReport(from: from, to: to, groupBy: groupBy) }
-        let fmt = ISO8601DateFormatter()
-        let q = "?from=\(fmt.string(from: from))&to=\(fmt.string(from: to))&group_by=\(groupBy)"
+        let q = "?from=\(dateFmt.string(from: from))&to=\(dateFmt.string(from: to))&group_by=\(groupBy)"
         return try await get(path: "/reports/sales\(q)")
     }
 
@@ -706,8 +712,7 @@ class APIService: ObservableObject {
 
     func getWasteByMaterial(from: Date, to: Date) async throws -> [WasteByMaterial] {
         if useMock { return try await MockAPIService.shared.getWasteByMaterial(from: from, to: to) }
-        let fmt = ISO8601DateFormatter()
-        let q = "?from=\(fmt.string(from: from))&to=\(fmt.string(from: to))"
+        let q = "?from=\(dateFmt.string(from: from))&to=\(dateFmt.string(from: to))"
         return try await get(path: "/reports/waste-by-material\(q)")
     }
 

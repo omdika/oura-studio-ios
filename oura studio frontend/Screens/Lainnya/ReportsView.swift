@@ -81,6 +81,7 @@ struct SalesReportDetailView: View {
 
     @State private var report: SalesReport?
     @State private var isLoading = true
+    @State private var errorMsg: String?
     @State private var fromDate: Date = Calendar.current.date(byAdding: .day, value: -30, to: Date()) ?? Date()
     @State private var toDate: Date = Date()
 
@@ -98,6 +99,32 @@ struct SalesReportDetailView: View {
 
                 if isLoading {
                     ProgressView().frame(maxWidth: .infinity).padding()
+                } else if let msg = errorMsg {
+                    VStack(spacing: 8) {
+                        Image(systemName: "exclamationmark.triangle")
+                            .font(.system(size: 28))
+                            .foregroundStyle(OuraTheme.Colors.warningText)
+                        Text("Gagal memuat laporan")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(OuraTheme.Colors.textPrimary)
+                        Text(msg)
+                            .font(.system(size: 12))
+                            .foregroundStyle(OuraTheme.Colors.textSecondary)
+                            .multilineTextAlignment(.center)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(24)
+                } else if let r = report, r.points.isEmpty {
+                    VStack(spacing: 8) {
+                        Image(systemName: "chart.line.uptrend.xyaxis")
+                            .font(.system(size: 28))
+                            .foregroundStyle(OuraTheme.Colors.textTertiary)
+                        Text("Belum ada transaksi di periode ini")
+                            .font(.system(size: 14))
+                            .foregroundStyle(OuraTheme.Colors.textSecondary)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(24)
                 } else if let r = report {
                     VStack(alignment: .leading, spacing: 12) {
                         OuraSectionHeader(title: "Ringkasan")
@@ -160,7 +187,14 @@ struct SalesReportDetailView: View {
 
     private func load() async {
         isLoading = true
-        report = try? await api.getSalesReport(from: fromDate, to: toDate)
+        errorMsg = nil
+        do {
+            report = try await api.getSalesReport(from: fromDate, to: toDate)
+        } catch {
+            report = nil
+            errorMsg = error.localizedDescription
+            print("🔴 [SalesReport] load error: \(error)")
+        }
         isLoading = false
     }
 }
