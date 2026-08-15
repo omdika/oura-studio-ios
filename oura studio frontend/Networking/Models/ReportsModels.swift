@@ -9,10 +9,10 @@ struct SalesReportPoint: Codable, Identifiable {
     var id: String { period }
 
     enum CodingKeys: String, CodingKey {
-        case period
-        case totalRevenue = "total_revenue"
-        case totalProfit = "total_profit"
-        case orderCount = "order_count"
+        case period = "date"
+        case totalRevenue
+        case totalProfit
+        case orderCount
     }
 }
 
@@ -20,12 +20,6 @@ struct SalesReport: Codable {
     let points: [SalesReportPoint]
     let totalRevenue: Double
     let totalProfit: Double
-
-    enum CodingKeys: String, CodingKey {
-        case points
-        case totalRevenue = "total_revenue"
-        case totalProfit = "total_profit"
-    }
 }
 
 struct MarginRankingItem: Codable, Identifiable {
