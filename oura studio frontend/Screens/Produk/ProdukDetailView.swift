@@ -521,14 +521,7 @@ struct AddSizeSheet: View {
             let alreadyExists = existingSizes.contains { $0.sizeLabel == s && $0.fabricVariantName == name }
             if alreadyExists {
                 // Size pre-created (e.g., via TambahResepSheet); allow only when adding stock
-                if let qty = initialStockQty, qty > 0 {
-                    if selectedSpecId != nil { return true }
-                    return (manualCutWidthCm ?? 0) > 0 && (manualCutLengthCm ?? 0) > 0
-                }
-                return false
-            }
-            if selectedSpecId == nil, let qty = initialStockQty, qty > 0 {
-                guard (manualCutWidthCm ?? 0) > 0 && (manualCutLengthCm ?? 0) > 0 else { return false }
+                return (initialStockQty ?? 0) > 0
             }
             return true
         } else {
@@ -627,7 +620,7 @@ struct AddSizeSheet: View {
                             .listRowBackground(OuraTheme.Colors.surfaceCard)
                     } header: { OuraSectionHeader(title: "Dimensi Potongan per Pcs") }
                       footer: {
-                          Text("Wajib diisi jika ada stok awal. Digunakan untuk menghitung berapa kain yang dikurangi dari inventori.")
+                          Text("Opsional. Isi untuk mengurangi stok bahan otomatis. Jika tidak diisi, stok ditambah manual tanpa mengurangi bahan.")
                       }
                 }
 
@@ -640,8 +633,10 @@ struct AddSizeSheet: View {
                       footer: {
                           if selectedSpecId != nil {
                               Text("Stok bahan akan dikurangi otomatis sesuai resep.")
+                          } else if (manualCutWidthCm ?? 0) > 0 && (manualCutLengthCm ?? 0) > 0 {
+                              Text("Stok bahan dikurangi sesuai dimensi di atas.")
                           } else {
-                              Text("Stok bahan dikurangi sesuai dimensi di atas jika diisi.")
+                              Text("Stok ditambah manual — bahan tidak akan dikurangi.")
                           }
                       }
                 }
@@ -731,6 +726,8 @@ struct AddSizeSheet: View {
                           let w = manualCutWidthCm, w > 0,
                           let l = manualCutLengthCm, l > 0 {
                     _ = try await api.addStockManual(sku: productSku, sizeId: targetSize.id, qty: Int(qty), materialId: mat.id, cutWidthCm: w, cutLengthCm: l)
+                } else {
+                    _ = try await api.adjustStock(sku: productSku, sizeId: targetSize.id, qty: Int(qty), reason: "initial")
                 }
             }
             dismiss()
