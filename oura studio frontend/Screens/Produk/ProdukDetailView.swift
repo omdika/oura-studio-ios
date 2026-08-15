@@ -1164,9 +1164,9 @@ struct ProdukSizeDetailView: View {
 
     private func applyPrice(_ price: Double) async {
         do {
-            let updated = try await api.patchProductSize(sku: size.productSku, sizeId: size.id,
+            _ = try await api.patchProductSize(sku: size.productSku, sizeId: size.id,
                 PatchProductSizeRequest(sellingPrice: price, reorderMinQty: nil))
-            size = updated
+            await refreshSize()
         } catch let e as APIError { errorMsg = e.errorDescription }
         catch { errorMsg = error.localizedDescription }
     }
