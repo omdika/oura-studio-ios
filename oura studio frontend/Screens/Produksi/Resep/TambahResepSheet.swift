@@ -165,7 +165,7 @@ struct TambahResepSheet: View {
                             label: "Bahan Tambahan",
                             selectedIds: $selectedComponentIds,
                             items: allMaterials
-                                .filter { $0.category != .fabric }
+                                .filter { $0.category == .hardware }
                                 .map { (id: $0.id, name: $0.name) },
                             placeholder: "Pilih bahan tambahan (opsional)"
                         )

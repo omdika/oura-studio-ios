@@ -293,7 +293,7 @@ struct ResepEditorView: View {
             OuraSectionHeader(title: "Komponen Bahan")
 
             if isEditing {
-                let nonFabrics = allMaterials.filter { $0.category != .fabric && !$0.isArchived }
+                let nonFabrics = allMaterials.filter { $0.category == .hardware && !$0.isArchived }
                 TokenizedMultiSelectField(
                     label: "Bahan Tambahan",
                     selectedIds: $editComponentIds,
