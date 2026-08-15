@@ -1397,7 +1397,7 @@ class MockAPIService {
             let prf   = profitByDay[d]  ?? 0
             let count = countByDay[d]   ?? 0
             guard rev > 0 || count > 0 else { continue }
-            points.append(SalesReportPoint(id: UUID(), period: fmt.string(from: d),
+            points.append(SalesReportPoint(period: fmt.string(from: d),
                                            totalRevenue: rev, totalProfit: prf, orderCount: count))
         }
 
@@ -1412,10 +1412,10 @@ class MockAPIService {
             guard let hpp = detail.latestHppBreakdown?.total,
                   let price = detail.sellingPrice,
                   let margin = detail.marginPct else { return nil }
-            return MarginRankingItem(id: UUID(), productSizeId: detail.id,
+            return MarginRankingItem(productSizeId: detail.id,
                                      productName: detail.productName, sizeLabel: detail.sizeLabel,
-                                     hpp: hpp, sellingPrice: price, marginPct: margin,
-                                     markupPct: (price - hpp) / hpp)
+                                     fabricVariantName: detail.fabricVariantName,
+                                     hpp: hpp, sellingPrice: price, marginPct: margin)
         }.sorted { $0.marginPct > $1.marginPct }
     }
 
@@ -1439,7 +1439,7 @@ class MockAPIService {
     func getWasteByMaterial(from: Date, to: Date) async throws -> [WasteByMaterial] {
         await delay()
         return _materials.filter { $0.category == .fabric }.map { mat in
-            WasteByMaterial(id: UUID(), materialId: mat.id, materialName: mat.name,
+            WasteByMaterial(materialId: mat.id, materialName: mat.name,
                             avgWastePct: Double.random(in: 8...25),
                             totalWasteAreaCm2: Double.random(in: 500...5000))
         }
