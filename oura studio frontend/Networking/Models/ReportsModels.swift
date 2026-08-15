@@ -1,14 +1,15 @@
 import Foundation
 
 struct SalesReportPoint: Codable, Identifiable {
-    let id: UUID
     let period: String
     let totalRevenue: Double
     let totalProfit: Double
     let orderCount: Int
 
+    var id: String { period }
+
     enum CodingKeys: String, CodingKey {
-        case id, period
+        case period
         case totalRevenue = "total_revenue"
         case totalProfit = "total_profit"
         case orderCount = "order_count"
@@ -28,24 +29,24 @@ struct SalesReport: Codable {
 }
 
 struct MarginRankingItem: Codable, Identifiable {
-    let id: UUID
     let productSizeId: UUID
     let productName: String
     let sizeLabel: String
+    let fabricVariantName: String?
     let hpp: Double
     let sellingPrice: Double
     let marginPct: Double
-    let markupPct: Double
+
+    var id: UUID { productSizeId }
 
     enum CodingKeys: String, CodingKey {
-        case id
         case productSizeId = "product_size_id"
         case productName = "product_name"
         case sizeLabel = "size_label"
-        case hpp
+        case fabricVariantName = "fabric_variant_name"
+        case hpp = "hpp_total"
         case sellingPrice = "selling_price"
         case marginPct = "margin_pct"
-        case markupPct = "markup_pct"
     }
 }
 
@@ -95,14 +96,14 @@ struct StockCard: Codable {
 }
 
 struct WasteByMaterial: Codable, Identifiable {
-    let id: UUID
     let materialId: UUID
     let materialName: String
     let avgWastePct: Double
     let totalWasteAreaCm2: Double
 
+    var id: UUID { materialId }
+
     enum CodingKeys: String, CodingKey {
-        case id
         case materialId = "material_id"
         case materialName = "material_name"
         case avgWastePct = "avg_waste_pct"
