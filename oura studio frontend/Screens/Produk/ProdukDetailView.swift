@@ -700,7 +700,7 @@ struct AddSizeSheet: View {
         defer { isLoadingData = false }
         async let specsTask = api.getPatternSpecsForSize(productSku: productSku, sizeLabel: prefilledSizeLabel ?? "")
         async let matsTask  = api.getMaterials()
-        availableSpecs = (try? await specsTask) ?? []
+        availableSpecs = ((try? await specsTask) ?? []).filter { $0.productSku == productSku }
         allFabrics     = ((try? await matsTask) ?? []).filter { $0.category == .fabric }
     }
 
@@ -721,7 +721,12 @@ struct AddSizeSheet: View {
             }
             if let qty = initialStockQty, qty > 0 {
                 if let specId = selectedSpecId {
-                    _ = try await api.addStockFromBahan(sku: productSku, sizeId: targetSize.id, qty: Int(qty), specId: specId)
+                    do {
+                        _ = try await api.addStockFromBahan(sku: productSku, sizeId: targetSize.id, qty: Int(qty), specId: specId)
+                    } catch APIError.serverError(404, _) {
+                        // Spec found in picker but doesn't belong to this product on backend — fall back to plain stock add
+                        _ = try await api.adjustStock(sku: productSku, sizeId: targetSize.id, qty: Int(qty), reason: "initial")
+                    }
                 } else if let mat = allFabrics.first(where: { $0.name == fabricName }),
                           let w = manualCutWidthCm, w > 0,
                           let l = manualCutLengthCm, l > 0 {
