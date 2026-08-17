@@ -172,6 +172,16 @@ struct ProduksiBatchView: View {
     private func confirm(_ batch: ProductionBatch) async {
         do {
             try await api.confirmBatch(id: batch.id)
+            // Auto-apply suggested price (40% margin) for every item that has HPP
+            await withTaskGroup(of: Void.self) { group in
+                for item in batch.items {
+                    let hpp = item.latestHppBreakdown?.total
+                        ?? (item.hppTotal > 0 ? item.hppTotal : nil)
+                    guard let hpp, hpp > 0, item.productSizeId != nil else { continue }
+                    let price = ceil(hpp / 0.6) // 40% margin = hpp / (1 - 0.40)
+                    group.addTask { await self.applyPrice(item: item, price: price) }
+                }
+            }
             await load()
         } catch {
             errorMsg = error.localizedDescription
