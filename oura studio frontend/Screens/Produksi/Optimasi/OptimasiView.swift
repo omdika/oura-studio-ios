@@ -24,6 +24,23 @@ struct OptimasiView: View {
         }
         var strategy: OptimizerStrategy { fabricLayouts.first?.layout.strategy ?? .minWaste }
         var id: Int { strategyIndex }
+
+        var displayItems: [(productName: String, sizeLabel: String, qty: Int)] {
+            let perFabric: [[UUID: (String, String, Int)]] = fabricLayouts.map { fl in
+                var bySize: [UUID: (String, String, Int)] = [:]
+                for item in fl.layout.items {
+                    let prev = bySize[item.productSizeId]
+                    bySize[item.productSizeId] = (item.productName, item.sizeLabel, (prev?.2 ?? 0) + item.qtySuggested)
+                }
+                return bySize
+            }
+            let allIds = Set(perFabric.flatMap { $0.keys })
+            return allIds.compactMap { sizeId -> (String, String, Int)? in
+                let entries = perFabric.compactMap { $0[sizeId] }
+                guard let first = entries.first else { return nil }
+                return (first.0, first.1, entries.map { $0.2 }.min() ?? 0)
+            }.sorted { $0.1 < $1.1 }
+        }
     }
 
     @State private var step: Step = .selectSpec
@@ -513,17 +530,15 @@ struct OptimasiView: View {
                 }
             }
 
-            if let items = primaryLayout?.items {
-                ForEach(items) { item in
-                    HStack {
-                        Text("\(item.productName) · \(item.sizeLabel)")
-                            .font(.system(size: 13))
-                            .foregroundStyle(OuraTheme.Colors.textSecondary)
-                        Spacer()
-                        Text("\(item.qtySuggested) pcs")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(OuraTheme.Colors.textPrimary)
-                    }
+            ForEach(Array(result.displayItems.enumerated()), id: \.offset) { _, item in
+                HStack {
+                    Text("\(item.productName) · \(item.sizeLabel)")
+                        .font(.system(size: 13))
+                        .foregroundStyle(OuraTheme.Colors.textSecondary)
+                    Spacer()
+                    Text("\(item.qty) pcs")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(OuraTheme.Colors.textPrimary)
                 }
             }
 
