@@ -58,6 +58,8 @@ struct OptimasiView: View {
     @State private var rollSelections: [UUID: MaterialPurchase] = [:]   // materialId → chosen roll
     @State private var targetQty: Int = 1
     @State private var fabricLayoutResults: [FabricLayoutResult] = []
+    @State private var allMaterials: [Material] = []
+    @State private var settings: [SettingItem] = []
     @State private var isLoading = false
     @State private var isCalculating = false
     @State private var errorMsg: String?
@@ -553,6 +555,28 @@ struct OptimasiView: View {
                             .foregroundStyle(OuraTheme.Colors.textTertiary)
                     }
                 }
+                if let hpp = hppEstimate(fabricCostPerPiece: item.fabricCostPerPiece) {
+                    VStack(spacing: 4) {
+                        Divider().overlay(OuraTheme.Colors.separator)
+                        hppRow(label: "Kain", value: item.fabricCostPerPiece)
+                        if hpp.components > 0 {
+                            hppRow(label: "Bahan & Benang", value: hpp.components)
+                        }
+                        hppRow(label: "Labor", value: hpp.labor)
+                        hppRow(label: "Overhead", value: hpp.overhead)
+                        Divider().overlay(OuraTheme.Colors.separator)
+                        HStack {
+                            Text("Estimasi HPP")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(OuraTheme.Colors.textPrimary)
+                            Spacer()
+                            Text(String(format: "Rp%.0f/pcs", hpp.total))
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundStyle(OuraTheme.Colors.accent)
+                        }
+                    }
+                    .padding(.top, 4)
+                }
             }
 
             Button {
@@ -576,6 +600,42 @@ struct OptimasiView: View {
         .ouraCard()
     }
 
+    private struct HppEstimate {
+        let components: Double  // bahan tambahan (non-fabric)
+        let labor: Double
+        let overhead: Double
+        let total: Double       // fabric cost already included
+    }
+
+    private func hppEstimate(fabricCostPerPiece: Double) -> HppEstimate? {
+        guard let spec = selectedSpec else { return nil }
+        let matMap = Dictionary(uniqueKeysWithValues: allMaterials.map { ($0.id, $0.currentAvgCost) })
+        let settingsMap = Dictionary(uniqueKeysWithValues: settings.map { ($0.key, $0.value) })
+        let componentsCost = spec.components.reduce(0.0) { sum, comp in
+            sum + comp.qtyPerUnit * (matMap[comp.materialId] ?? 0)
+        }
+        let threadPooled    = settingsMap["pooled_material_rate:thread"]    ?? 0
+        let packagingPooled = settingsMap["pooled_material_rate:packaging"] ?? 0
+        let laborRate       = settingsMap["labor_rate_per_minute"]          ?? 0
+        let overhead        = settingsMap["default_overhead_per_unit"]      ?? 0
+        let labor           = spec.estLaborMinutes * laborRate
+        let total = fabricCostPerPiece + componentsCost + threadPooled + packagingPooled + labor + overhead
+        return HppEstimate(components: componentsCost + threadPooled + packagingPooled,
+                           labor: labor, overhead: overhead, total: total)
+    }
+
+    private func hppRow(label: String, value: Double) -> some View {
+        HStack {
+            Text(label)
+                .font(.system(size: 11))
+                .foregroundStyle(OuraTheme.Colors.textTertiary)
+            Spacer()
+            Text(String(format: "Rp%.0f", value))
+                .font(.system(size: 11))
+                .foregroundStyle(OuraTheme.Colors.textSecondary)
+        }
+    }
+
     private func statCell(label: String, value: String) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(label)
@@ -591,7 +651,15 @@ struct OptimasiView: View {
 
     private func loadData() async {
         isLoading = true
-        let mats = (try? await api.getMaterials()) ?? []
+        async let matsTask    = api.getMaterials()
+        async let specsTask   = api.getPatternSpecs()
+        async let settingsTask = api.getSettings()
+        let mats     = (try? await matsTask)     ?? []
+        let specs    = (try? await specsTask)    ?? []
+        let fetched  = (try? await settingsTask) ?? []
+        allMaterials = mats
+        patternSpecs = specs
+        settings     = fetched
         let fabricMats = mats.filter { $0.category == .fabric }
         var pairs: [(material: Material, purchase: MaterialPurchase)] = []
         for mat in fabricMats {
@@ -603,7 +671,6 @@ struct OptimasiView: View {
             pairs.append(contentsOf: available.map { (material: mat, purchase: $0) })
         }
         fabricPurchases = pairs
-        patternSpecs = (try? await api.getPatternSpecs()) ?? []
         isLoading = false
     }
 
