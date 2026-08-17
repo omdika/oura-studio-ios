@@ -25,29 +25,44 @@ struct OptimasiView: View {
         var strategy: OptimizerStrategy { fabricLayouts.first?.layout.strategy ?? .minWaste }
         var id: Int { strategyIndex }
 
-        var displayItems: [(productName: String, sizeLabel: String, qty: Int, fabricCostPerPiece: Double)] {
-            // (name, label, totalQty, weightedCostSum) per productSizeId per fabric
-            let perFabric: [[UUID: (String, String, Int, Double)]] = fabricLayouts.map { fl in
+        struct DisplayItem {
+            let productName: String
+            let sizeLabel: String
+            let qty: Int
+            let fabricCostPerPiece: Double             // total across all fabrics
+            let fabricBreakdown: [(name: String, cost: Double)]  // per-fabric contribution
+        }
+
+        var displayItems: [DisplayItem] {
+            // Per fabric: (materialName, dict[productSizeId → (name, label, totalQty, costSum)])
+            let perFabric: [(fabricName: String, bySize: [UUID: (String, String, Int, Double)])] = fabricLayouts.map { fl in
                 var bySize: [UUID: (String, String, Int, Double)] = [:]
                 for item in fl.layout.items {
                     let prev = bySize[item.productSizeId]
                     let prevQty = prev?.2 ?? 0
                     let newQty = prevQty + item.qtySuggested
-                    // weighted cost: track sum, divide later
                     let newCostSum = (prev?.3 ?? 0) + item.costPerPiece * Double(item.qtySuggested)
                     bySize[item.productSizeId] = (item.productName, item.sizeLabel, newQty, newCostSum)
                 }
-                return bySize
+                return (fl.materialName, bySize)
             }
-            let allIds = Set(perFabric.flatMap { $0.keys })
-            return allIds.compactMap { sizeId -> (String, String, Int, Double)? in
-                let entries = perFabric.compactMap { $0[sizeId] }
+            let allIds = Set(perFabric.flatMap { $0.bySize.keys })
+            return allIds.compactMap { sizeId -> DisplayItem? in
+                let entries = perFabric.compactMap { fabric -> (productName: String, sizeLabel: String, qty: Int, costSum: Double, fabricName: String)? in
+                    guard let e = fabric.bySize[sizeId] else { return nil }
+                    return (e.0, e.1, e.2, e.3, fabric.fabricName)
+                }
                 guard let first = entries.first else { return nil }
-                let minQty = entries.map { $0.2 }.min() ?? 0
-                // sum weighted-avg cost per fabric (each fabric contributes to one product)
-                let totalFabricCost = entries.map { $0.2 > 0 ? $0.3 / Double($0.2) : 0 }.reduce(0, +)
-                return (first.0, first.1, minQty, totalFabricCost)
-            }.sorted { $0.1 < $1.1 }
+                let minQty = entries.map { $0.qty }.min() ?? 0
+                let breakdown = entries.map { entry -> (name: String, cost: Double) in
+                    let avg = entry.qty > 0 ? entry.costSum / Double(entry.qty) : 0
+                    return (entry.fabricName, avg)
+                }
+                let totalFabricCost = breakdown.map { $0.cost }.reduce(0, +)
+                return DisplayItem(productName: first.productName, sizeLabel: first.sizeLabel,
+                                   qty: minQty, fabricCostPerPiece: totalFabricCost,
+                                   fabricBreakdown: breakdown)
+            }.sorted { $0.sizeLabel < $1.sizeLabel }
         }
     }
 
@@ -558,7 +573,13 @@ struct OptimasiView: View {
                 if let hpp = hppEstimate(fabricCostPerPiece: item.fabricCostPerPiece) {
                     VStack(spacing: 4) {
                         Divider().overlay(OuraTheme.Colors.separator)
-                        hppRow(label: "Kain", value: item.fabricCostPerPiece)
+                        if item.fabricBreakdown.count > 1 {
+                            ForEach(Array(item.fabricBreakdown.enumerated()), id: \.offset) { _, fb in
+                                hppRow(label: fb.name, value: fb.cost)
+                            }
+                        } else {
+                            hppRow(label: "Kain", value: item.fabricCostPerPiece)
+                        }
                         if hpp.components > 0 {
                             hppRow(label: "Bahan & Benang", value: hpp.components)
                         }
