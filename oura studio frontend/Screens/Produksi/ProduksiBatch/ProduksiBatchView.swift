@@ -4,6 +4,9 @@ struct ProduksiBatchView: View {
     @EnvironmentObject private var api: APIService
 
     @State private var batches: [ProductionBatch] = []
+    @State private var allMaterials: [Material] = []
+    @State private var settings: [SettingItem] = []
+    @State private var patternSpecs: [PatternSpec] = []
     @State private var isLoading = true
     @State private var errorMsg: String?
     @State private var expandedBatchId: UUID? = nil
@@ -167,8 +170,45 @@ struct ProduksiBatchView: View {
 
     private func load() async {
         isLoading = true
-        batches = (try? await api.getProductionBatches()) ?? []
+        async let batchesTask  = api.getProductionBatches()
+        async let matsTask     = api.getMaterials()
+        async let specsTask    = api.getPatternSpecs()
+        async let settingsTask = api.getSettings()
+        var loaded  = (try? await batchesTask)  ?? []
+        allMaterials = (try? await matsTask)    ?? []
+        patternSpecs = (try? await specsTask)   ?? []
+        settings     = (try? await settingsTask) ?? []
+        enrichDraftHpp(&loaded)
+        batches = loaded
         isLoading = false
+    }
+
+    private func enrichDraftHpp(_ batches: inout [ProductionBatch]) {
+        let settingsMap = Dictionary(uniqueKeysWithValues: settings.map { ($0.key, $0.value) })
+        let matCostMap  = Dictionary(uniqueKeysWithValues: allMaterials.map { ($0.id, $0.currentAvgCost) })
+        let specMap     = Dictionary(uniqueKeysWithValues: patternSpecs.map { ($0.id, $0) })
+        let laborRate   = settingsMap["labor_rate_per_minute"]          ?? 0
+        let overhead    = settingsMap["default_overhead_per_unit"]      ?? 0
+        let threadPool  = settingsMap["pooled_material_rate:thread"]    ?? 0
+        let packPool    = settingsMap["pooled_material_rate:packaging"] ?? 0
+        let pooled      = threadPool + packPool
+        for bIdx in batches.indices where batches[bIdx].isDraft {
+            for iIdx in batches[bIdx].items.indices {
+                var item = batches[bIdx].items[iIdx]
+                guard item.latestHppBreakdown == nil, item.hppFabric > 0 else { continue }
+                let spec  = item.patternSpecId.flatMap { specMap[$0] }
+                let labor = (spec?.estLaborMinutes ?? 0) * laborRate
+                let hardware: Double = spec?.components.reduce(0.0) { partial, comp in
+                    partial + comp.qtyPerUnit * (matCostMap[comp.materialId] ?? 0)
+                } ?? 0
+                let total    = item.hppFabric + pooled + hardware + labor + overhead
+                item.latestHppBreakdown = HPPBreakdown(
+                    fabric: item.hppFabric, pooledMaterial: pooled,
+                    hardware: hardware, labor: labor, overhead: overhead, total: total
+                )
+                batches[bIdx].items[iIdx] = item
+            }
+        }
     }
 
     private func confirm(_ batch: ProductionBatch) async {
@@ -191,9 +231,11 @@ struct ProduksiBatchView: View {
 
     private func updateItem(batch: ProductionBatch, item: ProductionBatchItem, qty: Int) async {
         do {
-            let updated = try await api.updateBatchItem(batchId: batch.id, itemId: item.id, qtyActual: qty)
+            var updated = try await api.updateBatchItem(batchId: batch.id, itemId: item.id, qtyActual: qty)
             if let bIdx = batches.firstIndex(where: { $0.id == batch.id }),
                let iIdx = batches[bIdx].items.firstIndex(where: { $0.id == item.id }) {
+                // Preserve client-side enrichment — API response doesn't include latestHppBreakdown
+                updated.latestHppBreakdown = updated.latestHppBreakdown ?? batches[bIdx].items[iIdx].latestHppBreakdown
                 batches[bIdx].items[iIdx] = updated
             }
         } catch {
@@ -476,7 +518,8 @@ private struct BatchItemRow: View {
                     .multilineTextAlignment(.center)
                     .frame(width: 44)
                     .onChange(of: qtyText) { _, new in
-                        if let q = Int(new) { onUpdate(q) }
+                        guard let q = Int(new), q != item.qtyActual else { return }
+                        onUpdate(q)
                     }
 
                 Button {
