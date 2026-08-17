@@ -25,20 +25,28 @@ struct OptimasiView: View {
         var strategy: OptimizerStrategy { fabricLayouts.first?.layout.strategy ?? .minWaste }
         var id: Int { strategyIndex }
 
-        var displayItems: [(productName: String, sizeLabel: String, qty: Int)] {
-            let perFabric: [[UUID: (String, String, Int)]] = fabricLayouts.map { fl in
-                var bySize: [UUID: (String, String, Int)] = [:]
+        var displayItems: [(productName: String, sizeLabel: String, qty: Int, fabricCostPerPiece: Double)] {
+            // (name, label, totalQty, weightedCostSum) per productSizeId per fabric
+            let perFabric: [[UUID: (String, String, Int, Double)]] = fabricLayouts.map { fl in
+                var bySize: [UUID: (String, String, Int, Double)] = [:]
                 for item in fl.layout.items {
                     let prev = bySize[item.productSizeId]
-                    bySize[item.productSizeId] = (item.productName, item.sizeLabel, (prev?.2 ?? 0) + item.qtySuggested)
+                    let prevQty = prev?.2 ?? 0
+                    let newQty = prevQty + item.qtySuggested
+                    // weighted cost: track sum, divide later
+                    let newCostSum = (prev?.3 ?? 0) + item.costPerPiece * Double(item.qtySuggested)
+                    bySize[item.productSizeId] = (item.productName, item.sizeLabel, newQty, newCostSum)
                 }
                 return bySize
             }
             let allIds = Set(perFabric.flatMap { $0.keys })
-            return allIds.compactMap { sizeId -> (String, String, Int)? in
+            return allIds.compactMap { sizeId -> (String, String, Int, Double)? in
                 let entries = perFabric.compactMap { $0[sizeId] }
                 guard let first = entries.first else { return nil }
-                return (first.0, first.1, entries.map { $0.2 }.min() ?? 0)
+                let minQty = entries.map { $0.2 }.min() ?? 0
+                // sum weighted-avg cost per fabric (each fabric contributes to one product)
+                let totalFabricCost = entries.map { $0.2 > 0 ? $0.3 / Double($0.2) : 0 }.reduce(0, +)
+                return (first.0, first.1, minQty, totalFabricCost)
             }.sorted { $0.1 < $1.1 }
         }
     }
@@ -531,14 +539,19 @@ struct OptimasiView: View {
             }
 
             ForEach(Array(result.displayItems.enumerated()), id: \.offset) { _, item in
-                HStack {
+                HStack(alignment: .center) {
                     Text("\(item.productName) · \(item.sizeLabel)")
                         .font(.system(size: 13))
                         .foregroundStyle(OuraTheme.Colors.textSecondary)
                     Spacer()
-                    Text("\(item.qty) pcs")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(OuraTheme.Colors.textPrimary)
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text("\(item.qty) pcs")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(OuraTheme.Colors.textPrimary)
+                        Text("~kain \(String(format: "Rp%.0f", item.fabricCostPerPiece))/pcs")
+                            .font(.system(size: 11))
+                            .foregroundStyle(OuraTheme.Colors.textTertiary)
+                    }
                 }
             }
 
