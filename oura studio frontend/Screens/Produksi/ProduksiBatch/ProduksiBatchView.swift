@@ -89,7 +89,7 @@ struct ProduksiBatchView: View {
                         VStack(alignment: .leading, spacing: 12) {
                             OuraSectionHeader(title: matName.uppercased())
                             ForEach(grouped[matName] ?? []) { batch in
-                                confirmedBatchRow(batch)
+                                ConfirmedBatchCard(batch: batch)
                             }
                         }
                     }
@@ -99,55 +99,6 @@ struct ProduksiBatchView: View {
             .padding(.top, 12)
             .padding(.bottom, 100)
         }
-    }
-
-    private func confirmedBatchRow(_ batch: ProductionBatch) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Header
-            HStack(alignment: .top) {
-                Text(batch.batchLabel)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(OuraTheme.Colors.textPrimary)
-                Spacer()
-                VStack(alignment: .trailing, spacing: 3) {
-                    OuraTag(text: "Selesai", color: OuraTheme.Colors.greenAccent, bg: OuraTheme.Colors.greenBg)
-                    Text(batch.producedAt, style: .date)
-                        .font(.system(size: 11))
-                        .foregroundStyle(OuraTheme.Colors.textTertiary)
-                }
-            }
-            .padding(OuraTheme.Spacing.cardPad)
-
-            if !batch.items.isEmpty {
-                Divider().overlay(OuraTheme.Colors.separator).padding(.horizontal, OuraTheme.Spacing.cardPad)
-
-                VStack(spacing: 0) {
-                    ForEach(batch.items.sorted { $0.sizeLabel < $1.sizeLabel }) { item in
-                        HStack {
-                            HStack(spacing: 6) {
-                                Rectangle()
-                                    .fill(OuraTheme.Colors.border)
-                                    .frame(width: 2, height: 14)
-                                    .clipShape(Capsule())
-                                Text(item.sizeLabel)
-                                    .font(.system(size: 13, weight: .medium))
-                                    .foregroundStyle(OuraTheme.Colors.textPrimary)
-                            }
-                            Spacer()
-                            Text("\(item.qtyActual) pcs")
-                                .font(.system(size: 13, weight: .semibold))
-                                .foregroundStyle(OuraTheme.Colors.textPrimary)
-                            Text("· HPP \(item.hppTotal.rupiahFormatted)")
-                                .font(.system(size: 11))
-                                .foregroundStyle(OuraTheme.Colors.textTertiary)
-                        }
-                        .padding(.horizontal, OuraTheme.Spacing.cardPad)
-                        .padding(.vertical, 8)
-                    }
-                }
-            }
-        }
-        .ouraCard()
     }
 
     private var emptyView: some View {
@@ -454,6 +405,192 @@ private struct BatchCard: View {
         .padding(.vertical, 3)
     }
 }
+
+// MARK: - Confirmed batch card
+
+private struct ConfirmedBatchCard: View {
+    let batch: ProductionBatch
+
+    @State private var hppItemId: UUID? = nil
+
+    private func effectiveHpp(for item: ProductionBatchItem) -> HPPBreakdown? {
+        if let breakdown = item.latestHppBreakdown { return breakdown }
+        guard item.hppFabric > 0 else { return nil }
+        let total = item.hppTotal > 0
+            ? item.hppTotal
+            : item.hppFabric + item.hppPooledMaterial + item.hppHardware + item.hppLabor + item.hppOverhead
+        return HPPBreakdown(fabric: item.hppFabric, pooledMaterial: item.hppPooledMaterial,
+                            hardware: item.hppHardware, labor: item.hppLabor,
+                            overhead: item.hppOverhead, total: total)
+    }
+
+    private var hppFocusItem: ProductionBatchItem? {
+        guard let id = hppItemId else { return nil }
+        return batch.items.first { $0.id == id && effectiveHpp(for: $0) != nil }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .top) {
+                Text(batch.batchLabel)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(OuraTheme.Colors.textPrimary)
+                Spacer()
+                VStack(alignment: .trailing, spacing: 3) {
+                    OuraTag(text: "Selesai", color: OuraTheme.Colors.greenAccent, bg: OuraTheme.Colors.greenBg)
+                    Text(batch.producedAt, style: .date)
+                        .font(.system(size: 11))
+                        .foregroundStyle(OuraTheme.Colors.textTertiary)
+                }
+            }
+            .padding(OuraTheme.Spacing.cardPad)
+
+            if !batch.items.isEmpty {
+                Divider().overlay(OuraTheme.Colors.separator).padding(.horizontal, OuraTheme.Spacing.cardPad)
+
+                VStack(spacing: 0) {
+                    ForEach(batch.items.sorted { $0.sizeLabel < $1.sizeLabel }) { item in
+                        let hasHpp = effectiveHpp(for: item) != nil
+                        let isSelected = hppItemId == item.id && hasHpp
+                        Button {
+                            guard hasHpp else { return }
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                hppItemId = hppItemId == item.id ? nil : item.id
+                            }
+                        } label: {
+                            HStack {
+                                HStack(spacing: 6) {
+                                    Rectangle()
+                                        .fill(isSelected ? OuraTheme.Colors.accent : OuraTheme.Colors.border)
+                                        .frame(width: 2, height: 14)
+                                        .clipShape(Capsule())
+                                    Text(item.sizeLabel)
+                                        .font(.system(size: 13, weight: .medium))
+                                        .foregroundStyle(OuraTheme.Colors.textPrimary)
+                                }
+                                Spacer()
+                                Text("\(item.qtyActual) pcs")
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundStyle(OuraTheme.Colors.textPrimary)
+                                if item.hppTotal > 0 {
+                                    Text("· HPP \(item.hppTotal.rupiahFormatted)")
+                                        .font(.system(size: 11))
+                                        .foregroundStyle(isSelected ? OuraTheme.Colors.accent : OuraTheme.Colors.textTertiary)
+                                }
+                                if hasHpp {
+                                    Image(systemName: "chevron.right")
+                                        .font(.system(size: 10, weight: .medium))
+                                        .foregroundStyle(OuraTheme.Colors.textTertiary)
+                                        .rotationEffect(.degrees(isSelected ? 90 : 0))
+                                        .animation(.easeInOut(duration: 0.2), value: isSelected)
+                                }
+                            }
+                            .padding(.horizontal, OuraTheme.Spacing.cardPad)
+                            .padding(.vertical, 8)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+
+                if let focus = hppFocusItem, let hpp = effectiveHpp(for: focus) {
+                    Divider().overlay(OuraTheme.Colors.separator)
+                    hppRincian(sizeLabel: focus.sizeLabel, hpp: hpp)
+                }
+            }
+        }
+        .ouraCard()
+    }
+
+    private func hppRincian(sizeLabel: String, hpp: HPPBreakdown) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 4) {
+                Text("RINCIAN HPP")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(OuraTheme.Colors.textTertiary)
+                Text("·")
+                    .font(.system(size: 11))
+                    .foregroundStyle(OuraTheme.Colors.textTertiary)
+                Text(sizeLabel.uppercased())
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(OuraTheme.Colors.accent)
+            }
+            .padding(.horizontal, OuraTheme.Spacing.cardPad)
+            .padding(.top, 12)
+            .padding(.bottom, 6)
+
+            VStack(spacing: 0) {
+                hppRow("Kain (fabric)", value: hpp.fabric, dot: Color(red: 0.24, green: 0.52, blue: 0.95))
+                if hpp.fabricItems.count > 1 {
+                    ForEach(hpp.fabricItems, id: \.name) { hppSubRow($0.name, cost: $0.cost) }
+                }
+                if hpp.pooledMaterial > 0 {
+                    hppRow("Bahan Pooled", value: hpp.pooledMaterial, dot: Color(red: 0.58, green: 0.35, blue: 0.85))
+                }
+                if hpp.hardware > 0 {
+                    hppRow("Hardware", value: hpp.hardware, dot: Color(red: 0.95, green: 0.75, blue: 0.20))
+                    if hpp.hardwareItems.count > 1 {
+                        ForEach(hpp.hardwareItems, id: \.name) { hppSubRow($0.name, cost: $0.cost) }
+                    }
+                }
+                if hpp.labor > 0 {
+                    hppRow("Tenaga Kerja", value: hpp.labor, dot: Color(red: 0.95, green: 0.48, blue: 0.22))
+                }
+                if hpp.overhead > 0 {
+                    hppRow("Overhead", value: hpp.overhead, dot: OuraTheme.Colors.textTertiary)
+                }
+            }
+            .padding(.horizontal, OuraTheme.Spacing.cardPad)
+
+            Divider()
+                .overlay(OuraTheme.Colors.separator)
+                .padding(.horizontal, OuraTheme.Spacing.cardPad)
+                .padding(.top, 8)
+
+            HStack {
+                Text("HPP Total")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(OuraTheme.Colors.textPrimary)
+                Spacer()
+                Text(hpp.total.rupiahFormatted)
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(OuraTheme.Colors.accent)
+            }
+            .padding(.horizontal, OuraTheme.Spacing.cardPad)
+            .padding(.vertical, 10)
+        }
+    }
+
+    private func hppRow(_ label: String, value: Double, dot: Color) -> some View {
+        HStack(spacing: 8) {
+            Circle().fill(dot).frame(width: 7, height: 7)
+            Text(label)
+                .font(.system(size: 13))
+                .foregroundStyle(OuraTheme.Colors.textSecondary)
+            Spacer()
+            Text(value.rupiahFormatted)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(OuraTheme.Colors.textPrimary)
+        }
+        .padding(.vertical, 5)
+    }
+
+    private func hppSubRow(_ label: String, cost: Double) -> some View {
+        HStack {
+            Text("· \(label)")
+                .font(.system(size: 12))
+                .foregroundStyle(OuraTheme.Colors.textTertiary)
+                .padding(.leading, 15)
+            Spacer()
+            Text(cost.rupiahFormatted)
+                .font(.system(size: 12))
+                .foregroundStyle(OuraTheme.Colors.textSecondary)
+        }
+        .padding(.vertical, 3)
+    }
+}
+
+// MARK: - Draft item row
 
 private struct BatchItemRow: View {
     let item: ProductionBatchItem
