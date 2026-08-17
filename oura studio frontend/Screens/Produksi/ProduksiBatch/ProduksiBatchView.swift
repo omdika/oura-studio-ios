@@ -224,8 +224,16 @@ private struct BatchCard: View {
 
     @State private var hppItemId: UUID? = nil
 
+    private func effectiveHpp(for item: ProductionBatchItem) -> HPPBreakdown? {
+        if let breakdown = item.latestHppBreakdown { return breakdown }
+        guard item.hppTotal > 0 else { return nil }
+        return HPPBreakdown(fabric: item.hppFabric, pooledMaterial: item.hppPooledMaterial,
+                            hardware: item.hppHardware, labor: item.hppLabor,
+                            overhead: item.hppOverhead, total: item.hppTotal)
+    }
+
     private var hppFocusItem: ProductionBatchItem? {
-        let withHpp = batch.items.filter { $0.latestHppBreakdown != nil }
+        let withHpp = batch.items.filter { effectiveHpp(for: $0) != nil }
         guard !withHpp.isEmpty else { return nil }
         if let focused = hppItemId, let item = withHpp.first(where: { $0.id == focused }) {
             return item
@@ -261,16 +269,16 @@ private struct BatchCard: View {
                 ForEach(batch.items) { item in
                     BatchItemRow(
                         item: item,
-                        isHppSelected: hppFocusItem?.id == item.id && item.latestHppBreakdown != nil,
+                        isHppSelected: hppFocusItem?.id == item.id && effectiveHpp(for: item) != nil,
                         onUpdate: { qty in onUpdateItem(item, qty) },
-                        onSelectHpp: item.latestHppBreakdown != nil ? { hppItemId = item.id } : nil
+                        onSelectHpp: effectiveHpp(for: item) != nil ? { hppItemId = item.id } : nil
                     )
                     if item.id != batch.items.last?.id {
                         Divider().padding(.leading, 16).overlay(OuraTheme.Colors.separator)
                     }
                 }
 
-                if let focus = hppFocusItem, let hpp = focus.latestHppBreakdown {
+                if let focus = hppFocusItem, let hpp = effectiveHpp(for: focus) {
                     Divider().overlay(OuraTheme.Colors.separator)
                     hppRincian(sizeLabel: focus.sizeLabel, hpp: hpp)
                 }
