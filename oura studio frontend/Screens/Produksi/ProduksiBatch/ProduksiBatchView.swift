@@ -226,10 +226,14 @@ private struct BatchCard: View {
 
     private func effectiveHpp(for item: ProductionBatchItem) -> HPPBreakdown? {
         if let breakdown = item.latestHppBreakdown { return breakdown }
-        guard item.hppTotal > 0 else { return nil }
+        // Real backend draft: only hppFabric is populated; full HPP computed at confirmation
+        guard item.hppFabric > 0 else { return nil }
+        let total = item.hppTotal > 0
+            ? item.hppTotal
+            : item.hppFabric + item.hppPooledMaterial + item.hppHardware + item.hppLabor + item.hppOverhead
         return HPPBreakdown(fabric: item.hppFabric, pooledMaterial: item.hppPooledMaterial,
                             hardware: item.hppHardware, labor: item.hppLabor,
-                            overhead: item.hppOverhead, total: item.hppTotal)
+                            overhead: item.hppOverhead, total: total)
     }
 
     private var hppFocusItem: ProductionBatchItem? {
@@ -343,13 +347,21 @@ private struct BatchCard: View {
                 if hpp.fabricItems.count > 1 {
                     ForEach(hpp.fabricItems, id: \.name) { hppSubRow($0.name, cost: $0.cost) }
                 }
-                hppRow("Bahan Pooled", value: hpp.pooledMaterial, dot: Color(red: 0.58, green: 0.35, blue: 0.85))
-                hppRow("Hardware", value: hpp.hardware, dot: Color(red: 0.95, green: 0.75, blue: 0.20))
-                if hpp.hardwareItems.count > 1 {
-                    ForEach(hpp.hardwareItems, id: \.name) { hppSubRow($0.name, cost: $0.cost) }
+                if hpp.pooledMaterial > 0 {
+                    hppRow("Bahan Pooled", value: hpp.pooledMaterial, dot: Color(red: 0.58, green: 0.35, blue: 0.85))
                 }
-                hppRow("Tenaga Kerja", value: hpp.labor, dot: Color(red: 0.95, green: 0.48, blue: 0.22))
-                hppRow("Overhead", value: hpp.overhead, dot: OuraTheme.Colors.textTertiary)
+                if hpp.hardware > 0 {
+                    hppRow("Hardware", value: hpp.hardware, dot: Color(red: 0.95, green: 0.75, blue: 0.20))
+                    if hpp.hardwareItems.count > 1 {
+                        ForEach(hpp.hardwareItems, id: \.name) { hppSubRow($0.name, cost: $0.cost) }
+                    }
+                }
+                if hpp.labor > 0 {
+                    hppRow("Tenaga Kerja", value: hpp.labor, dot: Color(red: 0.95, green: 0.48, blue: 0.22))
+                }
+                if hpp.overhead > 0 {
+                    hppRow("Overhead", value: hpp.overhead, dot: OuraTheme.Colors.textTertiary)
+                }
             }
             .padding(.horizontal, OuraTheme.Spacing.cardPad)
 
