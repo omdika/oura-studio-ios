@@ -304,7 +304,12 @@ class APIService: ObservableObject {
 
     func getMaterialUsage(materialId: UUID) async throws -> [MaterialUsageEntry] {
         if useMock { return try await MockAPIService.shared.getMaterialUsage(materialId: materialId) }
-        return []
+        return try await get(path: "/materials/\(materialId)/usage")
+    }
+
+    func getFabricFamilies() async throws -> [String] {
+        if useMock { return try await MockAPIService.shared.getFabricFamilies() }
+        return try await get(path: "/materials/families")
     }
 
     func addStockManual(sku: String, sizeId: UUID, qty: Int, materialId: UUID, cutWidthCm: Double, cutLengthCm: Double) async throws -> ProductSizeDetail {
@@ -454,6 +459,7 @@ class APIService: ObservableObject {
                     id: f.id,
                     materialId: f.materialId,
                     materialName: f.materialName,
+                    fabricFamily: nil,            // populated when backend includes fabric_family in join
                     cutLengthCm: f.cutHeightCm,  // backend "height" = UI "panjang/length"
                     cutWidthCm: f.cutWidthCm,
                     rotationAllowed: f.rotationAllowed

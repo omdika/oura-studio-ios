@@ -4,6 +4,7 @@ struct PatternFabric: Codable, Identifiable {
     let id: UUID
     let materialId: UUID
     let materialName: String
+    let fabricFamily: String?
     let cutLengthCm: Double   // Panjang potongan
     let cutWidthCm: Double    // Lebar potongan
     let rotationAllowed: Bool
@@ -12,6 +13,7 @@ struct PatternFabric: Codable, Identifiable {
         case id
         case materialId      = "material_id"
         case materialName    = "material_name"
+        case fabricFamily    = "fabric_family"
         case cutLengthCm     = "cut_height_cm"
         case cutWidthCm      = "cut_width_cm"
         case rotationAllowed = "rotation_allowed"

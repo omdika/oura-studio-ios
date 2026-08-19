@@ -13,6 +13,8 @@ struct BahanDetailView: View {
     @State private var showTambah = false
     @State private var editingPurchase: MaterialPurchase? = nil
     @State private var navigatingProduct: Product? = nil
+    @State private var localFabricFamily: String? = nil
+    @State private var showFamilyPicker = false
 
     // MARK: - Derived
 
@@ -71,6 +73,33 @@ struct BahanDetailView: View {
                 VStack(alignment: .leading, spacing: 0) {
                     HStack {
                         OuraTag(text: material.category.displayName, color: categoryColor, bg: categoryBg)
+                        if material.category == .fabric {
+                            if let family = localFabricFamily {
+                                Button { showFamilyPicker = true } label: {
+                                    Text(family)
+                                        .font(.system(size: 12, weight: .semibold))
+                                        .foregroundStyle(OuraTheme.Colors.textSecondary)
+                                        .padding(.horizontal, 9).padding(.vertical, 5)
+                                        .background(OuraTheme.Colors.surfaceCard)
+                                        .clipShape(Capsule())
+                                        .overlay(Capsule().stroke(OuraTheme.Colors.border, lineWidth: 1))
+                                }
+                                .buttonStyle(.plain)
+                            } else {
+                                Button { showFamilyPicker = true } label: {
+                                    HStack(spacing: 3) {
+                                        Image(systemName: "plus").font(.system(size: 10, weight: .bold))
+                                        Text("Jenis").font(.system(size: 12, weight: .semibold))
+                                    }
+                                    .foregroundStyle(OuraTheme.Colors.textTertiary)
+                                    .padding(.horizontal, 9).padding(.vertical, 5)
+                                    .background(OuraTheme.Colors.surfaceSheet)
+                                    .clipShape(Capsule())
+                                    .overlay(Capsule().stroke(OuraTheme.Colors.border, lineWidth: 1))
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
                         Spacer()
                         if let sisa = totalRemainingCm {
                             let sisaLabel = String(format: "Sisa %.0f cm", sisa)
@@ -105,7 +134,20 @@ struct BahanDetailView: View {
         }
         .background(OuraTheme.Colors.background)
         .toolbar(.hidden, for: .navigationBar)
-        .task { await loadPurchases() }
+        .task { localFabricFamily = material.fabricFamily; await loadPurchases() }
+        .sheet(isPresented: $showFamilyPicker) {
+            FabricFamilyPickerSheet(currentFamily: localFabricFamily) { newFamily in
+                Task {
+                    if let updated = try? await api.patchMaterial(
+                        id: material.id,
+                        PatchMaterialRequest(fabricFamily: newFamily)
+                    ) {
+                        localFabricFamily = updated.fabricFamily
+                    }
+                }
+            }
+            .environmentObject(api)
+        }
         .sheet(isPresented: $showTambah, onDismiss: { Task { await loadPurchases() } }) {
             TambahPembelianSheet(preselectedMaterial: material)
         }
@@ -302,6 +344,121 @@ struct BahanDetailView: View {
         usageEntries = (try? await usageTask) ?? []
         allProducts  = (try? await productsTask) ?? []
         isLoading = false
+    }
+}
+
+// MARK: - Fabric family picker sheet
+
+private struct FabricFamilyPickerSheet: View {
+    @EnvironmentObject private var api: APIService
+    @Environment(\.dismiss) private var dismiss
+
+    let currentFamily: String?
+    let onSave: (String?) -> Void
+
+    @State private var families: [String] = []
+    @State private var inputText: String
+
+    init(currentFamily: String?, onSave: @escaping (String?) -> Void) {
+        self.currentFamily = currentFamily
+        self.onSave = onSave
+        _inputText = State(initialValue: currentFamily ?? "")
+    }
+
+    private var trimmed: String { inputText.trimmingCharacters(in: .whitespaces) }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                if !families.isEmpty {
+                    Section {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 8) {
+                                ForEach(families, id: \.self) { family in
+                                    Button { inputText = family } label: {
+                                        Text(family)
+                                            .font(.system(size: 13, weight: .medium))
+                                            .foregroundStyle(
+                                                inputText == family
+                                                    ? OuraTheme.Colors.accent
+                                                    : OuraTheme.Colors.textSecondary
+                                            )
+                                            .padding(.horizontal, 12).padding(.vertical, 6)
+                                            .background(
+                                                inputText == family
+                                                    ? OuraTheme.Colors.accentLight
+                                                    : OuraTheme.Colors.surfaceCard
+                                            )
+                                            .clipShape(Capsule())
+                                            .overlay(
+                                                Capsule().stroke(
+                                                    inputText == family
+                                                        ? OuraTheme.Colors.accent
+                                                        : OuraTheme.Colors.border,
+                                                    lineWidth: 1
+                                                )
+                                            )
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                            .padding(.vertical, 4)
+                        }
+                        .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
+                        .listRowBackground(OuraTheme.Colors.surfaceCard)
+                    } header: {
+                        OuraSectionHeader(title: "Jenis yang Sudah Ada")
+                    }
+                    .listSectionSeparator(.hidden)
+                }
+
+                Section {
+                    TextField("contoh: Satin, Waffle, Nilon", text: $inputText)
+                        .autocorrectionDisabled()
+                        .foregroundStyle(OuraTheme.Colors.textPrimary)
+                        .listRowBackground(OuraTheme.Colors.surfaceCard)
+                        .listRowInsets(EdgeInsets(top: 12, leading: 16, bottom: 12, trailing: 16))
+                } header: {
+                    OuraSectionHeader(title: "Nama Jenis")
+                } footer: {
+                    Text("Kain sejenis dikelompokkan di form resep — input dimensi cukup sekali per jenis.")
+                        .font(.system(size: 12))
+                        .foregroundStyle(OuraTheme.Colors.textTertiary)
+                }
+                .listSectionSeparator(.hidden)
+
+                if currentFamily != nil {
+                    Section {
+                        Button("Hapus Jenis", role: .destructive) {
+                            onSave(nil)
+                            dismiss()
+                        }
+                        .frame(maxWidth: .infinity)
+                        .listRowBackground(OuraTheme.Colors.surfaceCard)
+                        .listRowInsets(EdgeInsets(top: 12, leading: 16, bottom: 12, trailing: 16))
+                    }
+                    .listSectionSeparator(.hidden)
+                }
+            }
+            .scrollContentBackground(.hidden)
+            .background(OuraTheme.Colors.background)
+            .navigationTitle("Jenis Kain")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Batal") { dismiss() }
+                        .foregroundStyle(OuraTheme.Colors.accent)
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Simpan") {
+                        onSave(trimmed.isEmpty ? nil : trimmed)
+                        dismiss()
+                    }
+                    .foregroundStyle(OuraTheme.Colors.accent)
+                }
+            }
+        }
+        .task { families = (try? await api.getFabricFamilies()) ?? [] }
     }
 }
 

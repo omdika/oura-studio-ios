@@ -17,6 +17,7 @@ struct TambahPembelianSheet: View {
     @State private var newMaterialName: String = ""
     @State private var newMaterialCategory: MaterialCategory? = nil
     @State private var newFabricWidthCm: Double? = nil
+    @State private var newFabricFamily: String = ""
 
     // Purchase fields
     @State private var widthCm: Double? = nil
@@ -226,6 +227,22 @@ struct TambahPembelianSheet: View {
                 .listRowBackground(OuraTheme.Colors.surfaceCard)
                 .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
 
+                if newMaterialCategory == .fabric {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Jenis Kain (opsional)")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(OuraTheme.Colors.textSecondary)
+                        TextField("contoh: Satin, Waffle, Nilon", text: $newFabricFamily)
+                            .font(.system(size: 15))
+                            .foregroundStyle(OuraTheme.Colors.textPrimary)
+                            .autocorrectionDisabled()
+                        Text("Kain sejenis dikelompokkan di form resep.")
+                            .font(.system(size: 12))
+                            .foregroundStyle(OuraTheme.Colors.textTertiary)
+                    }
+                    .listRowBackground(OuraTheme.Colors.surfaceCard)
+                    .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
+                }
 
             } header: {
                 OuraSectionHeader(title: "Bahan Baru")
@@ -375,13 +392,15 @@ struct TambahPembelianSheet: View {
             if let existing = resolvedMaterial {
                 materialId = existing.id
             } else if isCreatingNew, let cat = newMaterialCategory {
+                let familyVal = newFabricFamily.trimmingCharacters(in: .whitespaces)
                 let mat = try await api.createMaterial(CreateMaterialRequest(
                     name: newMaterialName,
                     category: cat.rawValue,
                     costClass: cat.defaultCostClass,
                     purchaseUnit: cat.defaultPurchaseUnit,
                     usageUnit: cat.defaultUsageUnit,
-                    fabricWidthCm: cat == .fabric ? newFabricWidthCm : nil
+                    fabricWidthCm: cat == .fabric ? newFabricWidthCm : nil,
+                    fabricFamily: cat == .fabric && !familyVal.isEmpty ? familyVal : nil
                 ))
                 materialId = mat.id
             } else {

@@ -15,8 +15,22 @@ struct SpecGroup: Identifiable {
     var isSingleFabric: Bool { specs.count == 1 && specs[0].fabrics.count <= 1 }
     var firstFabric: PatternFabric? { specs.flatMap { $0.fabrics }.first }
     var allFabricNames: String {
-        let names = specs.flatMap { $0.fabrics }.map { $0.materialName }
-        return names.isEmpty ? "Tanpa Kain" : names.joined(separator: " · ")
+        let fabrics = specs.flatMap { $0.fabrics }
+        if fabrics.isEmpty { return "Tanpa Kain" }
+        var familyCounts: [String: Int] = [:]
+        var ungroupedNames: [String] = []
+        for fabric in fabrics {
+            if let fam = fabric.fabricFamily {
+                familyCounts[fam, default: 0] += 1
+            } else {
+                ungroupedNames.append(fabric.materialName)
+            }
+        }
+        var parts = familyCounts.keys.sorted().map { fam -> String in
+            familyCounts[fam]! > 1 ? "\(fam) (\(familyCounts[fam]!))" : fam
+        }
+        parts += ungroupedNames
+        return parts.joined(separator: " · ")
     }
 }
 

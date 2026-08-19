@@ -198,35 +198,35 @@ class MockAPIService {
             PatternSpec(id: specScrunM_Satin, productSizeId: sizeScrunM, productName: "Scrunchie",
                         productSku: "SCRUNCHIE", sizeLabel: "M",
                         fabrics: [PatternFabric(id: UUID(), materialId: matSatinId, materialName: "Satin Pelangi",
-                                                cutLengthCm: 90, cutWidthCm: 20, rotationAllowed: true)],
+                                                fabricFamily: "Satin", cutLengthCm: 90, cutWidthCm: 20, rotationAllowed: true)],
                         estLaborMinutes: 10, isActive: true,
                         effectiveFrom: ago(days: 7), effectiveTo: nil,
                         components: [], usedInBatchCount: 0),
             PatternSpec(id: specScrunM_Waffle, productSizeId: sizeScrunXS, productName: "Scrunchie",
                         productSku: "SCRUNCHIE", sizeLabel: "M",
                         fabrics: [PatternFabric(id: UUID(), materialId: matWaffleId, materialName: "Waffle Merah",
-                                                cutLengthCm: 80, cutWidthCm: 18, rotationAllowed: true)],
+                                                fabricFamily: "Waffle", cutLengthCm: 80, cutWidthCm: 18, rotationAllowed: true)],
                         estLaborMinutes: 10, isActive: true,
                         effectiveFrom: ago(days: 7), effectiveTo: nil,
                         components: [], usedInBatchCount: 0),
             PatternSpec(id: specScrunS_Satin, productSizeId: sizeScrunL, productName: "Scrunchie",
                         productSku: "SCRUNCHIE", sizeLabel: "L",
                         fabrics: [PatternFabric(id: UUID(), materialId: matSatinId, materialName: "Satin Pelangi",
-                                                cutLengthCm: 100, cutWidthCm: 22, rotationAllowed: true)],
+                                                fabricFamily: "Satin", cutLengthCm: 100, cutWidthCm: 22, rotationAllowed: true)],
                         estLaborMinutes: 12, isActive: true,
                         effectiveFrom: ago(days: 7), effectiveTo: nil,
                         components: [], usedInBatchCount: 0),
             PatternSpec(id: specIkatM_Brokat, productSizeId: sizeScrunS, productName: "Scrunchie",
                         productSku: "SCRUNCHIE", sizeLabel: "L",
                         fabrics: [PatternFabric(id: UUID(), materialId: matWaffleId, materialName: "Waffle Merah",
-                                                cutLengthCm: 90, cutWidthCm: 21, rotationAllowed: true)],
+                                                fabricFamily: "Waffle", cutLengthCm: 90, cutWidthCm: 21, rotationAllowed: true)],
                         estLaborMinutes: 12, isActive: true,
                         effectiveFrom: ago(days: 7), effectiveTo: nil,
                         components: [], usedInBatchCount: 0),
             PatternSpec(id: specScrunL_SilkPutih, productSizeId: sizeScrunXL, productName: "Scrunchie",
                         productSku: "SCRUNCHIE", sizeLabel: "L",
                         fabrics: [PatternFabric(id: UUID(), materialId: matSilkPutihId, materialName: "Silk Putih",
-                                                cutLengthCm: 80, cutWidthCm: 18, rotationAllowed: true)],
+                                                fabricFamily: nil, cutLengthCm: 80, cutWidthCm: 18, rotationAllowed: true)],
                         estLaborMinutes: 12, isActive: true,
                         effectiveFrom: ago(days: 3), effectiveTo: nil,
                         components: [], usedInBatchCount: 0),
@@ -636,10 +636,12 @@ class MockAPIService {
         let sizeLabel   = sizeDetail?.sizeLabel   ?? ""
 
         let fabricObjects = req.fabrics.map { f in
-            PatternFabric(id: UUID(), materialId: f.materialId,
-                          materialName: _materials.first(where: { $0.id == f.materialId })?.name ?? "Unknown",
-                          cutLengthCm: f.cutLengthCm, cutWidthCm: f.cutWidthCm,
-                          rotationAllowed: f.rotationAllowed)
+            let mat = _materials.first(where: { $0.id == f.materialId })
+            return PatternFabric(id: UUID(), materialId: f.materialId,
+                                 materialName: mat?.name ?? "Unknown",
+                                 fabricFamily: mat?.fabricFamily,
+                                 cutLengthCm: f.cutLengthCm, cutWidthCm: f.cutWidthCm,
+                                 rotationAllowed: f.rotationAllowed)
         }
         let comps = req.components.map { c in
             PatternComponent(id: UUID(), patternSpecId: UUID(),
@@ -1211,6 +1213,12 @@ class MockAPIService {
     func getMaterialUsage(materialId: UUID) async throws -> [MaterialUsageEntry] {
         await delay()
         return (_materialUsage[materialId] ?? []).sorted { $0.date > $1.date }
+    }
+
+    func getFabricFamilies() async throws -> [String] {
+        await delay()
+        let families = _materials.compactMap { $0.fabricFamily }
+        return Array(Set(families)).sorted()
     }
 
     // MARK: - Sales

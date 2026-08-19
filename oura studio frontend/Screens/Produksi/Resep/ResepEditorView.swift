@@ -1,5 +1,12 @@
 import SwiftUI
 
+private struct FabricGroup: Identifiable {
+    let family: String?
+    let fabIds: [UUID]
+    var id: String { family ?? fabIds.map { $0.uuidString }.joined(separator: "-") }
+    var isGrouped: Bool { family != nil && fabIds.count > 1 }
+}
+
 struct ResepEditorView: View {
     @EnvironmentObject private var api: APIService
     @Environment(\.dismiss) private var dismiss
@@ -42,6 +49,23 @@ struct ResepEditorView: View {
             && editFabricIds.allSatisfy { id in (fabricLengths[id] ?? 0) > 0 && (fabricWidths[id] ?? 0) > 0 }
             && editComponentIds.allSatisfy { id in (componentQtys[id] ?? 0) > 0 }
             && (editLaborMinutes ?? 0) > 0
+    }
+
+    private var editorFabricGroups: [FabricGroup] {
+        var familyMap: [String: [UUID]] = [:]
+        var ungrouped: [UUID] = []
+        for fabId in editFabricIds {
+            if let family = allMaterials.first(where: { $0.id == fabId })?.fabricFamily {
+                familyMap[family, default: []].append(fabId)
+            } else {
+                ungrouped.append(fabId)
+            }
+        }
+        var groups: [FabricGroup] = familyMap.keys.sorted().map {
+            FabricGroup(family: $0, fabIds: familyMap[$0]!)
+        }
+        groups += ungrouped.map { FabricGroup(family: nil, fabIds: [$0]) }
+        return groups
     }
 
     var body: some View {
@@ -216,33 +240,36 @@ struct ResepEditorView: View {
                     }
                 }
 
-                ForEach(editFabricIds, id: \.self) { fabId in
-                    let name = allMaterials.first { $0.id == fabId }?.name ?? ""
+                ForEach(editorFabricGroups) { group in
+                    let repId = group.fabIds[0]
+                    let displayName = group.isGrouped
+                        ? "\(group.family!) (\(group.fabIds.count) warna)"
+                        : (allMaterials.first { $0.id == repId }?.name ?? "")
                     VStack(alignment: .leading, spacing: 8) {
-                        Text(name)
+                        Text(displayName)
                             .font(.system(size: 13, weight: .semibold))
                             .foregroundStyle(OuraTheme.Colors.textSecondary)
                         HStack(spacing: 12) {
                             NumericInputField(
                                 label: "Panjang (cm)",
                                 value: Binding(
-                                    get: { fabricLengths[fabId] },
-                                    set: { fabricLengths[fabId] = $0 }
+                                    get: { fabricLengths[repId] },
+                                    set: { val in for id in group.fabIds { fabricLengths[id] = val } }
                                 ),
                                 unit: "cm"
                             )
                             NumericInputField(
                                 label: "Lebar (cm)",
                                 value: Binding(
-                                    get: { fabricWidths[fabId] },
-                                    set: { fabricWidths[fabId] = $0 }
+                                    get: { fabricWidths[repId] },
+                                    set: { val in for id in group.fabIds { fabricWidths[id] = val } }
                                 ),
                                 unit: "cm"
                             )
                         }
                         Toggle("Rotasi Diizinkan", isOn: Binding(
-                            get: { fabricRotations[fabId] ?? true },
-                            set: { fabricRotations[fabId] = $0 }
+                            get: { fabricRotations[repId] ?? true },
+                            set: { val in for id in group.fabIds { fabricRotations[id] = val } }
                         ))
                         .tint(OuraTheme.Colors.accent)
                         .font(.system(size: 13))
@@ -254,15 +281,16 @@ struct ResepEditorView: View {
                 NumericInputField(label: "Estimasi Kerja (menit)", value: $editLaborMinutes, unit: "min")
 
             } else {
-                // Display mode — show all fabrics from all specs in the group
+                // Display mode — show fabrics grouped by family
                 if allCurrentFabrics.isEmpty {
                     infoRow("Kain", value: "Tanpa Kain")
                 } else {
-                    ForEach(allCurrentFabrics) { fabric in
-                        infoRow("Kain", value: fabric.materialName)
-                        infoRow("Dimensi", value: String(format: "%.0f × %.0f cm", fabric.cutLengthCm, fabric.cutWidthCm))
-                        infoRow("Rotasi", value: fabric.rotationAllowed ? "Diizinkan" : "Tidak")
-                        if fabric.id != allCurrentFabrics.last?.id {
+                    let displayItems = fabricDisplayItems(allCurrentFabrics)
+                    ForEach(Array(displayItems.enumerated()), id: \.offset) { idx, item in
+                        infoRow("Kain", value: item.label)
+                        infoRow("Dimensi", value: item.dims)
+                        infoRow("Rotasi", value: item.rotation)
+                        if idx < displayItems.count - 1 {
                             Divider().overlay(OuraTheme.Colors.separator).padding(.vertical, 2)
                         }
                     }
@@ -364,6 +392,36 @@ struct ResepEditorView: View {
         }
         .padding(OuraTheme.Spacing.cardPad)
         .ouraCard()
+    }
+
+    private struct FabricDisplayItem {
+        let label: String
+        let dims: String
+        let rotation: String
+    }
+
+    private func fabricDisplayItems(_ fabrics: [PatternFabric]) -> [FabricDisplayItem] {
+        var seen = Set<String>()
+        var result: [FabricDisplayItem] = []
+        for fabric in fabrics {
+            if let fam = fabric.fabricFamily {
+                guard seen.insert(fam).inserted else { continue }
+                let count = fabrics.filter { $0.fabricFamily == fam }.count
+                let label = count > 1 ? "\(fam) (\(count) warna)" : fam
+                result.append(FabricDisplayItem(
+                    label: label,
+                    dims: String(format: "%.0f × %.0f cm", fabric.cutLengthCm, fabric.cutWidthCm),
+                    rotation: fabric.rotationAllowed ? "Diizinkan" : "Tidak"
+                ))
+            } else {
+                result.append(FabricDisplayItem(
+                    label: fabric.materialName,
+                    dims: String(format: "%.0f × %.0f cm", fabric.cutLengthCm, fabric.cutWidthCm),
+                    rotation: fabric.rotationAllowed ? "Diizinkan" : "Tidak"
+                ))
+            }
+        }
+        return result
     }
 
     private func infoRow(_ label: String, value: String) -> some View {

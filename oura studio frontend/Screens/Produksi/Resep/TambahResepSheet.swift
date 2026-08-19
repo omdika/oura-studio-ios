@@ -1,30 +1,40 @@
 import SwiftUI
 
+private struct FabricGroup: Identifiable {
+    let family: String?
+    let fabIds: [UUID]
+    var id: String { family ?? fabIds.map { $0.uuidString }.joined(separator: "-") }
+    var isGrouped: Bool { family != nil && fabIds.count > 1 }
+}
+
 struct TambahResepSheet: View {
     @EnvironmentObject private var api: APIService
     @Environment(\.dismiss) private var dismiss
 
-    // Section 1: Product + size
+    // Section 1: Product + sizes (all tabs selectable)
     @State private var products: [Product] = []
     @State private var allSizes: [ProductSizeDetail] = []
     @State private var selectedProductId: UUID?
     @State private var selectedProductName: String = ""
-    @State private var selectedSizeName: String = ""
+    @State private var activeSizeLabel: String = ""
 
-    // Section 2: Fabrics (multi, all optional)
+    // Section 2: Fabrics (shared picker, dimensions vary per size tab)
     @State private var fabrics: [Material] = []
     @State private var selectedFabricIds: [UUID] = []
-    @State private var fabricLengths: [UUID: Double] = [:]
-    @State private var fabricWidths: [UUID: Double] = [:]
-    @State private var fabricRotations: [UUID: Bool] = [:]
+    @State private var fabricLengths: [String: [UUID: Double]] = [:]
+    @State private var fabricWidths: [String: [UUID: Double]] = [:]
+    @State private var fabricRotations: [String: [UUID: Bool]] = [:]
 
-    // Section 3: Components
+    // Section 3: Components (shared)
     @State private var allMaterials: [Material] = []
     @State private var selectedComponentIds: [UUID] = []
     @State private var componentQtys: [UUID: Double] = [:]
 
-    // Section 4: Labor
+    // Section 4: Labor (shared)
     @State private var laborMinutes: Double?
+
+    // Recipe type
+    @State private var isFabricVariant = true
 
     // New product quick-create
     @State private var showNewProductSheet = false
@@ -41,7 +51,7 @@ struct TambahResepSheet: View {
     @State private var showDiscardAlert = false
 
     private var hasChanges: Bool {
-        selectedProductId != nil || !selectedSizeName.isEmpty ||
+        selectedProductId != nil ||
         !selectedFabricIds.isEmpty || !selectedComponentIds.isEmpty ||
         (laborMinutes ?? 0) > 0
     }
@@ -51,12 +61,8 @@ struct TambahResepSheet: View {
         guard let p = selectedProduct else { return [] }
         return allSizes.filter { $0.productId == p.id }
     }
-    // Any size with matching sizeLabel works — we only use it for productSku / productId
-    private var selectedSize: ProductSizeDetail? {
-        sizesForProduct.first { $0.sizeLabel == selectedSizeName }
-    }
 
-    // Unique size labels for the picker (avoids duplicate chips when multiple fabric variants share a label)
+    // Unique size labels for tabs (avoids duplicates when multiple fabric variants share a label)
     private var uniqueSizeLabels: [String] {
         var seen = Set<String>()
         return sizesForProduct.compactMap { size in
@@ -64,14 +70,35 @@ struct TambahResepSheet: View {
         }.sorted()
     }
 
-    private var canSave: Bool {
-        guard selectedSize != nil else { return false }
-        guard (laborMinutes ?? 0) > 0 else { return false }
-        let fabricsValid = selectedFabricIds.allSatisfy { id in
-            (fabricLengths[id] ?? 0) > 0 && (fabricWidths[id] ?? 0) > 0
+    private func sizeIsComplete(_ label: String) -> Bool {
+        guard !selectedFabricIds.isEmpty else { return false }
+        return selectedFabricIds.allSatisfy { id in
+            (fabricLengths[label]?[id] ?? 0) > 0 && (fabricWidths[label]?[id] ?? 0) > 0
         }
-        let compsValid = selectedComponentIds.allSatisfy { id in (componentQtys[id] ?? 0) > 0 }
-        return fabricsValid && compsValid
+    }
+
+    private var canSave: Bool {
+        guard !selectedFabricIds.isEmpty else { return false }
+        guard (laborMinutes ?? 0) > 0 else { return false }
+        guard selectedComponentIds.allSatisfy({ id in (componentQtys[id] ?? 0) > 0 }) else { return false }
+        return uniqueSizeLabels.contains { sizeIsComplete($0) }
+    }
+
+    private var fabricGroups: [FabricGroup] {
+        var familyMap: [String: [UUID]] = [:]
+        var ungrouped: [UUID] = []
+        for fabId in selectedFabricIds {
+            if let family = fabrics.first(where: { $0.id == fabId })?.fabricFamily {
+                familyMap[family, default: []].append(fabId)
+            } else {
+                ungrouped.append(fabId)
+            }
+        }
+        var groups: [FabricGroup] = familyMap.keys.sorted().map {
+            FabricGroup(family: $0, fabIds: familyMap[$0]!)
+        }
+        groups += ungrouped.map { FabricGroup(family: nil, fabIds: [$0]) }
+        return groups
     }
 
     var body: some View {
@@ -91,9 +118,17 @@ struct TambahResepSheet: View {
                     )
                     .listRowBackground(OuraTheme.Colors.surfaceCard)
                     .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
-                    .onChange(of: selectedProductId) { _, _ in selectedSizeName = "" }
+                    .onChange(of: selectedProductId) { _, _ in
+                        activeSizeLabel = uniqueSizeLabels.first ?? ""
+                        fabricLengths = [:]
+                        fabricWidths = [:]
+                        fabricRotations = [:]
+                    }
 
                     if selectedProductId != nil {
+                        tipeResepSelector
+                            .listRowBackground(OuraTheme.Colors.surfaceCard)
+                            .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
                         sizePickerRow
                             .listRowBackground(OuraTheme.Colors.surfaceCard)
                             .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
@@ -103,8 +138,8 @@ struct TambahResepSheet: View {
                 }
                 .listSectionSeparator(.hidden)
 
-                // Kain (opsional, multi)
-                if selectedSize != nil {
+                // Kain (shared picker, dimensions keyed by active size tab)
+                if !activeSizeLabel.isEmpty {
                     Section {
                         TokenizedMultiSelectField(
                             label: "Kain yang Digunakan",
@@ -114,45 +149,56 @@ struct TambahResepSheet: View {
                         )
                         .listRowBackground(OuraTheme.Colors.surfaceCard)
                         .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
-                        .onChange(of: selectedFabricIds) { _, newIds in
-                            for id in newIds where fabricRotations[id] == nil {
-                                fabricRotations[id] = true
-                            }
-                        }
 
-                        ForEach(selectedFabricIds, id: \.self) { fabId in
-                            let name = fabrics.first { $0.id == fabId }?.name ?? ""
+                        ForEach(fabricGroups) { group in
+                            let repId = group.fabIds[0]
+                            let displayName = group.isGrouped
+                                ? "\(group.family!) (\(group.fabIds.count) warna)"
+                                : (fabrics.first { $0.id == repId }?.name ?? "")
                             VStack(alignment: .leading, spacing: 10) {
-                                Text(name)
+                                Text(displayName)
                                     .font(.system(size: 13, weight: .semibold))
                                     .foregroundStyle(OuraTheme.Colors.textSecondary)
                                 HStack(spacing: 12) {
                                     NumericInputField(
                                         label: "Panjang (cm)",
                                         value: Binding(
-                                            get: { fabricLengths[fabId] },
-                                            set: { fabricLengths[fabId] = $0 }
+                                            get: { fabricLengths[activeSizeLabel]?[repId] },
+                                            set: { val in
+                                                var dict = fabricLengths[activeSizeLabel] ?? [:]
+                                                for id in group.fabIds { dict[id] = val }
+                                                fabricLengths[activeSizeLabel] = dict
+                                            }
                                         ),
                                         unit: "cm"
                                     )
                                     NumericInputField(
                                         label: "Lebar (cm)",
                                         value: Binding(
-                                            get: { fabricWidths[fabId] },
-                                            set: { fabricWidths[fabId] = $0 }
+                                            get: { fabricWidths[activeSizeLabel]?[repId] },
+                                            set: { val in
+                                                var dict = fabricWidths[activeSizeLabel] ?? [:]
+                                                for id in group.fabIds { dict[id] = val }
+                                                fabricWidths[activeSizeLabel] = dict
+                                            }
                                         ),
                                         unit: "cm"
                                     )
                                 }
                                 Toggle("Rotasi Diizinkan", isOn: Binding(
-                                    get: { fabricRotations[fabId] ?? true },
-                                    set: { fabricRotations[fabId] = $0 }
+                                    get: { fabricRotations[activeSizeLabel]?[repId] ?? true },
+                                    set: { val in
+                                        var dict = fabricRotations[activeSizeLabel] ?? [:]
+                                        for id in group.fabIds { dict[id] = val }
+                                        fabricRotations[activeSizeLabel] = dict
+                                    }
                                 ))
                                 .tint(OuraTheme.Colors.accent)
                             }
                             .padding(.vertical, 4)
                             .listRowBackground(OuraTheme.Colors.surfaceCard)
                             .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                            .id(activeSizeLabel + group.id)
                         }
                     } header: {
                         OuraSectionHeader(title: "Kain (Opsional)")
@@ -261,12 +307,61 @@ struct TambahResepSheet: View {
                 allSizes.append(contentsOf: sizes)
                 selectedProductId = product.id
                 selectedProductName = product.name
-                selectedSizeName = sizes.count == 1 ? sizes[0].sizeLabel : ""
+                activeSizeLabel = sizes.first?.sizeLabel ?? ""
             }
         }
     }
 
-    // MARK: - Size picker row with inline "+ Ukuran Baru" chip
+    // MARK: - Tipe Resep selector
+
+    private var tipeResepSelector: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Tipe Resep")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(OuraTheme.Colors.textSecondary)
+            HStack(spacing: 8) {
+                Button { isFabricVariant = true } label: {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Varian Kain")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(isFabricVariant ? OuraTheme.Colors.accent : OuraTheme.Colors.textPrimary)
+                        Text("Tiap kain jadi varian produk tersendiri")
+                            .font(.system(size: 11))
+                            .foregroundStyle(isFabricVariant ? OuraTheme.Colors.accent : OuraTheme.Colors.textTertiary)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(12)
+                    .background(isFabricVariant ? OuraTheme.Colors.accentLight : OuraTheme.Colors.surfaceSheet)
+                    .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.medium))
+                    .overlay(RoundedRectangle(cornerRadius: OuraTheme.Radius.medium).stroke(
+                        isFabricVariant ? OuraTheme.Colors.accent.opacity(0.5) : OuraTheme.Colors.border, lineWidth: 1))
+                }
+                .buttonStyle(.plain)
+                .animation(.easeInOut(duration: 0.15), value: isFabricVariant)
+
+                Button { isFabricVariant = false } label: {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Kombo Kain")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(!isFabricVariant ? OuraTheme.Colors.accent : OuraTheme.Colors.textPrimary)
+                        Text("Semua kain masuk dalam satu resep")
+                            .font(.system(size: 11))
+                            .foregroundStyle(!isFabricVariant ? OuraTheme.Colors.accent : OuraTheme.Colors.textTertiary)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(12)
+                    .background(!isFabricVariant ? OuraTheme.Colors.accentLight : OuraTheme.Colors.surfaceSheet)
+                    .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.medium))
+                    .overlay(RoundedRectangle(cornerRadius: OuraTheme.Radius.medium).stroke(
+                        !isFabricVariant ? OuraTheme.Colors.accent.opacity(0.5) : OuraTheme.Colors.border, lineWidth: 1))
+                }
+                .buttonStyle(.plain)
+                .animation(.easeInOut(duration: 0.15), value: isFabricVariant)
+            }
+        }
+    }
+
+    // MARK: - Size tab picker row
 
     private var sizePickerRow: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -277,21 +372,44 @@ struct TambahResepSheet: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
                     ForEach(uniqueSizeLabels, id: \.self) { label in
-                        let isSelected = selectedSizeName == label
+                        let isActive = activeSizeLabel == label
+                        let isDone = sizeIsComplete(label)
                         Button {
-                            selectedSizeName = isSelected ? "" : label
+                            activeSizeLabel = label
                         } label: {
-                            Text(label)
-                                .font(.system(size: 13, weight: .semibold))
-                                .foregroundStyle(isSelected ? .white : OuraTheme.Colors.textSecondary)
-                                .padding(.horizontal, 14)
-                                .padding(.vertical, 7)
-                                .background(isSelected ? OuraTheme.Colors.accent : OuraTheme.Colors.surfaceSheet)
-                                .clipShape(Capsule())
-                                .overlay(Capsule().stroke(isSelected ? Color.clear : OuraTheme.Colors.border, lineWidth: 1))
+                            HStack(spacing: 4) {
+                                if isDone {
+                                    Image(systemName: "checkmark")
+                                        .font(.system(size: 10, weight: .bold))
+                                }
+                                Text(label)
+                                    .font(.system(size: 13, weight: .semibold))
+                            }
+                            .foregroundStyle(
+                                isActive ? .white :
+                                isDone   ? OuraTheme.Colors.accent :
+                                           OuraTheme.Colors.textSecondary
+                            )
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 7)
+                            .background(
+                                isActive ? OuraTheme.Colors.accent :
+                                isDone   ? OuraTheme.Colors.accentLight :
+                                           OuraTheme.Colors.surfaceSheet
+                            )
+                            .clipShape(Capsule())
+                            .overlay(
+                                Capsule().stroke(
+                                    isActive ? Color.clear :
+                                    isDone   ? OuraTheme.Colors.accent.opacity(0.35) :
+                                               OuraTheme.Colors.border,
+                                    lineWidth: 1
+                                )
+                            )
                         }
                         .buttonStyle(.plain)
-                        .animation(.easeInOut(duration: 0.15), value: selectedSizeName)
+                        .animation(.easeInOut(duration: 0.15), value: activeSizeLabel)
+                        .animation(.easeInOut(duration: 0.15), value: isDone)
                     }
 
                     Button {
@@ -329,7 +447,7 @@ struct TambahResepSheet: View {
         do {
             let newSize = try await api.createProductSize(sku: product.sku, sizeLabel: label)
             allSizes.append(newSize)
-            selectedSizeName = newSize.sizeLabel
+            activeSizeLabel = newSize.sizeLabel
         } catch let e as APIError {
             errorMsg = e.errorDescription
         } catch {
@@ -349,17 +467,9 @@ struct TambahResepSheet: View {
     }
 
     private func save() async {
-        guard let size = selectedSize else {
-            errorMsg = "Pilih produk dan ukuran terlebih dahulu."; return
-        }
-
-        let incomplFabrics = selectedFabricIds.filter { id in
-            (fabricLengths[id] ?? 0) <= 0 || (fabricWidths[id] ?? 0) <= 0
-        }
-        if !incomplFabrics.isEmpty {
-            let names = incomplFabrics.compactMap { id in fabrics.first { $0.id == id }?.name }.joined(separator: ", ")
-            errorMsg = "Isi dimensi panjang dan lebar untuk kain: \(names)"
-            return
+        let completedLabels = uniqueSizeLabels.filter { sizeIsComplete($0) }
+        guard !completedLabels.isEmpty else {
+            errorMsg = "Isi dimensi kain untuk setidaknya satu ukuran."; return
         }
 
         let incomplComps = selectedComponentIds.filter { id in (componentQtys[id] ?? 0) <= 0 }
@@ -370,8 +480,7 @@ struct TambahResepSheet: View {
         }
 
         guard (laborMinutes ?? 0) > 0 else {
-            errorMsg = "Isi estimasi waktu kerja (menit)."
-            return
+            errorMsg = "Isi estimasi waktu kerja (menit)."; return
         }
 
         isSaving = true
@@ -383,24 +492,60 @@ struct TambahResepSheet: View {
         }
 
         do {
-            guard !selectedFabricIds.isEmpty else {
-                throw APIError.serverError(400, "Pilih setidaknya satu kain untuk resep ini.")
+            if isFabricVariant {
+                // Varian Kain: one spec per (size × fabric), each in its own ProductSize
+                for sizeLabel in completedLabels {
+                    for fabId in selectedFabricIds {
+                        guard let fabric = fabrics.first(where: { $0.id == fabId }) else { continue }
+                        let existingVariant = allSizes.first {
+                            $0.sizeLabel == sizeLabel && $0.fabricVariantName == fabric.name
+                        }
+                        let targetSizeId: UUID
+                        if let existing = existingVariant {
+                            targetSizeId = existing.id
+                        } else {
+                            let newSize = try await api.createProductSize(
+                                sku: selectedProduct!.sku,
+                                sizeLabel: sizeLabel,
+                                fabricVariantName: fabric.name
+                            )
+                            allSizes.append(newSize)
+                            targetSizeId = newSize.id
+                        }
+                        let fabricInput = CreatePatternSpecRequest.FabricInput(
+                            materialId: fabId,
+                            cutLengthCm: fabricLengths[sizeLabel]?[fabId] ?? 0,
+                            cutWidthCm: fabricWidths[sizeLabel]?[fabId] ?? 0,
+                            rotationAllowed: fabricRotations[sizeLabel]?[fabId] ?? true
+                        )
+                        _ = try await api.createOrUpdatePatternSpec(CreatePatternSpecRequest(
+                            productSizeId: targetSizeId,
+                            fabrics: [fabricInput],
+                            estLaborMinutes: laborMinutes ?? 0,
+                            components: components
+                        ))
+                    }
+                }
+            } else {
+                // Kombo Kain: all fabrics in one spec per base size
+                for sizeLabel in completedLabels {
+                    guard let size = sizesForProduct.first(where: { $0.sizeLabel == sizeLabel }) else { continue }
+                    let fabricInputs = selectedFabricIds.map { fabId in
+                        CreatePatternSpecRequest.FabricInput(
+                            materialId: fabId,
+                            cutLengthCm: fabricLengths[sizeLabel]?[fabId] ?? 0,
+                            cutWidthCm: fabricWidths[sizeLabel]?[fabId] ?? 0,
+                            rotationAllowed: fabricRotations[sizeLabel]?[fabId] ?? true
+                        )
+                    }
+                    _ = try await api.createOrUpdatePatternSpec(CreatePatternSpecRequest(
+                        productSizeId: size.id,
+                        fabrics: fabricInputs,
+                        estLaborMinutes: laborMinutes ?? 0,
+                        components: components
+                    ))
+                }
             }
-            let fabricInputs = selectedFabricIds.map { fabId in
-                CreatePatternSpecRequest.FabricInput(
-                    materialId: fabId,
-                    cutLengthCm: fabricLengths[fabId] ?? 0,
-                    cutWidthCm: fabricWidths[fabId] ?? 0,
-                    rotationAllowed: fabricRotations[fabId] ?? true
-                )
-            }
-            let req = CreatePatternSpecRequest(
-                productSizeId: size.id,
-                fabrics: fabricInputs,
-                estLaborMinutes: laborMinutes ?? 0,
-                components: components
-            )
-            _ = try await api.createOrUpdatePatternSpec(req)
             dismiss()
         } catch let e as APIError {
             errorMsg = e.errorDescription
@@ -429,7 +574,7 @@ private struct TambahProdukCepatSheet: View {
 
     private let presets: [(label: String, sizes: [String])] = [
         ("Free Size", ["Free Size"]),
-        ("XS – XL",  ["XS", "S", "M", "L", "XL"]),
+        ("XS – XXL", ["XS", "S", "M", "L", "XL", "XXL"]),
         ("S – XXL",  ["S", "M", "L", "XL", "XXL"]),
     ]
 

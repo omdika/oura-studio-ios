@@ -47,6 +47,13 @@ struct NumericInputField: View {
         .onAppear {
             if let v = value { text = formatNum(v) }
         }
+        .onChange(of: value) { _, newValue in
+            // Sync text when binding changes externally (e.g. switching size tabs).
+            // Skip while focused so in-progress decimal input (e.g. "0.") isn't wiped.
+            guard !isFocused else { return }
+            let formatted = newValue.map { formatNum($0) } ?? ""
+            if formatted != text { text = formatted }
+        }
     }
 
     private func formatNum(_ v: Double) -> String {

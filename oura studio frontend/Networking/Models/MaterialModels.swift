@@ -71,6 +71,7 @@ struct Material: Codable, Identifiable, Hashable {
     let purchaseUnit: String
     let usageUnit: String
     let fabricWidthCm: Double?
+    var fabricFamily: String?
     let currentAvgCost: Double
     let reorderMinQty: Double?
     let isArchived: Bool
@@ -85,6 +86,7 @@ struct Material: Codable, Identifiable, Hashable {
         case purchaseUnit = "purchase_unit"
         case usageUnit = "usage_unit"
         case fabricWidthCm = "fabric_width_cm"
+        case fabricFamily = "fabric_family"
         case currentAvgCost = "current_avg_cost"
         case reorderMinQty = "reorder_min_qty"
         case isArchived = "is_archived"
@@ -155,13 +157,26 @@ struct MaterialPurchase: Codable, Identifiable {
     }
 }
 
-struct MaterialUsageEntry: Identifiable {
+struct MaterialUsageEntry: Identifiable, Codable {
     let id: UUID
     let materialId: UUID
     let deductedCm: Double
     let description: String
     let date: Date
-    var productSku: String? = nil
+    var productSku: String?
+    var sizeLabel: String?
+    var productSizeId: UUID?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case materialId = "material_id"
+        case deductedCm = "deducted_cm"
+        case description
+        case date
+        case productSku = "product_sku"
+        case sizeLabel = "size_label"
+        case productSizeId = "product_size_id"
+    }
 }
 
 struct CreateMaterialRequest: Codable {
@@ -171,6 +186,7 @@ struct CreateMaterialRequest: Codable {
     let purchaseUnit: String
     let usageUnit: String
     let fabricWidthCm: Double?
+    let fabricFamily: String?
 
     enum CodingKeys: String, CodingKey {
         case name, category
@@ -178,6 +194,7 @@ struct CreateMaterialRequest: Codable {
         case purchaseUnit = "purchase_unit"
         case usageUnit = "usage_unit"
         case fabricWidthCm = "fabric_width_cm"
+        case fabricFamily = "fabric_family"
     }
 }
 
@@ -186,12 +203,28 @@ struct PatchMaterialRequest: Codable {
     let reorderMinQty: Double?
     let isArchived: Bool?
     let fabricWidthCm: Double?
+    let fabricFamily: String?
+
+    init(
+        name: String? = nil,
+        reorderMinQty: Double? = nil,
+        isArchived: Bool? = nil,
+        fabricWidthCm: Double? = nil,
+        fabricFamily: String? = nil
+    ) {
+        self.name = name
+        self.reorderMinQty = reorderMinQty
+        self.isArchived = isArchived
+        self.fabricWidthCm = fabricWidthCm
+        self.fabricFamily = fabricFamily
+    }
 
     enum CodingKeys: String, CodingKey {
         case name
         case reorderMinQty = "reorder_min_qty"
         case isArchived = "is_archived"
         case fabricWidthCm = "fabric_width_cm"
+        case fabricFamily = "fabric_family"
     }
 }
 
