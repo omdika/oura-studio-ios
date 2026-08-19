@@ -10,13 +10,31 @@ struct BahanListView: View {
     @State private var showTambah = false
     @State private var displayCount = 15
     @State private var hasLoadedOnce = false
+    @State private var selectedCategory: MaterialCategory? = nil
+    @State private var selectedFabricFamily: String? = nil
 
     private let pageSize = 15
 
+    private var fabricFamilies: [String] {
+        let fams = materials
+            .filter { !$0.isArchived && $0.category == .fabric }
+            .compactMap { $0.fabricFamily }
+        var seen = Set<String>()
+        return fams.filter { seen.insert($0).inserted }.sorted()
+    }
+
     private var filtered: [Material] {
-        let active = materials.filter { !$0.isArchived }
-        guard !searchText.isEmpty else { return active }
-        return active.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
+        var base = materials.filter { !$0.isArchived }
+        if let cat = selectedCategory {
+            base = base.filter { $0.category == cat }
+            if cat == .fabric, let fam = selectedFabricFamily {
+                base = base.filter { $0.fabricFamily == fam }
+            }
+        }
+        if !searchText.isEmpty {
+            base = base.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
+        }
+        return base
     }
 
     private var displayed: [Material] { Array(filtered.prefix(displayCount)) }
@@ -26,7 +44,15 @@ struct BahanListView: View {
             sectionHeader
             searchField
                 .padding(.horizontal, OuraTheme.Spacing.horizontal)
-                .padding(.bottom, 6)
+                .padding(.bottom, 4)
+
+            categoryFilterRow
+                .padding(.bottom, selectedCategory == .fabric && !fabricFamilies.isEmpty ? 6 : 4)
+
+            if selectedCategory == .fabric && !fabricFamilies.isEmpty {
+                familyFilterRow
+                    .padding(.bottom, 4)
+            }
 
             Group {
                 if isLoading {
@@ -57,6 +83,8 @@ struct BahanListView: View {
             if !showing { Task { await load(silent: true) } }
         }
         .onChange(of: searchText) { displayCount = pageSize }
+        .onChange(of: selectedCategory) { displayCount = pageSize }
+        .onChange(of: selectedFabricFamily) { displayCount = pageSize }
     }
 
     // MARK: - Header
@@ -115,6 +143,69 @@ struct BahanListView: View {
         )
     }
 
+    // MARK: - Filter chips
+
+    private var categoryFilterRow: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 6) {
+                filterChip("Semua", isSelected: selectedCategory == nil) {
+                    selectedCategory = nil
+                    selectedFabricFamily = nil
+                }
+                ForEach(MaterialCategory.allCases, id: \.self) { cat in
+                    filterChip(catShortName(cat), isSelected: selectedCategory == cat) {
+                        if selectedCategory == cat {
+                            selectedCategory = nil
+                        } else {
+                            selectedCategory = cat
+                            selectedFabricFamily = nil
+                        }
+                    }
+                }
+            }
+            .padding(.horizontal, OuraTheme.Spacing.horizontal)
+        }
+    }
+
+    private var familyFilterRow: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 6) {
+                filterChip("Semua Jenis", isSelected: selectedFabricFamily == nil) {
+                    selectedFabricFamily = nil
+                }
+                ForEach(fabricFamilies, id: \.self) { family in
+                    filterChip(family, isSelected: selectedFabricFamily == family) {
+                        selectedFabricFamily = selectedFabricFamily == family ? nil : family
+                    }
+                }
+            }
+            .padding(.horizontal, OuraTheme.Spacing.horizontal)
+        }
+    }
+
+    private func filterChip(_ title: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
+                .foregroundStyle(isSelected ? OuraTheme.Colors.accent : OuraTheme.Colors.textSecondary)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(isSelected ? OuraTheme.Colors.accentLight : OuraTheme.Colors.surfaceCard)
+                .clipShape(Capsule())
+                .overlay(Capsule().stroke(isSelected ? OuraTheme.Colors.accent : OuraTheme.Colors.border, lineWidth: 0.75))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func catShortName(_ cat: MaterialCategory) -> String {
+        switch cat {
+        case .fabric:    return "Kain"
+        case .thread:    return "Benang"
+        case .hardware:  return "Hardware"
+        case .packaging: return "Packaging"
+        }
+    }
+
     // MARK: - List
 
     private var materialList: some View {
@@ -151,14 +242,23 @@ struct BahanListView: View {
     // MARK: - Empty / Error
 
     private var emptyView: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "tray")
+        let isFiltered = selectedCategory != nil || selectedFabricFamily != nil || !searchText.isEmpty
+        return VStack(spacing: 12) {
+            Image(systemName: isFiltered ? "line.3.horizontal.decrease.circle" : "tray")
                 .font(.system(size: 40))
                 .foregroundStyle(OuraTheme.Colors.textTertiary)
-            Text(searchText.isEmpty ? "Belum ada bahan" : "Bahan tidak ditemukan")
+            Text(isFiltered ? "Tidak ada bahan yang cocok" : "Belum ada bahan")
                 .font(.system(size: 15, weight: .medium))
                 .foregroundStyle(OuraTheme.Colors.textSecondary)
-            if searchText.isEmpty {
+            if isFiltered {
+                Button("Reset filter") {
+                    selectedCategory = nil
+                    selectedFabricFamily = nil
+                    searchText = ""
+                }
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(OuraTheme.Colors.accent)
+            } else {
                 Text("Tambah pembelian bahan pertama")
                     .font(.system(size: 13))
                     .foregroundStyle(OuraTheme.Colors.textTertiary)

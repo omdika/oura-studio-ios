@@ -149,6 +149,9 @@ struct TambahResepSheet: View {
                         )
                         .listRowBackground(OuraTheme.Colors.surfaceCard)
                         .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
+                        .onChange(of: selectedFabricIds) { _, _ in
+                            propagateGroupDimensions()
+                        }
 
                         ForEach(fabricGroups) { group in
                             let repId = group.fabIds[0]
@@ -452,6 +455,28 @@ struct TambahResepSheet: View {
             errorMsg = e.errorDescription
         } catch {
             errorMsg = error.localizedDescription
+        }
+    }
+
+    private func propagateGroupDimensions() {
+        for group in fabricGroups {
+            guard let repId = group.fabIds.first else { continue }
+            for sizeLabel in uniqueSizeLabels {
+                guard let repLen = fabricLengths[sizeLabel]?[repId], repLen > 0 else { continue }
+                let repWid = fabricWidths[sizeLabel]?[repId] ?? 0
+                let repRot = fabricRotations[sizeLabel]?[repId] ?? true
+                var lenDict = fabricLengths[sizeLabel] ?? [:]
+                var widDict = fabricWidths[sizeLabel] ?? [:]
+                var rotDict = fabricRotations[sizeLabel] ?? [:]
+                for id in group.fabIds {
+                    if (lenDict[id] ?? 0) == 0 { lenDict[id] = repLen }
+                    if (widDict[id] ?? 0) == 0 { widDict[id] = repWid }
+                    if rotDict[id] == nil { rotDict[id] = repRot }
+                }
+                fabricLengths[sizeLabel] = lenDict
+                fabricWidths[sizeLabel] = widDict
+                fabricRotations[sizeLabel] = rotDict
+            }
         }
     }
 

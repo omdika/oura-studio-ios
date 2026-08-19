@@ -19,6 +19,10 @@ struct TambahPembelianSheet: View {
     @State private var newFabricWidthCm: Double? = nil
     @State private var newFabricFamily: String = ""
 
+    // Fabric family edit for existing selected material
+    @State private var editFabricFamily: String = ""
+    @State private var originalFabricFamily: String = ""
+
     // Purchase fields
     @State private var widthCm: Double? = nil
     @State private var lengthCm: Double? = nil
@@ -45,6 +49,14 @@ struct TambahPembelianSheet: View {
     // MARK: - Computed
 
     private var resolvedMaterial: Material? { preselectedMaterial ?? selectedMaterial }
+
+    private var existingFabricFamilies: [String] {
+        let fams = materials
+            .filter { $0.category == .fabric }
+            .compactMap { $0.fabricFamily }
+        var seen = Set<String>()
+        return fams.filter { seen.insert($0).inserted }.sorted()
+    }
 
     private var effectiveCategory: MaterialCategory? {
         resolvedMaterial?.category ?? (isCreatingNew ? newMaterialCategory : nil)
@@ -228,14 +240,49 @@ struct TambahPembelianSheet: View {
                 .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
 
                 if newMaterialCategory == .fabric {
-                    VStack(alignment: .leading, spacing: 6) {
+                    VStack(alignment: .leading, spacing: 8) {
                         Text("Jenis Kain (opsional)")
                             .font(.system(size: 13, weight: .medium))
                             .foregroundStyle(OuraTheme.Colors.textSecondary)
-                        TextField("contoh: Satin, Waffle, Nilon", text: $newFabricFamily)
+
+                        if !existingFabricFamilies.isEmpty {
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 6) {
+                                    ForEach(existingFabricFamilies, id: \.self) { family in
+                                        Button {
+                                            newFabricFamily = newFabricFamily == family ? "" : family
+                                        } label: {
+                                            Text(family)
+                                                .font(.system(size: 13, weight: .medium))
+                                                .foregroundStyle(newFabricFamily == family
+                                                    ? OuraTheme.Colors.accent
+                                                    : OuraTheme.Colors.textSecondary)
+                                                .padding(.horizontal, 10)
+                                                .padding(.vertical, 5)
+                                                .background(newFabricFamily == family
+                                                    ? OuraTheme.Colors.accentLight
+                                                    : OuraTheme.Colors.background)
+                                                .clipShape(Capsule())
+                                                .overlay(Capsule().stroke(
+                                                    newFabricFamily == family
+                                                        ? OuraTheme.Colors.accent
+                                                        : OuraTheme.Colors.border,
+                                                    lineWidth: 0.75))
+                                        }
+                                        .buttonStyle(.plain)
+                                    }
+                                }
+                            }
+                        }
+
+                        TextField(existingFabricFamilies.isEmpty
+                            ? "contoh: Satin, Waffle, Katun"
+                            : "atau ketik nama family baru...",
+                            text: $newFabricFamily)
                             .font(.system(size: 15))
                             .foregroundStyle(OuraTheme.Colors.textPrimary)
                             .autocorrectionDisabled()
+
                         Text("Kain sejenis dikelompokkan di form resep.")
                             .font(.system(size: 12))
                             .foregroundStyle(OuraTheme.Colors.textTertiary)
@@ -273,6 +320,9 @@ struct TambahPembelianSheet: View {
                     selectedMaterial = materials.first { $0.id == id }
                     isCreatingNew = false
                     widthCm = selectedMaterial?.fabricWidthCm
+                    let family = selectedMaterial?.fabricFamily ?? ""
+                    editFabricFamily = family
+                    originalFabricFamily = family
                 }
                 .listRowBackground(OuraTheme.Colors.surfaceCard)
                 .listRowInsets(EdgeInsets(top: 12, leading: 16, bottom: 12, trailing: 16))
@@ -289,6 +339,24 @@ struct TambahPembelianSheet: View {
     private var detailSection: some View {
         Section {
             if isFabric {
+                // Family kain hanya untuk existing selected material (new material punya field sendiri di atas)
+                if !isCreatingNew && resolvedMaterial != nil {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Jenis Kain (opsional)")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(OuraTheme.Colors.textSecondary)
+                        TextField("contoh: Satin, Waffle, Katun", text: $editFabricFamily)
+                            .font(.system(size: 15))
+                            .foregroundStyle(OuraTheme.Colors.textPrimary)
+                            .autocorrectionDisabled()
+                        Text("Kain sejenis dikelompokkan saat pilih bahan di form resep.")
+                            .font(.system(size: 12))
+                            .foregroundStyle(OuraTheme.Colors.textTertiary)
+                    }
+                    .listRowBackground(OuraTheme.Colors.surfaceCard)
+                    .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
+                }
+
                 NumericInputField(label: "Lebar (cm)", value: $widthCm, unit: "cm")
                     .listRowBackground(OuraTheme.Colors.surfaceCard)
                     .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
@@ -391,6 +459,16 @@ struct TambahPembelianSheet: View {
 
             if let existing = resolvedMaterial {
                 materialId = existing.id
+                // Patch fabric family jika berubah
+                if existing.category == .fabric {
+                    let trimmed = editFabricFamily.trimmingCharacters(in: .whitespaces)
+                    if trimmed != originalFabricFamily {
+                        _ = try? await api.patchMaterial(
+                            id: existing.id,
+                            PatchMaterialRequest(fabricFamily: trimmed.isEmpty ? nil : trimmed)
+                        )
+                    }
+                }
             } else if isCreatingNew, let cat = newMaterialCategory {
                 let familyVal = newFabricFamily.trimmingCharacters(in: .whitespaces)
                 let mat = try await api.createMaterial(CreateMaterialRequest(

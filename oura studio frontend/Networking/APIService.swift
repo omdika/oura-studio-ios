@@ -287,10 +287,9 @@ class APIService: ObservableObject {
 
     func adjustStock(sku: String, sizeId: UUID, qty: Int, reason: String, note: String? = nil) async throws -> ProductSizeDetail {
         if useMock { return try await MockAPIService.shared.adjustStock(sku: sku, sizeId: sizeId, qty: qty, reason: reason, note: note) }
-        let basic: ProductSizeBasic = try await post(path: "/products/\(sku)/sizes/\(sizeId.uuidString)/stock-adjustments",
-                                                     body: StockAdjustmentRequest(qty: qty, reason: reason, note: note))
-        let name = await resolveProductName(sku: sku)
-        return sizeDetailFromBasic(basic, sku: sku, productName: name)
+        let req = StockAdjustmentRequest(productSizeId: sizeId, changeQty: qty, reason: reason, note: note)
+        let _: StockAdjustmentLedgerEntry = try await post(path: "/stock/adjustments", body: req)
+        return try await getProductSizeById(id: sizeId)
     }
 
     func addStockFromBahan(sku: String, sizeId: UUID, qty: Int, specId: UUID) async throws -> ProductSizeDetail {
@@ -333,6 +332,11 @@ class APIService: ObservableObject {
             all.append(contentsOf: basic.map { sizeDetailFromBasic($0, sku: p.sku, productName: p.name) })
         }
         return all
+    }
+
+    func getProductSizeById(id: UUID) async throws -> ProductSizeDetail {
+        if useMock { return try await MockAPIService.shared.getProductSizeById(id: id) }
+        return try await get(path: "/product-sizes/\(id.uuidString)")
     }
 
     // Converts a flat ProductSizeBasic (list endpoint format) to the enriched ProductSizeDetail

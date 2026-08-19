@@ -725,14 +725,14 @@ struct AddSizeSheet: View {
                         _ = try await api.addStockFromBahan(sku: productSku, sizeId: targetSize.id, qty: Int(qty), specId: specId)
                     } catch APIError.serverError(404, _) {
                         // Spec found in picker but doesn't belong to this product on backend — fall back to plain stock add
-                        _ = try await api.adjustStock(sku: productSku, sizeId: targetSize.id, qty: Int(qty), reason: "initial")
+                        _ = try await api.adjustStock(sku: productSku, sizeId: targetSize.id, qty: Int(qty), reason: "adjustment")
                     }
                 } else if let mat = allFabrics.first(where: { $0.name == fabricName }),
                           let w = manualCutWidthCm, w > 0,
                           let l = manualCutLengthCm, l > 0 {
                     _ = try await api.addStockManual(sku: productSku, sizeId: targetSize.id, qty: Int(qty), materialId: mat.id, cutWidthCm: w, cutLengthCm: l)
                 } else {
-                    _ = try await api.adjustStock(sku: productSku, sizeId: targetSize.id, qty: Int(qty), reason: "initial")
+                    _ = try await api.adjustStock(sku: productSku, sizeId: targetSize.id, qty: Int(qty), reason: "adjustment")
                 }
             }
             dismiss()
@@ -1194,7 +1194,6 @@ struct TambahStokSheet: View {
     let size: ProductSizeDetail
 
     @State private var qty: Double? = nil
-    @State private var reason: String = "initial"
     @State private var note: String = ""
     @State private var isSaving = false
     @State private var errorMsg: String?
@@ -1220,20 +1219,6 @@ struct TambahStokSheet: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section {
-                    Picker("", selection: $reason) {
-                        Text("Stok Awal").tag("initial")
-                        Text("Koreksi Stok").tag("adjustment")
-                    }
-                    .pickerStyle(.segmented)
-                    .listRowBackground(OuraTheme.Colors.surfaceCard)
-                } header: { OuraSectionHeader(title: "Jenis Penambahan") }
-                  footer: {
-                      Text(reason == "initial"
-                          ? "Produk sudah ada sebelum pencatatan dimulai di aplikasi ini."
-                          : "Koreksi jumlah akibat barang temuan, kesalahan hitung, atau retur non-sistem.")
-                  }
-
                 Section {
                     NumericInputField(label: "Jumlah", value: $qty, unit: "pcs")
                         .listRowBackground(OuraTheme.Colors.surfaceCard)
@@ -1332,7 +1317,7 @@ struct TambahStokSheet: View {
                 }
             } else {
                 _ = try await api.adjustStock(sku: size.productSku, sizeId: size.id,
-                                              qty: Int(q), reason: reason,
+                                              qty: Int(q), reason: "adjustment",
                                               note: note.trimmingCharacters(in: .whitespaces).isEmpty ? nil : note)
             }
             dismiss()

@@ -8,6 +8,8 @@ struct ProdukListView: View {
     @State private var isLoading = true
     @State private var searchText: String = ""
     @State private var showAddProduct = false
+    @State private var showQRScanner = false
+    @State private var showQRGenerator = false
 
     private var filtered: [Product] {
         let active = products.filter { !$0.isArchived }
@@ -47,8 +49,28 @@ struct ProdukListView: View {
         .searchable(text: $searchText, prompt: "Cari produk atau bahan...")
         .task { await load() }
         .refreshable { await load() }
+        .toolbar {
+            ToolbarItemGroup(placement: .primaryAction) {
+                Button { showQRScanner = true } label: {
+                    Image(systemName: "qrcode.viewfinder")
+                }
+                .foregroundStyle(OuraTheme.Colors.accent)
+                Button { showQRGenerator = true } label: {
+                    Image(systemName: "qrcode")
+                }
+                .foregroundStyle(OuraTheme.Colors.accent)
+            }
+        }
         .sheet(isPresented: $showAddProduct, onDismiss: { Task { await load() } }) {
             TambahProdukLengkapSheet()
+        }
+        .sheet(isPresented: $showQRScanner) {
+            QRScannerSheet(mode: .stockInOnly)
+                .environmentObject(api)
+        }
+        .sheet(isPresented: $showQRGenerator) {
+            QRGeneratorView()
+                .environmentObject(api)
         }
     }
 

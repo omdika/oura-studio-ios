@@ -233,7 +233,31 @@ struct CreateProductSizeRequest: Codable {
 }
 
 struct StockAdjustmentRequest: Codable {
-    let qty: Int
-    let reason: String  // "initial" | "adjustment"
+    let productSizeId: UUID
+    let changeQty: Int
+    let reason: String
     let note: String?
+
+    enum CodingKeys: String, CodingKey {
+        case productSizeId = "product_size_id"
+        case changeQty = "change_qty"
+        case reason
+        case note
+    }
+}
+
+struct StockAdjustmentLedgerEntry: Codable {
+    let id: UUID
+    let productSizeId: UUID
+    let changeQty: Int
+    let reason: String
+    let createdAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case productSizeId = "product_size_id"
+        case changeQty = "change_qty"
+        case reason
+        case createdAt = "created_at"
+    }
 }

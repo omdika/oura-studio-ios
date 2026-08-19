@@ -1002,9 +1002,7 @@ private struct TambahStokDariResepSheet: View {
         errorMsg = nil
         do {
             for (sizeId, qty) in qtys where qty > 0 {
-                let currentStock = product.sizes.first { $0.id == sizeId }?.currentStockQty ?? 0
-                let reason = currentStock == 0 ? "initial" : "adjustment"
-                _ = try await api.adjustStock(sku: product.sku, sizeId: sizeId, qty: qty, reason: reason)
+                _ = try await api.adjustStock(sku: product.sku, sizeId: sizeId, qty: qty, reason: "adjustment")
             }
             onDone()
             dismiss()

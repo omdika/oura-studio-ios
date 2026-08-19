@@ -9,6 +9,7 @@ struct BerandaView: View {
     @State private var errorMsg: String?
     @State private var showTambahPembelian = false
     @State private var showTambahPenjualan = false
+    @State private var showQRScanner = false
     @State private var alertDisplayCount = 4
 
     private var greeting: String {
@@ -51,6 +52,10 @@ struct BerandaView: View {
             }
             .sheet(isPresented: $showTambahPenjualan) {
                 TambahPenjualanSheet()
+            }
+            .sheet(isPresented: $showQRScanner) {
+                QRScannerSheet(mode: .sellOnly)
+                    .environmentObject(api)
             }
         }
         .task { await loadDashboard() }
@@ -261,6 +266,13 @@ struct BerandaView: View {
                     appState.produksiSubTabIndex = 2 // ProduksiTab.optimasi
                     appState.selectedTab = 1
                 }
+
+                quickActionTile(
+                    icon: "qrcode.viewfinder",
+                    title: "Scan & Jual",
+                    color: OuraTheme.Colors.accent,
+                    bg: OuraTheme.Colors.accentLight
+                ) { showQRScanner = true }
             }
         }
     }

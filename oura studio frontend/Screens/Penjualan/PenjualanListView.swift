@@ -9,6 +9,7 @@ struct PenjualanListView: View {
     @State private var showAdd = false
     @State private var editingOrder: SalesOrder? = nil
     @State private var orderToDelete: SalesOrder? = nil
+    @State private var showQRScanner = false
 
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
@@ -80,6 +81,18 @@ struct PenjualanListView: View {
         .navigationBarTitleDisplayMode(.large)
         .task { await load() }
         .refreshable { await load() }
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button { showQRScanner = true } label: {
+                    Image(systemName: "qrcode.viewfinder")
+                }
+                .foregroundStyle(OuraTheme.Colors.accent)
+            }
+        }
+        .sheet(isPresented: $showQRScanner, onDismiss: { Task { await load() } }) {
+            QRScannerSheet(mode: .sellOnly)
+                .environmentObject(api)
+        }
         .sheet(isPresented: $showAdd, onDismiss: { Task { await load() } }) {
             TambahPenjualanSheet(onSave: { Task { await load() } })
                 .environmentObject(api)

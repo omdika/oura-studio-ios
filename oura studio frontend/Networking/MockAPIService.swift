@@ -502,6 +502,15 @@ class MockAPIService {
         return _productSizes.values.flatMap { $0 }.filter { !$0.isArchived }
     }
 
+    func getProductSizeById(id: UUID) async throws -> ProductSizeDetail {
+        await delay()
+        let all = _productSizes.values.flatMap { $0 }
+        guard let found = all.first(where: { $0.id == id }) else {
+            throw APIError.serverError(404, "Product size tidak ditemukan")
+        }
+        return found
+    }
+
     func patchProduct(sku: String, name: String) async throws -> Product {
         await delay()
         guard let idx = _products.firstIndex(where: { $0.sku == sku }) else {
