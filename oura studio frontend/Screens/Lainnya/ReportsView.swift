@@ -133,7 +133,7 @@ struct SalesReportDetailView: View {
                             Spacer()
                             summaryCell("Total Profit", value: r.totalProfit.rupiahFormatted)
                             Spacer()
-                            summaryCell("Transaksi", value: "\(r.points.count)")
+                            summaryCell("Transaksi", value: "\(r.points.reduce(0) { $0 + $1.orderCount })")
                         }
                         .padding(OuraTheme.Spacing.cardPad)
                         .ouraCard()
