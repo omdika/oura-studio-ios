@@ -27,6 +27,7 @@ struct ScanToStockSheet: View {
     @State private var deductBahan: Bool = true
     @State private var relatedSpec: PatternSpec? = nil
     @State private var isLoadingSpec: Bool = false
+    @State private var hppFromSpec: Bool = false    // true when fields pre-filled from recipe estimate
 
     enum StockReason: String, CaseIterable {
         case production = "production"
@@ -267,14 +268,14 @@ struct ScanToStockSheet: View {
                 withAnimation(.easeInOut(duration: 0.2)) { showHppSection.toggle() }
             } label: {
                 HStack(spacing: 8) {
-                    Image(systemName: "exclamationmark.circle.fill")
+                    Image(systemName: hppFromSpec ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
                         .font(.system(size: 14))
-                        .foregroundStyle(OuraTheme.Colors.warningText)
+                        .foregroundStyle(hppFromSpec ? OuraTheme.Colors.greenAccent : OuraTheme.Colors.warningText)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("HPP belum ada")
+                        Text(hppFromSpec ? "Estimasi HPP dari resep" : "HPP belum ada")
                             .font(.system(size: 13, weight: .semibold))
                             .foregroundStyle(OuraTheme.Colors.textPrimary)
-                        Text("Price Advisor tidak aktif. Atur sekarang?")
+                        Text(hppFromSpec ? "Nilai dapat diedit sebelum disimpan" : "Price Advisor tidak aktif. Atur sekarang?")
                             .font(.system(size: 12))
                             .foregroundStyle(OuraTheme.Colors.textSecondary)
                     }
@@ -285,7 +286,7 @@ struct ScanToStockSheet: View {
                 }
             }
             .buttonStyle(.plain)
-            .listRowBackground(OuraTheme.Colors.warningBg)
+            .listRowBackground(hppFromSpec ? Color.green.opacity(0.12) : OuraTheme.Colors.warningBg)
             .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
         }
         .listSectionSeparator(.hidden)
@@ -324,7 +325,7 @@ struct ScanToStockSheet: View {
                 .listRowBackground(OuraTheme.Colors.surfaceCard)
                 .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
             }
-        } header: { OuraSectionHeader(title: "Rincian HPP Manual") }
+        } header: { OuraSectionHeader(title: hppFromSpec ? "Rincian HPP · Estimasi Resep" : "Rincian HPP Manual") }
         .listSectionSeparator(.hidden)
     }
 
@@ -434,7 +435,7 @@ struct ScanToStockSheet: View {
         .navigationBarTitleDisplayMode(.inline)
     }
 
-    // MARK: - Load PatternSpec
+    // MARK: - Load PatternSpec + pre-fill HPP estimate
 
     private func loadSpec() async {
         guard hasFabricVariant, reason == .production else {
@@ -443,9 +444,60 @@ struct ScanToStockSheet: View {
         }
         isLoadingSpec = true
         defer { isLoadingSpec = false }
-        let specs = (try? await api.getPatternSpecsForSize(productSku: size.productSku, sizeLabel: size.sizeLabel)) ?? []
-        relatedSpec = specs.first(where: { $0.productSizeId == size.id && $0.isActive })
-        if relatedSpec == nil { deductBahan = false }
+
+        async let specsTask     = api.getPatternSpecsForSize(productSku: size.productSku, sizeLabel: size.sizeLabel)
+        async let materialsTask = api.getMaterials()
+        async let settingsTask  = api.getSettings()
+
+        let specs     = (try? await specsTask)     ?? []
+        let materials = (try? await materialsTask) ?? []
+        let settings  = (try? await settingsTask)  ?? []
+
+        let spec = specs.first(where: { $0.productSizeId == size.id && $0.isActive })
+        relatedSpec = spec
+
+        if let spec {
+            prefillHppFromSpec(spec, materials: materials, settings: settings)
+        } else {
+            deductBahan = false
+        }
+    }
+
+    private func prefillHppFromSpec(_ spec: PatternSpec, materials: [Material], settings: [SettingItem]) {
+        let matMap      = Dictionary(uniqueKeysWithValues: materials.map { ($0.id, $0.currentAvgCost) })
+        let settingsMap = Dictionary(uniqueKeysWithValues: settings.map { ($0.key, $0.value) })
+
+        // Fabric cost — cutLengthCm/100 meters × avgCost per meter per fabric layer
+        let fabricCost = spec.fabrics.reduce(0.0) { sum, fabric in
+            sum + (fabric.cutLengthCm / 100.0) * (matMap[fabric.materialId] ?? 0)
+        }
+
+        // Hardware / component cost
+        let componentCost = spec.components.reduce(0.0) { sum, comp in
+            sum + comp.qtyPerUnit * (matMap[comp.materialId] ?? 0)
+        }
+
+        // Pooled (thread + packaging)
+        let threadPooled    = settingsMap["pooled_material_rate:thread"]    ?? 0
+        let packagingPooled = settingsMap["pooled_material_rate:packaging"] ?? 0
+        let pooled          = threadPooled + packagingPooled
+
+        // Labor
+        let laborRate = settingsMap["labor_rate_per_minute"] ?? 0
+        let labor     = spec.estLaborMinutes * laborRate
+
+        // Overhead
+        let overhead = settingsMap["default_overhead_per_unit"] ?? 0
+
+        guard fabricCost + componentCost + pooled + labor + overhead > 0 else { return }
+
+        editHppFabric   = fabricCost   > 0 ? fabricCost   : nil
+        editHppPooled   = pooled       > 0 ? pooled       : nil
+        editHppHardware = componentCost > 0 ? componentCost : nil
+        editHppLabor    = labor        > 0 ? labor        : nil
+        editHppOverhead = overhead     > 0 ? overhead     : nil
+        hppFromSpec     = true
+        showHppSection  = true   // auto-expand when pre-filled
     }
 
     // MARK: - Save
