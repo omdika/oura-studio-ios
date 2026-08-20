@@ -891,10 +891,11 @@ struct ProdukSizeDetailView: View {
     @State private var isEditing = false
     @State private var editSellingPrice: Double?
     @State private var editReorderMin: Double?
-    @State private var targetMarginPct: Double? = 40
-    @State private var marketplaceFeePct: Double? = nil
-    @State private var advisorResult: PriceAdvisorResponse?
-    @State private var isAdvising = false
+    @State private var editHppFabric: Double?
+    @State private var editHppPooled: Double?
+    @State private var editHppHardware: Double?
+    @State private var editHppLabor: Double?
+    @State private var editHppOverhead: Double?
     @State private var showAdvisor = false
     @State private var isSaving = false
     @State private var showAddStock = false
@@ -905,11 +906,16 @@ struct ProdukSizeDetailView: View {
         self._size = State(initialValue: productSize)
     }
 
+    private var editHppTotal: Double {
+        (editHppFabric ?? 0) + (editHppPooled ?? 0) + (editHppHardware ?? 0)
+        + (editHppLabor ?? 0) + (editHppOverhead ?? 0)
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: OuraTheme.Spacing.sectionGap) {
                 infoCard
-                if let hpp = size.latestHppBreakdown { hppCard(hpp) }
+                hppSection
                 priceAdvisorSection
                 if let err = errorMsg {
                     Text(err).font(.system(size: 13)).foregroundStyle(OuraTheme.Colors.dangerText).padding(.horizontal)
@@ -928,7 +934,8 @@ struct ProdukSizeDetailView: View {
                     if isEditing { Task { await saveEdits() } }
                     else { startEdit() }
                 }
-                .foregroundStyle(OuraTheme.Colors.accent)
+                .foregroundStyle(isSaving ? OuraTheme.Colors.textDisabled : OuraTheme.Colors.accent)
+                .disabled(isSaving)
             }
         }
         .task { await refreshSize() }
@@ -942,6 +949,8 @@ struct ProdukSizeDetailView: View {
               let updated = fresh.first(where: { $0.id == size.id }) else { return }
         size = updated
     }
+
+    // MARK: - Info card
 
     private var infoCard: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -983,16 +992,39 @@ struct ProdukSizeDetailView: View {
         }
     }
 
-    private func hppCard(_ hpp: HPPBreakdown) -> some View {
+    // MARK: - HPP section (batch / manual / edit)
+
+    @ViewBuilder
+    private var hppSection: some View {
+        if isEditing && size.latestHppBreakdown == nil {
+            editHppCard
+        } else if let hpp = size.latestHppBreakdown {
+            hppCard(hpp, isManual: false)
+        } else if let hpp = size.manualHppBreakdown {
+            hppCard(hpp, isManual: true)
+        }
+    }
+
+    private func hppCard(_ hpp: HPPBreakdown, isManual: Bool) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            OuraSectionHeader(title: "HPP Breakdown")
+            HStack(spacing: 6) {
+                OuraSectionHeader(title: isManual ? "RINCIAN HPP" : "HPP Breakdown")
+                if isManual {
+                    Text("manual")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(OuraTheme.Colors.warningText)
+                        .padding(.horizontal, 6).padding(.vertical, 2)
+                        .background(OuraTheme.Colors.warningBg)
+                        .clipShape(Capsule())
+                }
+            }
             hppRow("Kain", value: hpp.fabric, total: hpp.total)
-            if hpp.fabricItems.count > 1 {
+            if !isManual, hpp.fabricItems.count > 1 {
                 ForEach(hpp.fabricItems, id: \.name) { hppSubRow($0.name, cost: $0.cost) }
             }
-            hppRow("Material Pool", value: hpp.pooledMaterial, total: hpp.total)
+            hppRow("Bahan Pooled", value: hpp.pooledMaterial, total: hpp.total)
             hppRow("Hardware", value: hpp.hardware, total: hpp.total)
-            if hpp.hardwareItems.count > 1 {
+            if !isManual, hpp.hardwareItems.count > 1 {
                 ForEach(hpp.hardwareItems, id: \.name) { hppSubRow($0.name, cost: $0.cost) }
             }
             hppRow("Tenaga Kerja", value: hpp.labor, total: hpp.total)
@@ -1002,6 +1034,35 @@ struct ProdukSizeDetailView: View {
                 Text("HPP Total").font(.system(size: 14, weight: .bold)).foregroundStyle(OuraTheme.Colors.textPrimary)
                 Spacer()
                 Text(hpp.total.rupiahFormatted).font(.system(size: 16, weight: .bold)).foregroundStyle(OuraTheme.Colors.accent)
+            }
+        }
+        .padding(OuraTheme.Spacing.cardPad)
+        .ouraCard()
+    }
+
+    private var editHppCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 6) {
+                OuraSectionHeader(title: "RINCIAN HPP")
+                Text("manual")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(OuraTheme.Colors.warningText)
+                    .padding(.horizontal, 6).padding(.vertical, 2)
+                    .background(OuraTheme.Colors.warningBg)
+                    .clipShape(Capsule())
+            }
+            CurrencyInputField(label: "Kain (fabric)", value: $editHppFabric)
+            CurrencyInputField(label: "Bahan Pooled", value: $editHppPooled)
+            CurrencyInputField(label: "Hardware", value: $editHppHardware)
+            CurrencyInputField(label: "Tenaga Kerja", value: $editHppLabor)
+            CurrencyInputField(label: "Overhead", value: $editHppOverhead)
+            if editHppTotal > 0 {
+                Divider().overlay(OuraTheme.Colors.separator)
+                HStack {
+                    Text("HPP Total").font(.system(size: 14, weight: .bold)).foregroundStyle(OuraTheme.Colors.textPrimary)
+                    Spacer()
+                    Text(editHppTotal.rupiahFormatted).font(.system(size: 15, weight: .bold)).foregroundStyle(OuraTheme.Colors.accent)
+                }
             }
         }
         .padding(OuraTheme.Spacing.cardPad)
@@ -1032,6 +1093,8 @@ struct ProdukSizeDetailView: View {
         }
     }
 
+    // MARK: - Price Advisor (always visible, uses shared component)
+
     private var priceAdvisorSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             Button { withAnimation { showAdvisor.toggle() } } label: {
@@ -1049,61 +1112,45 @@ struct ProdukSizeDetailView: View {
             .buttonStyle(.plain)
 
             if showAdvisor {
-                VStack(alignment: .leading, spacing: 12) {
-                    if size.latestHppBreakdown == nil {
-                        HStack(spacing: 8) {
-                            Image(systemName: "info.circle")
-                                .foregroundStyle(OuraTheme.Colors.textTertiary)
-                            Text("HPP belum tersedia. Konfirmasi batch produksi terlebih dahulu.")
-                                .font(.system(size: 13))
-                                .foregroundStyle(OuraTheme.Colors.textSecondary)
-                        }
-                        .padding(12)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(OuraTheme.Colors.border.opacity(0.5))
-                        .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.medium))
-                    } else {
-                        NumericInputField(label: "Target Margin (%)", value: $targetMarginPct, unit: "%")
-                        NumericInputField(label: "Fee Marketplace (%)", value: $marketplaceFeePct, unit: "%")
-                        Button { Task { await getAdvice() } } label: {
-                            HStack {
-                                Spacer()
-                                if isAdvising { ProgressView() }
-                                else { Text("Hitung Harga").font(.system(size: 14, weight: .semibold)) }
-                                Spacer()
-                            }
-                            .frame(height: 40)
-                            .foregroundStyle(.white)
-                            .background(OuraTheme.Colors.accentGradient)
-                            .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.medium))
-                        }
-                        .buttonStyle(.plain)
-                        if let result = advisorResult {
-                            Divider().overlay(OuraTheme.Colors.separator)
-                            infoRow("Harga Saran", value: result.suggestedPrice.rupiahFormatted)
-                            infoRow("Margin Aktual", value: String(format: "%.1f%%", result.resultingMarginPct * 100))
-                            infoRow("Markup", value: String(format: "%.1f%%", result.resultingMarkupPct * 100))
-                            Button {
-                                editSellingPrice = result.suggestedPrice
-                                Task { await applyPrice(result.suggestedPrice) }
-                            } label: {
-                                Text("Gunakan Harga Ini")
-                                    .font(.system(size: 13, weight: .semibold))
-                                    .foregroundStyle(OuraTheme.Colors.accent)
-                                    .padding(.vertical, 8)
-                                    .frame(maxWidth: .infinity)
-                                    .background(OuraTheme.Colors.accentLight)
-                                    .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.medium))
-                            }
-                            .buttonStyle(.plain)
+                if let hpp = effectiveHppForAdvisor {
+                    VStack(spacing: 0) {
+                        Divider().overlay(OuraTheme.Colors.separator)
+                        PriceAdvisorSection(hpp: hpp, itemLabel: size.displayLabel) { price in
+                            Task { await applyPrice(price) }
                         }
                     }
+                    .ouraCard()
+                } else {
+                    HStack(spacing: 8) {
+                        Image(systemName: "info.circle")
+                            .foregroundStyle(OuraTheme.Colors.textTertiary)
+                        Text("Isi HPP manual di atas untuk mengaktifkan Price Advisor.")
+                            .font(.system(size: 13))
+                            .foregroundStyle(OuraTheme.Colors.textSecondary)
+                    }
+                    .padding(12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(OuraTheme.Colors.border.opacity(0.5))
+                    .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.medium))
                 }
-                .padding(OuraTheme.Spacing.cardPad)
-                .ouraCard()
             }
         }
     }
+
+    // In edit mode, use live editHppTotal; in read mode, use stored effectiveHppBreakdown
+    private var effectiveHppForAdvisor: HPPBreakdown? {
+        if isEditing && size.latestHppBreakdown == nil && editHppTotal > 0 {
+            return HPPBreakdown(fabric: editHppFabric ?? 0,
+                                pooledMaterial: editHppPooled ?? 0,
+                                hardware: editHppHardware ?? 0,
+                                labor: editHppLabor ?? 0,
+                                overhead: editHppOverhead ?? 0,
+                                total: editHppTotal)
+        }
+        return size.effectiveHppBreakdown
+    }
+
+    // MARK: - Supporting rows
 
     private var stockRow: some View {
         HStack(alignment: .top, spacing: 8) {
@@ -1147,17 +1194,34 @@ struct ProdukSizeDetailView: View {
         }
     }
 
+    // MARK: - Edit lifecycle
+
     private func startEdit() {
         editSellingPrice = size.sellingPrice
         editReorderMin = size.reorderMinQty
+        if let manualHpp = size.manualHppBreakdown {
+            editHppFabric   = manualHpp.fabric
+            editHppPooled   = manualHpp.pooledMaterial
+            editHppHardware = manualHpp.hardware
+            editHppLabor    = manualHpp.labor
+            editHppOverhead = manualHpp.overhead
+        }
         withAnimation { isEditing = true }
     }
 
     private func saveEdits() async {
         isSaving = true; errorMsg = nil; defer { isSaving = false }
+        let includeManualHpp = editHppTotal > 0 && size.latestHppBreakdown == nil
         do {
             let updated = try await api.patchProductSize(sku: size.productSku, sizeId: size.id,
-                PatchProductSizeRequest(sellingPrice: editSellingPrice, reorderMinQty: editReorderMin))
+                PatchProductSizeRequest(
+                    sellingPrice: editSellingPrice,
+                    reorderMinQty: editReorderMin,
+                    manualHppFabric:   includeManualHpp ? (editHppFabric   ?? 0) : nil,
+                    manualHppPooled:   includeManualHpp ? (editHppPooled   ?? 0) : nil,
+                    manualHppHardware: includeManualHpp ? (editHppHardware ?? 0) : nil,
+                    manualHppLabor:    includeManualHpp ? (editHppLabor    ?? 0) : nil,
+                    manualHppOverhead: includeManualHpp ? (editHppOverhead ?? 0) : nil))
             size = updated
             withAnimation { isEditing = false }
         } catch let e as APIError { errorMsg = e.errorDescription }
@@ -1167,19 +1231,8 @@ struct ProdukSizeDetailView: View {
     private func applyPrice(_ price: Double) async {
         do {
             _ = try await api.patchProductSize(sku: size.productSku, sizeId: size.id,
-                PatchProductSizeRequest(sellingPrice: price, reorderMinQty: nil))
+                PatchProductSizeRequest(sellingPrice: price))
             await refreshSize()
-        } catch let e as APIError { errorMsg = e.errorDescription }
-        catch { errorMsg = error.localizedDescription }
-    }
-
-    private func getAdvice() async {
-        isAdvising = true; errorMsg = nil; defer { isAdvising = false }
-        let req = PriceAdvisorRequest(targetMarginPct: (targetMarginPct ?? 40) / 100,
-                                      marketplaceFeePct: marketplaceFeePct.map { $0 / 100 },
-                                      promoAllocationPct: nil)
-        do {
-            advisorResult = try await api.getPriceAdvisor(sku: size.productSku, sizeId: size.id, req)
         } catch let e as APIError { errorMsg = e.errorDescription }
         catch { errorMsg = error.localizedDescription }
     }

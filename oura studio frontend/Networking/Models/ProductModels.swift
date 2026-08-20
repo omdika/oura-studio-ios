@@ -123,6 +123,12 @@ struct ProductSizeDetail: Codable, Identifiable {
     let latestHppBreakdown: HPPBreakdown?
     let sellingPrice: Double?
     let marginPct: Double?
+    // Manual HPP fields — filled when product bypasses batch production flow
+    var manualHppFabric: Double?
+    var manualHppPooled: Double?
+    var manualHppHardware: Double?
+    var manualHppLabor: Double?
+    var manualHppOverhead: Double?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -139,6 +145,11 @@ struct ProductSizeDetail: Codable, Identifiable {
         case latestHppBreakdown = "latest_hpp_breakdown"
         case sellingPrice = "selling_price"
         case marginPct = "margin_pct"
+        case manualHppFabric   = "manual_hpp_fabric"
+        case manualHppPooled   = "manual_hpp_pooled"
+        case manualHppHardware = "manual_hpp_hardware"
+        case manualHppLabor    = "manual_hpp_labor"
+        case manualHppOverhead = "manual_hpp_overhead"
     }
 
     var displayLabel: String {
@@ -155,6 +166,23 @@ struct ProductSizeDetail: Codable, Identifiable {
         guard let margin = marginPct else { return nil }
         guard margin < 1.0 else { return nil }
         return margin / (1 - margin)
+    }
+
+    var manualHppBreakdown: HPPBreakdown? {
+        let total = (manualHppFabric ?? 0) + (manualHppPooled ?? 0)
+                  + (manualHppHardware ?? 0) + (manualHppLabor ?? 0) + (manualHppOverhead ?? 0)
+        guard total > 0 else { return nil }
+        return HPPBreakdown(fabric: manualHppFabric ?? 0,
+                            pooledMaterial: manualHppPooled ?? 0,
+                            hardware: manualHppHardware ?? 0,
+                            labor: manualHppLabor ?? 0,
+                            overhead: manualHppOverhead ?? 0,
+                            total: total)
+    }
+
+    // Batch HPP first, manual HPP as fallback
+    var effectiveHppBreakdown: HPPBreakdown? {
+        latestHppBreakdown ?? manualHppBreakdown
     }
 }
 
@@ -186,17 +214,35 @@ struct PatchProductSizeRequest: Codable {
     let sellingPrice: Double?
     let reorderMinQty: Double?
     let isArchived: Bool?
+    let manualHppFabric: Double?
+    let manualHppPooled: Double?
+    let manualHppHardware: Double?
+    let manualHppLabor: Double?
+    let manualHppOverhead: Double?
 
-    init(sellingPrice: Double? = nil, reorderMinQty: Double? = nil, isArchived: Bool? = nil) {
+    init(sellingPrice: Double? = nil, reorderMinQty: Double? = nil, isArchived: Bool? = nil,
+         manualHppFabric: Double? = nil, manualHppPooled: Double? = nil,
+         manualHppHardware: Double? = nil, manualHppLabor: Double? = nil,
+         manualHppOverhead: Double? = nil) {
         self.sellingPrice = sellingPrice
         self.reorderMinQty = reorderMinQty
         self.isArchived = isArchived
+        self.manualHppFabric   = manualHppFabric
+        self.manualHppPooled   = manualHppPooled
+        self.manualHppHardware = manualHppHardware
+        self.manualHppLabor    = manualHppLabor
+        self.manualHppOverhead = manualHppOverhead
     }
 
     enum CodingKeys: String, CodingKey {
-        case sellingPrice  = "selling_price"
-        case reorderMinQty = "reorder_min_qty"
-        case isArchived    = "is_archived"
+        case sellingPrice      = "selling_price"
+        case reorderMinQty     = "reorder_min_qty"
+        case isArchived        = "is_archived"
+        case manualHppFabric   = "manual_hpp_fabric"
+        case manualHppPooled   = "manual_hpp_pooled"
+        case manualHppHardware = "manual_hpp_hardware"
+        case manualHppLabor    = "manual_hpp_labor"
+        case manualHppOverhead = "manual_hpp_overhead"
     }
 }
 
