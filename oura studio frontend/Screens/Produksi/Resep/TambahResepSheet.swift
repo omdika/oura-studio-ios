@@ -84,6 +84,18 @@ struct TambahResepSheet: View {
         return uniqueSizeLabels.contains { sizeIsComplete($0) }
     }
 
+    // Returns names of fabrics that are missing dimensions for the active size tab.
+    // Used to surface exactly which fabric rows still need input.
+    private var missingDimFabricNames: [String] {
+        guard !selectedFabricIds.isEmpty, !activeSizeLabel.isEmpty else { return [] }
+        return selectedFabricIds.compactMap { id -> String? in
+            let hasLen = (fabricLengths[activeSizeLabel]?[id] ?? 0) > 0
+            let hasWid = (fabricWidths[activeSizeLabel]?[id] ?? 0) > 0
+            guard !hasLen || !hasWid else { return nil }
+            return fabrics.first { $0.id == id }?.name
+        }
+    }
+
     private var fabricGroups: [FabricGroup] {
         var familyMap: [String: [UUID]] = [:]
         var ungrouped: [UUID] = []
@@ -158,10 +170,20 @@ struct TambahResepSheet: View {
                             let displayName = group.isGrouped
                                 ? "\(group.family!) (\(group.fabIds.count) warna)"
                                 : (fabrics.first { $0.id == repId }?.name ?? "")
+                            let rowHasLen = (fabricLengths[activeSizeLabel]?[repId] ?? 0) > 0
+                            let rowHasWid = (fabricWidths[activeSizeLabel]?[repId] ?? 0) > 0
+                            let rowIncomplete = !rowHasLen || !rowHasWid
                             VStack(alignment: .leading, spacing: 10) {
-                                Text(displayName)
-                                    .font(.system(size: 13, weight: .semibold))
-                                    .foregroundStyle(OuraTheme.Colors.textSecondary)
+                                HStack(spacing: 6) {
+                                    Text(displayName)
+                                        .font(.system(size: 13, weight: .semibold))
+                                        .foregroundStyle(rowIncomplete ? OuraTheme.Colors.warningText : OuraTheme.Colors.textSecondary)
+                                    if rowIncomplete {
+                                        Image(systemName: "exclamationmark.circle.fill")
+                                            .font(.system(size: 12))
+                                            .foregroundStyle(OuraTheme.Colors.warningText)
+                                    }
+                                }
                                 HStack(spacing: 12) {
                                     NumericInputField(
                                         label: "Panjang (cm)",
@@ -202,6 +224,14 @@ struct TambahResepSheet: View {
                             .listRowBackground(OuraTheme.Colors.surfaceCard)
                             .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
                             .id(activeSizeLabel + group.id)
+                        }
+
+                        if !missingDimFabricNames.isEmpty && missingDimFabricNames.count < selectedFabricIds.count {
+                            Text("Isi dimensi untuk: \(missingDimFabricNames.joined(separator: ", "))")
+                                .font(.system(size: 12))
+                                .foregroundStyle(OuraTheme.Colors.warningText)
+                                .listRowBackground(OuraTheme.Colors.warningBg)
+                                .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
                         }
                     } header: {
                         OuraSectionHeader(title: "Kain (Opsional)")
@@ -523,6 +553,7 @@ struct TambahResepSheet: View {
                     for fabId in selectedFabricIds {
                         guard let fabric = fabrics.first(where: { $0.id == fabId }) else { continue }
                         let existingVariant = allSizes.first {
+                            $0.productId == selectedProduct!.id &&
                             $0.sizeLabel == sizeLabel && $0.fabricVariantName == fabric.name
                         }
                         let targetSizeId: UUID

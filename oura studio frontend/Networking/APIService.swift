@@ -160,6 +160,10 @@ class APIService: ObservableObject {
         return try loggedDecode(T.self, from: data, path: path)
     }
 
+    private func patchVoid<B: Encodable>(path: String, body: B) async throws {
+        _ = try await execute("PATCH", path: path, bodyData: try encoder.encode(body))
+    }
+
     private func delete(path: String) async throws {
         _ = try await execute("DELETE", path: path)
     }
@@ -410,6 +414,12 @@ class APIService: ObservableObject {
     func deletePatternSpec(id: UUID) async throws {
         if useMock { return try await MockAPIService.shared.deletePatternSpec(id: id) }
         try await delete(path: "/pattern-specs/\(id)")
+    }
+
+    func deactivatePatternSpec(id: UUID) async throws {
+        if useMock { return }
+        struct Body: Encodable { let isActive: Bool; enum CodingKeys: String, CodingKey { case isActive = "is_active" } }
+        try await patchVoid(path: "/pattern-specs/\(id)", body: Body(isActive: false))
     }
 
     func getPatternSpecsForSize(productSku: String, sizeLabel: String) async throws -> [PatternSpec] {

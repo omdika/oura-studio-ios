@@ -42,6 +42,8 @@ struct ResepListView: View {
     @State private var errorMsg: String?
     @State private var searchText: String = ""
     @State private var showTambah = false
+    @State private var showEditSheet = false
+    @State private var editSpecGroups: [SpecGroup] = []
 
     private var grouped: [(product: String, groups: [SpecGroup])] {
         let filtered = searchText.isEmpty
@@ -85,6 +87,9 @@ struct ResepListView: View {
         .task { await load() }
         .sheet(isPresented: $showTambah, onDismiss: { Task { await load() } }) {
             TambahResepSheet()
+        }
+        .sheet(isPresented: $showEditSheet, onDismiss: { Task { await load() } }) {
+            EditResepSheet(specGroups: editSpecGroups, onUpdate: {})
         }
     }
 
@@ -155,10 +160,27 @@ struct ResepListView: View {
                         .listRowSeparatorTint(OuraTheme.Colors.separator)
                     }
                 } header: {
-                    Text(group.product)
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(OuraTheme.Colors.textSecondary)
-                        .textCase(.none)
+                    HStack(spacing: 0) {
+                        Text(group.product)
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundStyle(OuraTheme.Colors.textSecondary)
+                            .textCase(.none)
+                        Spacer()
+                        Button {
+                            editSpecGroups = group.groups
+                            showEditSheet = true
+                        } label: {
+                            HStack(spacing: 3) {
+                                Image(systemName: "pencil")
+                                    .font(.system(size: 11, weight: .semibold))
+                                Text("Edit")
+                                    .font(.system(size: 12, weight: .semibold))
+                            }
+                            .foregroundStyle(OuraTheme.Colors.accent)
+                            .textCase(.none)
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
             }
         }

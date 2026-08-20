@@ -11,6 +11,30 @@ struct QRGeneratorView: View {
     @State private var selectedSizeIds: Set<UUID> = []
     @State private var qtyPerSize: [UUID: Int] = [:]
     @State private var isLoading = true
+    @State private var searchText = ""
+
+    private var filteredProducts: [Product] {
+        if searchText.isEmpty { return products }
+        return products.filter { product in
+            if product.name.localizedCaseInsensitiveContains(searchText) { return true }
+            let sizes = (sizesByProduct[product.id] ?? []).filter { !$0.isArchived }
+            return sizes.contains { $0.displayLabel.localizedCaseInsensitiveContains(searchText) }
+        }
+    }
+
+    private func filteredSizes(for product: Product) -> [ProductSizeDetail] {
+        let all = (sizesByProduct[product.id] ?? []).filter { !$0.isArchived }
+        guard !searchText.isEmpty, !product.name.localizedCaseInsensitiveContains(searchText) else { return all }
+        return all.filter { $0.displayLabel.localizedCaseInsensitiveContains(searchText) }
+    }
+
+    private var allSelectableSizes: [ProductSizeDetail] {
+        filteredProducts.flatMap { filteredSizes(for: $0) }
+    }
+
+    private var allSelectableSelected: Bool {
+        !allSelectableSizes.isEmpty && allSelectableSizes.allSatisfy { selectedSizeIds.contains($0.id) }
+    }
 
     private var totalLabelCount: Int {
         selectedSizeIds.reduce(0) { $0 + (qtyPerSize[$1] ?? 1) }
@@ -29,12 +53,15 @@ struct QRGeneratorView: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if products.isEmpty {
                     emptyView
+                } else if filteredProducts.isEmpty {
+                    noResultsView
                 } else {
                     productList
                 }
             }
             .navigationTitle("Generator QR")
             .navigationBarTitleDisplayMode(.large)
+            .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .always), prompt: "Cari produk atau ukuran...")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Tutup") { dismiss() }
@@ -59,8 +86,37 @@ struct QRGeneratorView: View {
 
     private var productList: some View {
         List {
-            ForEach(products) { product in
-                let sizes = (sizesByProduct[product.id] ?? []).filter { !$0.isArchived }
+            Section {
+                Button {
+                    if allSelectableSelected {
+                        allSelectableSizes.forEach {
+                            selectedSizeIds.remove($0.id)
+                            qtyPerSize.removeValue(forKey: $0.id)
+                        }
+                    } else {
+                        allSelectableSizes.forEach {
+                            selectedSizeIds.insert($0.id)
+                            if qtyPerSize[$0.id] == nil { qtyPerSize[$0.id] = 1 }
+                        }
+                    }
+                } label: {
+                    HStack {
+                        Text(allSelectableSelected ? "Batal Semua" : "Pilih Semua")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(OuraTheme.Colors.accent)
+                        Spacer()
+                        Image(systemName: allSelectableSelected ? "checkmark.circle.fill" : "circle")
+                            .font(.system(size: 18))
+                            .foregroundStyle(allSelectableSelected ? OuraTheme.Colors.accent : OuraTheme.Colors.border)
+                    }
+                }
+                .buttonStyle(.plain)
+                .listRowBackground(OuraTheme.Colors.surfaceCard)
+                .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
+            }
+
+            ForEach(filteredProducts) { product in
+                let sizes = filteredSizes(for: product)
                 if !sizes.isEmpty {
                     Section {
                         ForEach(sizes) { size in
@@ -225,6 +281,21 @@ struct QRGeneratorView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
+    private var noResultsView: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 40))
+                .foregroundStyle(OuraTheme.Colors.textTertiary)
+            Text("Tidak ada hasil")
+                .font(.system(size: 15, weight: .medium))
+                .foregroundStyle(OuraTheme.Colors.textSecondary)
+            Text("Coba kata kunci lain")
+                .font(.system(size: 13))
+                .foregroundStyle(OuraTheme.Colors.textTertiary)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
     // MARK: - QR generation
 
     private func makeQRImage(for sizeId: UUID) -> UIImage? {
@@ -263,13 +334,15 @@ struct QRGeneratorView: View {
         let pageRect = CGRect(x: 0, y: 0, width: 595.28, height: 841.89)
         let renderer = UIGraphicsPDFRenderer(bounds: pageRect)
 
-        let qrSize: CGFloat = 85
-        let labelH: CGFloat = 22
+        let mmToPt: CGFloat = 72.0 / 25.4
+        let qrSize: CGFloat = 18 * mmToPt  // 1.8 cm ≈ 51 pt
+        let labelH: CGFloat = 18
         let cellH = qrSize + labelH + 4
-        let margin: CGFloat = 28
-        let cols = 6
-        let colSpacing: CGFloat = (pageRect.width - margin * 2 - CGFloat(cols) * qrSize) / CGFloat(cols - 1)
-        let rowSpacing: CGFloat = 14
+        let margin: CGFloat = 2 * mmToPt   // 2 mm ≈ 5.67 pt
+        let gap: CGFloat = 0.5 * mmToPt    // 0.5 mm ≈ 1.42 pt
+        let colSpacing: CGFloat = gap
+        let rowSpacing: CGFloat = gap
+        let cols = Int((pageRect.width - 2 * margin + gap) / (qrSize + gap)) // 11 on A4
 
         return renderer.pdfData { ctx in
             var col = 0
