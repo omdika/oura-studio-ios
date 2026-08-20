@@ -242,7 +242,7 @@ struct ScanToStockSheet: View {
                 }
             }
             .listRowBackground(OuraTheme.Colors.surfaceCard)
-            .listRowInsets(EdgeInsets.zero)
+            .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
         } header: { OuraSectionHeader(title: "Rincian HPP") }
         .listSectionSeparator(.hidden)
     }
@@ -345,7 +345,7 @@ struct ScanToStockSheet: View {
                 }
             }
             .listRowBackground(OuraTheme.Colors.surfaceCard)
-            .listRowInsets(EdgeInsets.zero)
+            .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
         }
         .listSectionSeparator(.hidden)
     }
@@ -369,7 +369,7 @@ struct ScanToStockSheet: View {
                         Text("Kurangi bahan otomatis")
                             .font(.system(size: 14, weight: .medium))
                             .foregroundStyle(OuraTheme.Colors.textPrimary)
-                        Text("Pakai pola: \(spec.specLabel)")
+                        Text("Pola: \(spec.sizeLabel) · \(spec.fabricMaterialName)")
                             .font(.system(size: 12))
                             .foregroundStyle(OuraTheme.Colors.textTertiary)
                     }

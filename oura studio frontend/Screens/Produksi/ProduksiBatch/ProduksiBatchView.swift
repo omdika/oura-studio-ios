@@ -302,6 +302,7 @@ private struct BatchCard: View {
                 if let focus = hppFocusItem, let hpp = effectiveHpp(for: focus) {
                     Divider().overlay(OuraTheme.Colors.separator)
                     hppRincian(sizeLabel: focus.sizeLabel, hpp: hpp)
+                    Divider().overlay(OuraTheme.Colors.separator)
                     PriceAdvisorSection(hpp: hpp, itemLabel: focus.sizeLabel) { price in
                         onApplyPrice(focus, price)
                     }
@@ -525,6 +526,7 @@ private struct ConfirmedBatchCard: View {
                 if let focus = hppFocusItem, let hpp = effectiveHpp(for: focus) {
                     Divider().overlay(OuraTheme.Colors.separator)
                     hppRincian(sizeLabel: focus.sizeLabel, hpp: hpp)
+                    Divider().overlay(OuraTheme.Colors.separator)
                     PriceAdvisorSection(hpp: hpp, itemLabel: focus.sizeLabel) { price in
                         onApplyPrice(focus, price)
                     }
