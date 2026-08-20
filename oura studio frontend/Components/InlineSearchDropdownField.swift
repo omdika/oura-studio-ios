@@ -67,7 +67,7 @@ struct InlineSearchDropdownField: View {
                         .autocorrectionDisabled()
                         .textInputAutocapitalization(.never)
                         .focused($focused)
-                        .onChange(of: focused) { _, isFocused in
+                        .onChange(of: focused) { isFocused in
                             if isFocused { isEditing = true }
                         }
                         .accessibilityIdentifier("inline-search-\(label)")
@@ -168,7 +168,7 @@ struct InlineSearchDropdownField: View {
                 }
             }
         }
-        .onChange(of: selectedId) { _, newId in
+        .onChange(of: selectedId) { newId in
             if newId != nil {
                 isEditing = false
                 focused = false

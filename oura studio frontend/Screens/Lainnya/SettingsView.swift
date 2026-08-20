@@ -196,7 +196,7 @@ private struct SettingRow: View {
                     .font(.system(size: 15, weight: .medium))
                     .foregroundStyle(OuraTheme.Colors.textPrimary)
                     .focused($isFocused)
-                    .onChange(of: text) { _, new in
+                    .onChange(of: text) { new in
                         let normalized = new.replacingOccurrences(of: ",", with: ".")
                         if let v = Double(normalized) { onChange(v) }
                     }
@@ -230,7 +230,7 @@ private struct SettingRow: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
         .onAppear { text = formatValue(displayValue) }
-        .onChange(of: displayValue) { _, v in
+        .onChange(of: displayValue) { v in
             if !isFocused { text = formatValue(v) }
         }
     }

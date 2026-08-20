@@ -59,7 +59,7 @@ struct BerandaView: View {
             }
         }
         .task { await loadDashboard() }
-        .onChange(of: appState.dashboardNeedsRefresh) { _, needsRefresh in
+        .onChange(of: appState.dashboardNeedsRefresh) { needsRefresh in
             if needsRefresh {
                 appState.dashboardNeedsRefresh = false
                 Task { await loadDashboard() }

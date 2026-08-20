@@ -339,7 +339,7 @@ private struct BatchCard: View {
             }
         }
         .ouraCard(OuraTheme.Radius.card)
-        .onChange(of: isExpanded) { _, expanded in
+        .onChange(of: isExpanded) { expanded in
             if expanded { hppItemId = nil }
         }
     }
@@ -856,7 +856,7 @@ private struct BatchItemRow: View {
                     .foregroundStyle(OuraTheme.Colors.textPrimary)
                     .multilineTextAlignment(.center)
                     .frame(width: 44)
-                    .onChange(of: qtyText) { _, new in
+                    .onChange(of: qtyText) { new in
                         guard let q = Int(new), q != item.qtyActual else { return }
                         onUpdate(q)
                     }

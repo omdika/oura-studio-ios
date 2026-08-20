@@ -156,7 +156,7 @@ struct QRScannerSheet: View {
                 }
                 Spacer()
             }
-            .animation(.spring(duration: 0.3), value: cartToast != nil)
+            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: cartToast != nil)
             .zIndex(10)
 
             // Bottom area
@@ -457,6 +457,12 @@ struct QRScannerSheet: View {
     }
 
     private func addToCart(_ size: ProductSizeDetail) {
+        guard size.currentStockQty >= 1 else {
+            cartToast = "Stok habis — \(size.productName) belum diisi stok"
+            scanState = .scanning
+            scheduleToastDismiss()
+            return
+        }
         if let idx = cartItems.firstIndex(where: { $0.size.id == size.id }) {
             let newQty = cartItems[idx].qty + 1
             guard newQty <= size.currentStockQty else {
@@ -504,7 +510,7 @@ private struct QRCartCheckoutSheet: View {
     }
 
     private var canCheckout: Bool {
-        !cartItems.isEmpty && !isSaving
+        !cartItems.isEmpty && !isSaving && cartItems.allSatisfy { $0.unitPrice > 0 }
     }
 
     var body: some View {
@@ -512,7 +518,9 @@ private struct QRCartCheckoutSheet: View {
             List {
                 Section {
                     ForEach($cartItems) { $item in
-                        cartItemRow(item: $item)
+                        CartItemRowView(item: $item, onRemove: {
+                            cartItems.removeAll { $0.id == $item.wrappedValue.id }
+                        })
                     }
                     .onDelete { cartItems.remove(atOffsets: $0) }
                 } header: {
@@ -578,6 +586,22 @@ private struct QRCartCheckoutSheet: View {
                 }
                 .listSectionSeparator(.hidden)
 
+                if cartItems.contains(where: { $0.size.latestHppBreakdown == nil }) {
+                    Section {
+                        Label {
+                            Text("Satu atau lebih produk belum punya riwayat batch produksi. Profit akan dihitung dari estimasi resep pola, bukan HPP aktual.")
+                                .font(.system(size: 12))
+                                .foregroundStyle(OuraTheme.Colors.textSecondary)
+                        } icon: {
+                            Image(systemName: "info.circle")
+                                .foregroundStyle(OuraTheme.Colors.textTertiary)
+                                .font(.system(size: 14))
+                        }
+                        .listRowBackground(OuraTheme.Colors.surfaceSheet)
+                        .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
+                    }
+                }
+
                 if let err = errorMsg {
                     Section {
                         Text(err)
@@ -635,63 +659,6 @@ private struct QRCartCheckoutSheet: View {
         .presentationDragIndicator(.visible)
     }
 
-    @ViewBuilder
-    private func cartItemRow(item: Binding<CartItem>) -> some View {
-        HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 3) {
-                Text(item.wrappedValue.size.productName)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(OuraTheme.Colors.textPrimary)
-                Text(item.wrappedValue.size.displayLabel)
-                    .font(.system(size: 12))
-                    .foregroundStyle(OuraTheme.Colors.textSecondary)
-                Text(item.wrappedValue.unitPrice.rupiahFormatted)
-                    .font(.system(size: 12))
-                    .foregroundStyle(OuraTheme.Colors.textTertiary)
-            }
-
-            Spacer()
-
-            // Qty stepper: trash when qty = 1 to remove on tap
-            HStack(spacing: 4) {
-                Button {
-                    if item.wrappedValue.qty > 1 {
-                        item.qty.wrappedValue -= 1
-                    } else {
-                        cartItems.removeAll { $0.id == item.wrappedValue.id }
-                    }
-                } label: {
-                    Image(systemName: item.wrappedValue.qty > 1 ? "minus.circle" : "trash.circle")
-                        .font(.system(size: 24))
-                        .foregroundStyle(item.wrappedValue.qty > 1
-                            ? OuraTheme.Colors.accent
-                            : OuraTheme.Colors.dangerText)
-                }
-                .buttonStyle(.plain)
-
-                Text("\(item.wrappedValue.qty)")
-                    .font(.system(size: 16, weight: .bold))
-                    .foregroundStyle(OuraTheme.Colors.textPrimary)
-                    .frame(minWidth: 30, alignment: .center)
-
-                Button {
-                    guard item.wrappedValue.qty < item.wrappedValue.size.currentStockQty else { return }
-                    item.qty.wrappedValue += 1
-                } label: {
-                    Image(systemName: "plus.circle")
-                        .font(.system(size: 24))
-                        .foregroundStyle(item.wrappedValue.qty < item.wrappedValue.size.currentStockQty
-                            ? OuraTheme.Colors.accent
-                            : OuraTheme.Colors.border)
-                }
-                .buttonStyle(.plain)
-                .disabled(item.wrappedValue.qty >= item.wrappedValue.size.currentStockQty)
-            }
-        }
-        .listRowBackground(OuraTheme.Colors.surfaceCard)
-        .listRowInsets(EdgeInsets(top: 12, leading: 16, bottom: 12, trailing: 16))
-    }
-
     private func checkout() async {
         isSaving = true
         errorMsg = nil
@@ -723,6 +690,116 @@ private struct QRCartCheckoutSheet: View {
             errorMsg = e.errorDescription
         } catch {
             errorMsg = error.localizedDescription
+        }
+    }
+}
+
+// MARK: - Cart Item Row
+
+private struct CartItemRowView: View {
+    @Binding var item: CartItem
+    let onRemove: () -> Void
+
+    @State private var priceDigits: String = ""
+    @FocusState private var priceFocused: Bool
+
+    private var displayPrice: String {
+        guard !priceDigits.isEmpty, let num = Double(priceDigits) else { return "" }
+        let fmt = NumberFormatter()
+        fmt.numberStyle = .decimal
+        fmt.groupingSeparator = "."
+        fmt.maximumFractionDigits = 0
+        return fmt.string(from: NSNumber(value: num)) ?? priceDigits
+    }
+
+    var body: some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(item.size.productName)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(OuraTheme.Colors.textPrimary)
+                Text(item.size.displayLabel)
+                    .font(.system(size: 12))
+                    .foregroundStyle(OuraTheme.Colors.textSecondary)
+
+                if item.unitPrice > 0 && !priceFocused {
+                    Text(item.unitPrice.rupiahFormatted)
+                        .font(.system(size: 12))
+                        .foregroundStyle(OuraTheme.Colors.textTertiary)
+                } else {
+                    HStack(spacing: 6) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.orange)
+                        HStack(spacing: 3) {
+                            Text("Rp")
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundStyle(OuraTheme.Colors.textTertiary)
+                            TextField("Isi harga...", text: Binding(
+                                get: { displayPrice },
+                                set: { newVal in
+                                    let raw = newVal.filter { $0.isNumber }
+                                    priceDigits = raw
+                                    item.unitPrice = Double(raw) ?? 0
+                                }
+                            ))
+                            .focused($priceFocused)
+                            .keyboardType(.numberPad)
+                            .font(.system(size: 13))
+                            .foregroundStyle(OuraTheme.Colors.textPrimary)
+                            .frame(minWidth: 80)
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.orange.opacity(0.08))
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                        .overlay(RoundedRectangle(cornerRadius: 6)
+                            .stroke(Color.orange.opacity(0.35), lineWidth: 1))
+                    }
+                }
+            }
+
+            Spacer()
+
+            HStack(spacing: 4) {
+                Button {
+                    if item.qty > 1 {
+                        item.qty -= 1
+                    } else {
+                        onRemove()
+                    }
+                } label: {
+                    Image(systemName: item.qty > 1 ? "minus.circle" : "trash.circle")
+                        .font(.system(size: 24))
+                        .foregroundStyle(item.qty > 1
+                            ? OuraTheme.Colors.accent
+                            : OuraTheme.Colors.dangerText)
+                }
+                .buttonStyle(.plain)
+
+                Text("\(item.qty)")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(OuraTheme.Colors.textPrimary)
+                    .frame(minWidth: 30, alignment: .center)
+
+                Button {
+                    guard item.qty < item.size.currentStockQty else { return }
+                    item.qty += 1
+                } label: {
+                    Image(systemName: "plus.circle")
+                        .font(.system(size: 24))
+                        .foregroundStyle(item.qty < item.size.currentStockQty
+                            ? OuraTheme.Colors.accent
+                            : OuraTheme.Colors.border)
+                }
+                .buttonStyle(.plain)
+                .disabled(item.qty >= item.size.currentStockQty)
+            }
+        }
+        .listRowBackground(OuraTheme.Colors.surfaceCard)
+        .listRowInsets(EdgeInsets(top: 12, leading: 16, bottom: 12, trailing: 16))
+        .onAppear {
+            if item.unitPrice > 0 { priceDigits = String(Int(item.unitPrice)) }
         }
     }
 }

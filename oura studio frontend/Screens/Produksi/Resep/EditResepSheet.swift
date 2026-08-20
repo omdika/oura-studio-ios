@@ -205,7 +205,7 @@ struct EditResepSheet: View {
             )
             .listRowBackground(OuraTheme.Colors.surfaceCard)
             .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
-            .onChange(of: selectedFabricIds) { _, _ in
+            .onChange(of: selectedFabricIds) { _ in
                 propagateGroupDimensions()
             }
 

@@ -210,7 +210,7 @@ struct TambahProdukLengkapSheet: View {
                             .font(.system(size: 15))
                             .foregroundStyle(OuraTheme.Colors.textPrimary)
                             .autocorrectionDisabled()
-                            .onChange(of: productName) { _, val in sku = Self.autoSKU(from: val) }
+                            .onChange(of: productName) { val in sku = Self.autoSKU(from: val) }
                             .fieldStyle()
                     }
 

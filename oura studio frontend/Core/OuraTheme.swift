@@ -2,47 +2,59 @@ import SwiftUI
 
 enum OuraTheme {
     enum Colors {
+        // Adaptive helper
+        private static func c(
+            l: (CGFloat, CGFloat, CGFloat),
+            d: (CGFloat, CGFloat, CGFloat)
+        ) -> Color {
+            Color(UIColor { t in
+                t.userInterfaceStyle == .dark
+                    ? UIColor(red: d.0, green: d.1, blue: d.2, alpha: 1)
+                    : UIColor(red: l.0, green: l.1, blue: l.2, alpha: 1)
+            })
+        }
+
         // Backgrounds
-        static let background    = Color(red: 0.9298, green: 0.9036, blue: 0.8836)
-        static let surfaceCard   = Color(red: 0.9942, green: 0.9855, blue: 0.9760)
-        static let surfaceSheet  = Color(red: 0.9687, green: 0.9513, blue: 0.9324)
-        static let surfaceAlt    = Color(red: 0.9707, green: 0.9274, blue: 0.8802)
+        static let background   = c(l: (0.930, 0.904, 0.884), d: (0.102, 0.090, 0.082))
+        static let surfaceCard  = c(l: (0.994, 0.986, 0.976), d: (0.149, 0.133, 0.122))
+        static let surfaceSheet = c(l: (0.969, 0.951, 0.932), d: (0.129, 0.114, 0.106))
+        static let surfaceAlt   = c(l: (0.971, 0.927, 0.880), d: (0.137, 0.122, 0.102))
 
         // Borders
-        static let border        = Color(red: 0.8780, green: 0.8521, blue: 0.8324)
-        static let separator     = Color(red: 0.8268, green: 0.8012, blue: 0.7817)
+        static let border     = c(l: (0.878, 0.852, 0.832), d: (0.227, 0.208, 0.188))
+        static let separator  = c(l: (0.827, 0.801, 0.782), d: (0.180, 0.165, 0.153))
 
         // Text
-        static let textPrimary   = Color(red: 0.1539, green: 0.1121, blue: 0.0893)
-        static let textSecondary = Color(red: 0.4508, green: 0.3994, blue: 0.3720)
-        static let textTertiary  = Color(red: 0.6290, green: 0.5875, blue: 0.5655)
-        static let textDisabled  = Color(red: 0.5211, green: 0.4976, blue: 0.4797)
+        static let textPrimary   = c(l: (0.154, 0.112, 0.089), d: (0.929, 0.906, 0.878))
+        static let textSecondary = c(l: (0.451, 0.399, 0.372), d: (0.659, 0.596, 0.565))
+        static let textTertiary  = c(l: (0.629, 0.588, 0.565), d: (0.420, 0.376, 0.349))
+        static let textDisabled  = c(l: (0.521, 0.498, 0.480), d: (0.314, 0.286, 0.282))
 
-        // Brand / Accent (terracotta)
-        static let accent              = Color(red: 0.7461, green: 0.3384, blue: 0.2384)
-        static let accentGradientStart = Color(red: 0.7893, green: 0.3478, blue: 0.2395)
-        static let accentGradientEnd   = Color(red: 0.6795, green: 0.2995, blue: 0.2462)
-        static let accentLight         = Color(red: 1.0000, green: 0.8923, blue: 0.8615)
+        // Brand / Accent (terracotta — slightly brighter in dark)
+        static let accent              = c(l: (0.746, 0.338, 0.238), d: (0.816, 0.416, 0.314))
+        static let accentGradientStart = c(l: (0.789, 0.348, 0.239), d: (0.851, 0.435, 0.322))
+        static let accentGradientEnd   = c(l: (0.679, 0.300, 0.246), d: (0.745, 0.365, 0.267))
+        static let accentLight         = c(l: (1.000, 0.892, 0.862), d: (0.239, 0.102, 0.078))
 
         // Danger (red)
-        static let dangerText = Color(red: 0.7719, green: 0.2111, blue: 0.2154)
-        static let dangerBg   = Color(red: 1.0000, green: 0.8747, blue: 0.8567)
+        static let dangerText = c(l: (0.772, 0.211, 0.215), d: (0.910, 0.376, 0.376))
+        static let dangerBg   = c(l: (1.000, 0.875, 0.857), d: (0.239, 0.063, 0.063))
 
         // Warning (amber)
-        static let warningText = Color(red: 0.7321, green: 0.4161, blue: 0.0000)
-        static let warningBg   = Color(red: 1.0000, green: 0.9238, blue: 0.7900)
+        static let warningText = c(l: (0.732, 0.416, 0.000), d: (0.980, 0.706, 0.251))
+        static let warningBg   = c(l: (1.000, 0.924, 0.790), d: (0.239, 0.157, 0.000))
 
         // Blue (teal)
-        static let blueAccent = Color(red: 0.0000, green: 0.4476, blue: 0.4682)
-        static let blueBg     = Color(red: 0.8227, green: 0.9349, blue: 0.9400)
+        static let blueAccent = c(l: (0.000, 0.448, 0.468), d: (0.200, 0.722, 0.753))
+        static let blueBg     = c(l: (0.823, 0.935, 0.940), d: (0.047, 0.180, 0.196))
 
         // Green
-        static let greenAccent = Color(red: 0.2804, green: 0.5805, blue: 0.2998)
-        static let greenBg     = Color(red: 0.8603, green: 0.9522, blue: 0.8594)
+        static let greenAccent = c(l: (0.280, 0.580, 0.300), d: (0.333, 0.710, 0.353))
+        static let greenBg     = c(l: (0.860, 0.952, 0.859), d: (0.059, 0.165, 0.063))
 
         // Purple
-        static let purple   = Color(red: 0.6583, green: 0.5651, blue: 0.8299)
-        static let purpleBg = Color(red: 0.9400, green: 0.9200, blue: 0.9800)
+        static let purple   = c(l: (0.658, 0.565, 0.830), d: (0.722, 0.627, 0.878))
+        static let purpleBg = c(l: (0.940, 0.920, 0.980), d: (0.118, 0.098, 0.196))
 
         // Gradients
         static let accentGradient = LinearGradient(

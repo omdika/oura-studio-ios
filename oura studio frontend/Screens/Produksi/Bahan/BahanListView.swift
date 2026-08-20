@@ -79,7 +79,7 @@ struct BahanListView: View {
         .sheet(isPresented: $showTambah) {
             TambahPembelianSheet(preselectedMaterial: nil)
         }
-        .onChange(of: showTambah) { _, showing in
+        .onChange(of: showTambah) { showing in
             if !showing { Task { await load(silent: true) } }
         }
         .onChange(of: searchText) { displayCount = pageSize }

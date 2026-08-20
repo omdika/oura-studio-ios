@@ -316,7 +316,7 @@ struct TambahPembelianSheet: View {
                         widthCm = nil
                     }
                 }
-                .onChange(of: selectedMaterialId) { _, id in
+                .onChange(of: selectedMaterialId) { id in
                     selectedMaterial = materials.first { $0.id == id }
                     isCreatingNew = false
                     widthCm = selectedMaterial?.fabricWidthCm

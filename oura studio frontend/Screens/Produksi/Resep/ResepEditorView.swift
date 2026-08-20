@@ -234,7 +234,7 @@ struct ResepEditorView: View {
                     items: availableFabrics.map { (id: $0.id, name: $0.name) },
                     placeholder: "Pilih kain (opsional)"
                 )
-                .onChange(of: editFabricIds) { _, newIds in
+                .onChange(of: editFabricIds) { newIds in
                     for id in newIds where fabricRotations[id] == nil {
                         fabricRotations[id] = true
                     }

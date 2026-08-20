@@ -67,6 +67,7 @@ struct OptimasiView: View {
     }
 
     @State private var step: Step = .selectSpec
+    @State private var searchText: String = ""
     @State private var fabricPurchases: [(material: Material, purchase: MaterialPurchase)] = []
     @State private var patternSpecs: [PatternSpec] = []
     @State private var selectedSpec: PatternSpec?
@@ -102,10 +103,15 @@ struct OptimasiView: View {
     }
 
     private var groupedSpecs: [(productName: String, specs: [PatternSpec])] {
-        var dict: [String: [PatternSpec]] = [:]
-        for spec in patternSpecs.filter(\.isActive) {
-            dict[spec.productName, default: []].append(spec)
+        let filtered = patternSpecs.filter { spec in
+            guard spec.isActive else { return false }
+            guard !searchText.isEmpty else { return true }
+            return spec.productName.localizedCaseInsensitiveContains(searchText)
+                || spec.sizeLabel.localizedCaseInsensitiveContains(searchText)
+                || spec.fabrics.contains { $0.materialName.localizedCaseInsensitiveContains(searchText) }
         }
+        var dict: [String: [PatternSpec]] = [:]
+        for spec in filtered { dict[spec.productName, default: []].append(spec) }
         return dict
             .map { (productName: $0.key, specs: $0.value.sorted { $0.sizeLabel < $1.sizeLabel }) }
             .sorted { $0.productName < $1.productName }
@@ -202,10 +208,38 @@ struct OptimasiView: View {
         VStack(alignment: .leading, spacing: 12) {
             OuraSectionHeader(title: "Pilih Produk")
 
+            HStack(spacing: 8) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundStyle(OuraTheme.Colors.textTertiary)
+                    .font(.system(size: 14))
+                TextField("Cari produk atau kain...", text: $searchText)
+                    .font(.system(size: 14))
+                    .foregroundStyle(OuraTheme.Colors.textPrimary)
+                    .autocorrectionDisabled()
+                    .textInputAutocapitalization(.never)
+                if !searchText.isEmpty {
+                    Button { searchText = "" } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(OuraTheme.Colors.textTertiary)
+                            .font(.system(size: 14))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 9)
+            .background(OuraTheme.Colors.surfaceCard)
+            .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.medium))
+            .overlay(RoundedRectangle(cornerRadius: OuraTheme.Radius.medium)
+                .stroke(OuraTheme.Colors.border, lineWidth: 0.75))
+
             if isLoading {
                 ProgressView().frame(maxWidth: .infinity)
             } else if groupedSpecs.isEmpty {
-                Text("Tidak ada resep pola aktif. Buat resep di tab Resep terlebih dahulu.")
+                let msg = searchText.isEmpty
+                    ? "Tidak ada resep pola aktif. Buat resep di tab Resep terlebih dahulu."
+                    : "Tidak ada hasil untuk \"\(searchText)\""
+                Text(msg)
                     .font(.system(size: 14))
                     .foregroundStyle(OuraTheme.Colors.textSecondary)
                     .padding()

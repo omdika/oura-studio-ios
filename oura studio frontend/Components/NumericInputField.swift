@@ -22,7 +22,7 @@ struct NumericInputField: View {
                     .foregroundStyle(OuraTheme.Colors.textPrimary)
                     .focused($isFocused)
                     .accessibilityLabel(label)
-                    .onChange(of: text) { _, new in
+                    .onChange(of: text) { new in
                         let normalized = new.replacingOccurrences(of: ",", with: ".")
                         let filtered = normalized.filter { $0.isNumber || $0 == "." }
                         if filtered != new { text = filtered }
@@ -47,7 +47,7 @@ struct NumericInputField: View {
         .onAppear {
             if let v = value { text = formatNum(v) }
         }
-        .onChange(of: value) { _, newValue in
+        .onChange(of: value) { newValue in
             // Sync text when binding changes externally (e.g. switching size tabs).
             // Skip while focused so in-progress decimal input (e.g. "0.") isn't wiped.
             guard !isFocused else { return }

@@ -63,6 +63,23 @@ struct ScanToSellSheet: View {
             }
             .listSectionSeparator(.hidden)
 
+            if size.latestHppBreakdown == nil {
+                Section {
+                    Label {
+                        Text("Profit dihitung dari estimasi resep pola — batch produksi belum pernah dikonfirmasi.")
+                            .font(.system(size: 12))
+                            .foregroundStyle(OuraTheme.Colors.textSecondary)
+                    } icon: {
+                        Image(systemName: "info.circle")
+                            .foregroundStyle(OuraTheme.Colors.textTertiary)
+                            .font(.system(size: 14))
+                    }
+                    .listRowBackground(OuraTheme.Colors.surfaceSheet)
+                    .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
+                }
+                .listSectionSeparator(.hidden)
+            }
+
             Section {
                 HStack {
                     Text("Jumlah")

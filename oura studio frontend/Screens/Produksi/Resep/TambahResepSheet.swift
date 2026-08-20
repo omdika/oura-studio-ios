@@ -130,7 +130,7 @@ struct TambahResepSheet: View {
                     )
                     .listRowBackground(OuraTheme.Colors.surfaceCard)
                     .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
-                    .onChange(of: selectedProductId) { _, _ in
+                    .onChange(of: selectedProductId) { _ in
                         activeSizeLabel = uniqueSizeLabels.first ?? ""
                         fabricLengths = [:]
                         fabricWidths = [:]
@@ -161,7 +161,7 @@ struct TambahResepSheet: View {
                         )
                         .listRowBackground(OuraTheme.Colors.surfaceCard)
                         .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
-                        .onChange(of: selectedFabricIds) { _, _ in
+                        .onChange(of: selectedFabricIds) { _ in
                             propagateGroupDimensions()
                         }
 
@@ -670,7 +670,7 @@ private struct TambahProdukCepatSheet: View {
                             .font(.system(size: 15))
                             .foregroundStyle(OuraTheme.Colors.textPrimary)
                             .autocorrectionDisabled()
-                            .onChange(of: productName) { _, val in
+                            .onChange(of: productName) { val in
                                 skuCode = Self.autoSKU(from: val)
                             }
                             .inputFieldStyle()

@@ -371,10 +371,19 @@ struct QRGeneratorView: View {
                     }
                 }
 
-                let label = "\(size.productName)\n\(size.displayLabel)"
+                // Build 3-line caption: product name / fabric variant / size label
+                var captionParts = [size.productName]
+                if let fabric = size.fabricVariantName { captionParts.append(fabric) }
+                captionParts.append(size.sizeLabel)
+                let label = captionParts.joined(separator: "\n")
+
+                let ps = NSMutableParagraphStyle()
+                ps.minimumLineHeight = 6.0
+                ps.maximumLineHeight = 6.0
                 let attrs: [NSAttributedString.Key: Any] = [
-                    .font: UIFont.systemFont(ofSize: 7),
-                    .foregroundColor: UIColor.black
+                    .font: UIFont.systemFont(ofSize: 5.5),
+                    .foregroundColor: UIColor.black,
+                    .paragraphStyle: ps
                 ]
                 label.draw(
                     with: CGRect(x: x, y: currentY + qrSize + 2, width: qrSize, height: labelH),
