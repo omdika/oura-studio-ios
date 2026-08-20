@@ -14,16 +14,23 @@ struct QRGeneratorView: View {
     @State private var searchText = ""
 
     private var filteredProducts: [Product] {
-        if searchText.isEmpty { return products }
-        return products.filter { product in
-            if product.name.localizedCaseInsensitiveContains(searchText) { return true }
-            let sizes = (sizesByProduct[product.id] ?? []).filter { !$0.isArchived }
-            return sizes.contains { $0.displayLabel.localizedCaseInsensitiveContains(searchText) }
+        let base: [Product]
+        if searchText.isEmpty {
+            base = products
+        } else {
+            base = products.filter { product in
+                if product.name.localizedCaseInsensitiveContains(searchText) { return true }
+                let sizes = (sizesByProduct[product.id] ?? []).filter { !$0.isArchived }
+                return sizes.contains { $0.displayLabel.localizedCaseInsensitiveContains(searchText) }
+            }
         }
+        return base.sorted { $0.name.localizedCompare($1.name) == .orderedAscending }
     }
 
     private func filteredSizes(for product: Product) -> [ProductSizeDetail] {
-        let all = (sizesByProduct[product.id] ?? []).filter { !$0.isArchived }
+        let all = (sizesByProduct[product.id] ?? [])
+            .filter { !$0.isArchived }
+            .sorted { $0.displayLabel.localizedCompare($1.displayLabel) == .orderedAscending }
         guard !searchText.isEmpty, !product.name.localizedCaseInsensitiveContains(searchText) else { return all }
         return all.filter { $0.displayLabel.localizedCaseInsensitiveContains(searchText) }
     }
@@ -315,12 +322,20 @@ struct QRGeneratorView: View {
         isGenerating = true
         defer { isGenerating = false }
 
-        var repeatedIds: [UUID] = []
-        for id in selectedSizeIds {
-            let qty = qtyPerSize[id] ?? 1
-            repeatedIds.append(contentsOf: Array(repeating: id, count: qty))
-        }
         let allSizes = sizesByProduct.values.flatMap { $0 }
+        let sortedSelected = allSizes
+            .filter { selectedSizeIds.contains($0.id) }
+            .sorted {
+                let nameCmp = $0.productName.localizedCompare($1.productName)
+                if nameCmp != .orderedSame { return nameCmp == .orderedAscending }
+                return $0.displayLabel.localizedCompare($1.displayLabel) == .orderedAscending
+            }
+
+        var repeatedIds: [UUID] = []
+        for size in sortedSelected {
+            let qty = qtyPerSize[size.id] ?? 1
+            repeatedIds.append(contentsOf: Array(repeating: size.id, count: qty))
+        }
 
         let data = await Task.detached(priority: .userInitiated) {
             Self.generatePDF(for: repeatedIds, sizes: Array(allSizes))
