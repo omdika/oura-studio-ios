@@ -901,6 +901,12 @@ struct ProdukSizeDetailView: View {
     @State private var showAddStock = false
     @State private var errorMsg: String?
 
+    // Spec-based HPP estimate (loaded on appear; used when no batch/manual HPP exists)
+    @State private var relatedSpec: PatternSpec? = nil
+    @State private var isLoadingSpec: Bool = false
+    @State private var specHppBreakdown: HPPBreakdown? = nil
+    @State private var hppFromSpec: Bool = false
+
     init(productSize: ProductSizeDetail) {
         self.productSize = productSize
         self._size = State(initialValue: productSize)
@@ -938,7 +944,11 @@ struct ProdukSizeDetailView: View {
                 .disabled(isSaving)
             }
         }
-        .task { await refreshSize() }
+        .task {
+            async let a: Void = refreshSize()
+            async let b: Void = loadSpec()
+            _ = await (a, b)
+        }
         .sheet(isPresented: $showAddStock, onDismiss: { Task { await refreshSize() } }) {
             TambahStokSheet(size: size)
         }
@@ -948,6 +958,49 @@ struct ProdukSizeDetailView: View {
         guard let fresh = try? await api.getProductSizes(sku: size.productSku),
               let updated = fresh.first(where: { $0.id == size.id }) else { return }
         size = updated
+    }
+
+    private func loadSpec() async {
+        guard size.latestHppBreakdown == nil && size.manualHppBreakdown == nil else { return }
+        isLoadingSpec = true
+        defer { isLoadingSpec = false }
+
+        async let specsTask     = api.getPatternSpecsForSize(productSku: size.productSku, sizeLabel: size.sizeLabel)
+        async let materialsTask = api.getMaterials()
+        async let settingsTask  = api.getSettings()
+
+        let specs     = (try? await specsTask)     ?? []
+        let materials = (try? await materialsTask) ?? []
+        let settings  = (try? await settingsTask)  ?? []
+
+        let spec = specs.first(where: { $0.productSizeId == size.id && $0.isActive })
+        relatedSpec = spec
+        guard let spec else { return }
+
+        let matMap      = Dictionary(uniqueKeysWithValues: materials.map { ($0.id, $0.currentAvgCost) })
+        let settingsMap = Dictionary(uniqueKeysWithValues: settings.map { ($0.key, $0.value) })
+
+        let fabricCost = spec.fabrics.reduce(0.0) { sum, fabric in
+            sum + (fabric.cutLengthCm / 100.0) * (matMap[fabric.materialId] ?? 0)
+        }
+        let componentCost = spec.components.reduce(0.0) { sum, comp in
+            sum + comp.qtyPerUnit * (matMap[comp.materialId] ?? 0)
+        }
+        let pooled   = (settingsMap["pooled_material_rate:thread"] ?? 0)
+                     + (settingsMap["pooled_material_rate:packaging"] ?? 0)
+        let labor    = spec.estLaborMinutes * (settingsMap["labor_rate_per_minute"] ?? 0)
+        let overhead = settingsMap["default_overhead_per_unit"] ?? 0
+
+        let total = fabricCost + componentCost + pooled + labor + overhead
+        guard total > 0 else { return }
+
+        specHppBreakdown = HPPBreakdown(
+            fabric:         fabricCost,
+            pooledMaterial: pooled,
+            hardware:       componentCost,
+            labor:          labor,
+            overhead:       overhead,
+            total:          total)
     }
 
     // MARK: - Info card
@@ -1002,10 +1055,21 @@ struct ProdukSizeDetailView: View {
             hppCard(hpp, isManual: false)
         } else if let hpp = size.manualHppBreakdown {
             hppCard(hpp, isManual: true)
+        } else if isLoadingSpec {
+            HStack(spacing: 8) {
+                ProgressView().scaleEffect(0.8)
+                Text("Memuat estimasi HPP dari resep…")
+                    .font(.system(size: 13))
+                    .foregroundStyle(OuraTheme.Colors.textTertiary)
+            }
+            .padding(OuraTheme.Spacing.cardPad)
+            .ouraCard()
+        } else if let hpp = specHppBreakdown {
+            hppCard(hpp, isManual: false, isSpec: true)
         }
     }
 
-    private func hppCard(_ hpp: HPPBreakdown, isManual: Bool) -> some View {
+    private func hppCard(_ hpp: HPPBreakdown, isManual: Bool, isSpec: Bool = false) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 6) {
                 OuraSectionHeader(title: isManual ? "RINCIAN HPP" : "HPP Breakdown")
@@ -1016,15 +1080,22 @@ struct ProdukSizeDetailView: View {
                         .padding(.horizontal, 6).padding(.vertical, 2)
                         .background(OuraTheme.Colors.warningBg)
                         .clipShape(Capsule())
+                } else if isSpec {
+                    Text("estimasi resep")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(OuraTheme.Colors.greenAccent)
+                        .padding(.horizontal, 6).padding(.vertical, 2)
+                        .background(OuraTheme.Colors.greenAccent.opacity(0.15))
+                        .clipShape(Capsule())
                 }
             }
             hppRow("Kain", value: hpp.fabric, total: hpp.total)
-            if !isManual, hpp.fabricItems.count > 1 {
+            if !isManual && !isSpec, hpp.fabricItems.count > 1 {
                 ForEach(hpp.fabricItems, id: \.name) { hppSubRow($0.name, cost: $0.cost) }
             }
             hppRow("Bahan Pooled", value: hpp.pooledMaterial, total: hpp.total)
             hppRow("Hardware", value: hpp.hardware, total: hpp.total)
-            if !isManual, hpp.hardwareItems.count > 1 {
+            if !isManual && !isSpec, hpp.hardwareItems.count > 1 {
                 ForEach(hpp.hardwareItems, id: \.name) { hppSubRow($0.name, cost: $0.cost) }
             }
             hppRow("Tenaga Kerja", value: hpp.labor, total: hpp.total)
@@ -1035,6 +1106,11 @@ struct ProdukSizeDetailView: View {
                 Spacer()
                 Text(hpp.total.rupiahFormatted).font(.system(size: 16, weight: .bold)).foregroundStyle(OuraTheme.Colors.accent)
             }
+            if isSpec {
+                Text("Estimasi dari resep · Nilai dapat diubah saat Edit")
+                    .font(.system(size: 11))
+                    .foregroundStyle(OuraTheme.Colors.textTertiary)
+            }
         }
         .padding(OuraTheme.Spacing.cardPad)
         .ouraCard()
@@ -1044,12 +1120,21 @@ struct ProdukSizeDetailView: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 6) {
                 OuraSectionHeader(title: "RINCIAN HPP")
-                Text("manual")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(OuraTheme.Colors.warningText)
-                    .padding(.horizontal, 6).padding(.vertical, 2)
-                    .background(OuraTheme.Colors.warningBg)
-                    .clipShape(Capsule())
+                if hppFromSpec {
+                    Text("estimasi resep · dapat diedit")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(OuraTheme.Colors.greenAccent)
+                        .padding(.horizontal, 6).padding(.vertical, 2)
+                        .background(OuraTheme.Colors.greenAccent.opacity(0.15))
+                        .clipShape(Capsule())
+                } else {
+                    Text("manual")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(OuraTheme.Colors.warningText)
+                        .padding(.horizontal, 6).padding(.vertical, 2)
+                        .background(OuraTheme.Colors.warningBg)
+                        .clipShape(Capsule())
+                }
             }
             CurrencyInputField(label: "Kain (fabric)", value: $editHppFabric)
             CurrencyInputField(label: "Bahan Pooled", value: $editHppPooled)
@@ -1137,7 +1222,7 @@ struct ProdukSizeDetailView: View {
         }
     }
 
-    // In edit mode, use live editHppTotal; in read mode, use stored effectiveHppBreakdown
+    // Edit mode with typed values → live preview; otherwise use batch → manual → spec fallback chain
     private var effectiveHppForAdvisor: HPPBreakdown? {
         if isEditing && size.latestHppBreakdown == nil && editHppTotal > 0 {
             return HPPBreakdown(fabric: editHppFabric ?? 0,
@@ -1147,7 +1232,7 @@ struct ProdukSizeDetailView: View {
                                 overhead: editHppOverhead ?? 0,
                                 total: editHppTotal)
         }
-        return size.effectiveHppBreakdown
+        return size.effectiveHppBreakdown ?? specHppBreakdown
     }
 
     // MARK: - Supporting rows
@@ -1199,12 +1284,20 @@ struct ProdukSizeDetailView: View {
     private func startEdit() {
         editSellingPrice = size.sellingPrice
         editReorderMin = size.reorderMinQty
+        hppFromSpec = false
         if let manualHpp = size.manualHppBreakdown {
-            editHppFabric   = manualHpp.fabric
-            editHppPooled   = manualHpp.pooledMaterial
-            editHppHardware = manualHpp.hardware
-            editHppLabor    = manualHpp.labor
-            editHppOverhead = manualHpp.overhead
+            editHppFabric   = manualHpp.fabric        > 0 ? manualHpp.fabric        : nil
+            editHppPooled   = manualHpp.pooledMaterial > 0 ? manualHpp.pooledMaterial : nil
+            editHppHardware = manualHpp.hardware      > 0 ? manualHpp.hardware      : nil
+            editHppLabor    = manualHpp.labor         > 0 ? manualHpp.labor         : nil
+            editHppOverhead = manualHpp.overhead      > 0 ? manualHpp.overhead      : nil
+        } else if let specHpp = specHppBreakdown {
+            editHppFabric   = specHpp.fabric        > 0 ? specHpp.fabric        : nil
+            editHppPooled   = specHpp.pooledMaterial > 0 ? specHpp.pooledMaterial : nil
+            editHppHardware = specHpp.hardware      > 0 ? specHpp.hardware      : nil
+            editHppLabor    = specHpp.labor         > 0 ? specHpp.labor         : nil
+            editHppOverhead = specHpp.overhead      > 0 ? specHpp.overhead      : nil
+            hppFromSpec = true
         }
         withAnimation { isEditing = true }
     }

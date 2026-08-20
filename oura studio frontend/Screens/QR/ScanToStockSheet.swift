@@ -28,6 +28,7 @@ struct ScanToStockSheet: View {
     @State private var relatedSpec: PatternSpec? = nil
     @State private var isLoadingSpec: Bool = false
     @State private var hppFromSpec: Bool = false    // true when fields pre-filled from recipe estimate
+    @State private var bahanDeductionSkipped: Bool = false  // true when addStockFromBahan returned 404
 
     enum StockReason: String, CaseIterable {
         case production = "production"
@@ -405,6 +406,21 @@ struct ScanToStockSheet: View {
                     .font(.system(size: 13))
                     .foregroundStyle(OuraTheme.Colors.accent)
             }
+            if bahanDeductionSkipped {
+                HStack(alignment: .top, spacing: 8) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 13))
+                        .foregroundStyle(OuraTheme.Colors.warningText)
+                    Text("Stok produk berhasil ditambah, tapi bahan belum bisa dikurangi otomatis. Fitur ini memerlukan update server.")
+                        .font(.system(size: 13))
+                        .foregroundStyle(OuraTheme.Colors.warningText)
+                        .multilineTextAlignment(.leading)
+                }
+                .padding(12)
+                .background(OuraTheme.Colors.warningBg)
+                .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.medium))
+                .padding(.horizontal, 24)
+            }
             Spacer()
             VStack(spacing: 12) {
                 Button {
@@ -516,6 +532,8 @@ struct ScanToStockSheet: View {
                         sku: size.productSku, sizeId: size.id, qty: qty, specId: spec.id)
                 } catch let apiErr as APIError {
                     guard case .serverError(404, _) = apiErr else { throw apiErr }
+                    // Backend stock-from-bahan not yet deployed — stock added but bahan NOT deducted
+                    bahanDeductionSkipped = true
                     _ = try await api.adjustStock(
                         sku: size.productSku, sizeId: size.id, qty: qty,
                         reason: reason.rawValue, note: noteStr)
