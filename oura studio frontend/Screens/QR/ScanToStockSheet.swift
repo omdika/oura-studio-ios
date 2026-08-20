@@ -507,15 +507,23 @@ struct ScanToStockSheet: View {
         errorMsg = nil
         defer { isSaving = false }
         do {
-            // 1. Add stock — use addStockFromBahan if spec exists and toggle is ON
+            // 1. Add stock — use addStockFromBahan if spec exists and toggle is ON.
+            //    On 404 (backend not yet deployed), fall back to plain adjustStock.
+            let noteStr = note.trimmingCharacters(in: .whitespaces).isEmpty ? nil : note
             if reason == .production, deductBahan, let spec = relatedSpec {
-                _ = try await api.addStockFromBahan(
-                    sku: size.productSku, sizeId: size.id, qty: qty, specId: spec.id)
+                do {
+                    _ = try await api.addStockFromBahan(
+                        sku: size.productSku, sizeId: size.id, qty: qty, specId: spec.id)
+                } catch let apiErr as APIError {
+                    guard case .serverError(404, _) = apiErr else { throw apiErr }
+                    _ = try await api.adjustStock(
+                        sku: size.productSku, sizeId: size.id, qty: qty,
+                        reason: reason.rawValue, note: noteStr)
+                }
             } else {
                 _ = try await api.adjustStock(
                     sku: size.productSku, sizeId: size.id, qty: qty,
-                    reason: reason.rawValue,
-                    note: note.trimmingCharacters(in: .whitespaces).isEmpty ? nil : note)
+                    reason: reason.rawValue, note: noteStr)
             }
 
             // 2. Patch HPP and/or selling price if provided (best-effort — stock already saved)
