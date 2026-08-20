@@ -160,8 +160,8 @@ struct ScanToStockSheet: View {
                     }
                 }
 
-                // Material deduction toggle
-                if hasFabricVariant {
+                // Material deduction toggle — show whenever spec found (not just fabric variants)
+                if relatedSpec != nil || isLoadingSpec {
                     bahanDeductionSection
                 }
             }
@@ -438,7 +438,7 @@ struct ScanToStockSheet: View {
     // MARK: - Load PatternSpec + pre-fill HPP estimate
 
     private func loadSpec() async {
-        guard hasFabricVariant, reason == .production else {
+        guard reason == .production else {
             deductBahan = false
             return
         }
