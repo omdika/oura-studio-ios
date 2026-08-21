@@ -110,7 +110,7 @@ struct QRGeneratorView: View {
                     } else {
                         allSelectableSizes.forEach {
                             selectedSizeIds.insert($0.id)
-                            if qtyPerSize[$0.id] == nil { qtyPerSize[$0.id] = 1 }
+                            if qtyPerSize[$0.id] == nil { qtyPerSize[$0.id] = max(1, $0.currentStockQty) }
                         }
                     }
                 } label: {
@@ -199,7 +199,7 @@ struct QRGeneratorView: View {
                                     qtyPerSize.removeValue(forKey: size.id)
                                 } else {
                                     selectedSizeIds.insert(size.id)
-                                    qtyPerSize[size.id] = 1
+                                    qtyPerSize[size.id] = max(1, size.currentStockQty)
                                 }
                             }
                             .listRowBackground(OuraTheme.Colors.surfaceCard)
@@ -216,7 +216,7 @@ struct QRGeneratorView: View {
                             } else {
                                 sizes.forEach {
                                     selectedSizeIds.insert($0.id)
-                                    if qtyPerSize[$0.id] == nil { qtyPerSize[$0.id] = 1 }
+                                    if qtyPerSize[$0.id] == nil { qtyPerSize[$0.id] = max(1, $0.currentStockQty) }
                                 }
                             }
                         } label: {
