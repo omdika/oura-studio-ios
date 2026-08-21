@@ -916,7 +916,6 @@ struct ProdukSizeDetailView: View {
     @State private var editHppHardware: Double?
     @State private var editHppLabor: Double?
     @State private var editHppOverhead: Double?
-    @State private var showAdvisor = false
     @State private var isSaving = false
     @State private var showAddStock = false
     @State private var errorMsg: String?
@@ -1205,45 +1204,31 @@ struct ProdukSizeDetailView: View {
 
     // MARK: - Price Advisor (always visible, uses shared component)
 
+    // PriceAdvisorSection (the shared component) already renders its own "Price Advisor"
+    // header with a lightbulb icon and its own expand/collapse chevron -- wrapping it in a
+    // second outer disclosure here made the user tap twice to see the margin/fee fields.
+    // Render it directly, same as ScanToStockSheet does.
+    @ViewBuilder
     private var priceAdvisorSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Button { withAnimation { showAdvisor.toggle() } } label: {
-                HStack {
-                    Image(systemName: "lightbulb.fill").foregroundStyle(OuraTheme.Colors.warningText)
-                    Text("Price Advisor").font(.system(size: 15, weight: .semibold)).foregroundStyle(OuraTheme.Colors.textPrimary)
-                    Spacer()
-                    Image(systemName: showAdvisor ? "chevron.up" : "chevron.down")
-                        .font(.system(size: 12)).foregroundStyle(OuraTheme.Colors.textTertiary)
-                }
-                .padding(OuraTheme.Spacing.cardPad)
-                .background(OuraTheme.Colors.warningBg)
-                .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.card))
-            }
-            .buttonStyle(.plain)
-
-            if showAdvisor {
-                if let hpp = effectiveHppForAdvisor {
-                    VStack(spacing: 0) {
-                        Divider().overlay(OuraTheme.Colors.separator)
-                        PriceAdvisorSection(hpp: hpp, itemLabel: size.displayLabel) { price in
-                            Task { await applyPrice(price) }
-                        }
-                    }
-                    .ouraCard()
-                } else {
-                    HStack(spacing: 8) {
-                        Image(systemName: "info.circle")
-                            .foregroundStyle(OuraTheme.Colors.textTertiary)
-                        Text("Isi HPP manual di atas untuk mengaktifkan Price Advisor.")
-                            .font(.system(size: 13))
-                            .foregroundStyle(OuraTheme.Colors.textSecondary)
-                    }
-                    .padding(12)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(OuraTheme.Colors.border.opacity(0.5))
-                    .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.medium))
+        if let hpp = effectiveHppForAdvisor {
+            VStack(spacing: 0) {
+                PriceAdvisorSection(hpp: hpp, itemLabel: size.displayLabel) { price in
+                    Task { await applyPrice(price) }
                 }
             }
+            .ouraCard()
+        } else {
+            HStack(spacing: 8) {
+                Image(systemName: "info.circle")
+                    .foregroundStyle(OuraTheme.Colors.textTertiary)
+                Text("Isi HPP manual di atas untuk mengaktifkan Price Advisor.")
+                    .font(.system(size: 13))
+                    .foregroundStyle(OuraTheme.Colors.textSecondary)
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(OuraTheme.Colors.border.opacity(0.5))
+            .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.medium))
         }
     }
 
@@ -1351,6 +1336,10 @@ struct ProdukSizeDetailView: View {
             _ = try await api.patchProductSize(sku: size.productSku, sizeId: size.id,
                 PatchProductSizeRequest(sellingPrice: price))
             await refreshSize()
+            // When Price Advisor is used while the Harga Jual field above is in Edit mode, that
+            // field reads from editSellingPrice (not size.sellingPrice) -- without this, refreshSize()
+            // updates `size` but the on-screen field stays stale until the user re-enters Edit.
+            if isEditing { editSellingPrice = price }
         } catch let e as APIError { errorMsg = e.errorDescription }
         catch { errorMsg = error.localizedDescription }
     }
