@@ -1048,9 +1048,6 @@ struct ProdukSizeDetailView: View {
             if isEditing {
                 Divider().overlay(OuraTheme.Colors.separator)
                 NumericInputField(label: "Tambah Stok (pcs)", value: $editAddStockQty, unit: "pcs")
-                Text("Ditambahkan ke stok saat ini (\(size.currentStockQty) pcs) saat disimpan. Untuk penambahan yang mengurangi stok bahan sesuai resep, pakai tombol \"Tambah\" di atas.")
-                    .font(.system(size: 11))
-                    .foregroundStyle(OuraTheme.Colors.textTertiary)
                 CurrencyInputField(label: "Harga Jual", value: $editSellingPrice)
                 NumericInputField(label: "Reorder Min (pcs)", value: $editReorderMin, unit: "pcs")
             } else {
@@ -1278,14 +1275,18 @@ struct ProdukSizeDetailView: View {
                 }
             }
             Spacer()
-            Button { showAddStock = true } label: {
-                HStack(spacing: 3) {
-                    Image(systemName: "plus.circle").font(.system(size: 12))
-                    Text("Tambah").font(.system(size: 12, weight: .medium))
+            // Hidden while editing -- "Tambah Stok (pcs)" below covers the quick case, and having
+            // both visible at once made it unclear which one to use.
+            if !isEditing {
+                Button { showAddStock = true } label: {
+                    HStack(spacing: 3) {
+                        Image(systemName: "plus.circle").font(.system(size: 12))
+                        Text("Tambah").font(.system(size: 12, weight: .medium))
+                    }
+                    .foregroundStyle(OuraTheme.Colors.accent)
                 }
-                .foregroundStyle(OuraTheme.Colors.accent)
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
         }
     }
 
