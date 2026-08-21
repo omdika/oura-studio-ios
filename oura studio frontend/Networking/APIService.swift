@@ -360,7 +360,12 @@ class APIService: ObservableObject {
             manualStockQty: basic.manualStockQty ?? 0,
             latestHppBreakdown: basic.latestHppBreakdown,
             sellingPrice: basic.sellingPrice,
-            marginPct: basic.marginPct
+            marginPct: basic.marginPct,
+            manualHppFabric: basic.manualHppFabric,
+            manualHppPooled: basic.manualHppPooled,
+            manualHppHardware: basic.manualHppHardware,
+            manualHppLabor: basic.manualHppLabor,
+            manualHppOverhead: basic.manualHppOverhead
         )
     }
 

@@ -1018,11 +1018,15 @@ struct ProdukSizeDetailView: View {
                     .background(OuraTheme.Colors.border).clipShape(Capsule())
             }
             Divider().overlay(OuraTheme.Colors.separator)
+            // stockRow (with its "Tambah" button) stays visible in both modes — previously it was
+            // only shown outside Edit, which made adding stock look unavailable while editing
+            // harga/HPP in the same session.
+            stockRow
             if isEditing {
+                Divider().overlay(OuraTheme.Colors.separator)
                 CurrencyInputField(label: "Harga Jual", value: $editSellingPrice)
                 NumericInputField(label: "Reorder Min (pcs)", value: $editReorderMin, unit: "pcs")
             } else {
-                stockRow
                 if let fabric = size.fabricVariantName { infoRow("Jenis Kain", value: fabric) }
                 if let price = size.sellingPrice { infoRow("Harga Jual", value: price.rupiahFormatted) }
                 if let margin = size.marginPct { infoRow("Margin", value: String(format: "%.1f%%", margin * 100)) }

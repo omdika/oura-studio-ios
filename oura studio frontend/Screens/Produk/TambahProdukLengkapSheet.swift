@@ -31,6 +31,11 @@ struct TambahProdukLengkapSheet: View {
     @EnvironmentObject private var api: APIService
     @Environment(\.dismiss) private var dismiss
 
+    // Called after "Simpan Tanpa Resep" creates the product with its first size, so the caller
+    // can immediately navigate to ProdukSizeDetailView (harga/stok/HPP manual are all one screen
+    // away otherwise, with no built-in path back to them from this sheet).
+    var onCreatedWithoutRecipe: ((ProductSizeDetail) -> Void)? = nil
+
     // MARK: — Step 1: product fields
     @State private var productName = ""
     @State private var sku = ""
@@ -778,8 +783,13 @@ struct TambahProdukLengkapSheet: View {
                 name: productName.trimmingCharacters(in: .whitespaces),
                 sku: sku.trimmingCharacters(in: .whitespaces).isEmpty ? nil : sku.trimmingCharacters(in: .whitespaces)
             )
+            var createdSizes: [ProductSizeDetail] = []
             for size in selectedSizes {
-                _ = try await api.createProductSize(sku: product.sku, sizeLabel: size)
+                let detail = try await api.createProductSize(sku: product.sku, sizeLabel: size)
+                createdSizes.append(detail)
+            }
+            if let first = createdSizes.first {
+                onCreatedWithoutRecipe?(first)
             }
             dismiss()
         } catch let e as APIError { errorMsg = e.errorDescription }
