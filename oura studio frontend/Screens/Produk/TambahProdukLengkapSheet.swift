@@ -121,6 +121,14 @@ struct TambahProdukLengkapSheet: View {
         VStack(spacing: 0) {
             header
             Divider().overlay(OuraTheme.Colors.separator)
+            // Fixed right below the header (not inside the scrollable content below) so a save
+            // failure is visible immediately, regardless of scroll position — previously this sat
+            // at the bottom of the form/list and could be scrolled out of view.
+            if let err = errorMsg {
+                errorBanner(err)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 10)
+            }
             if isOnRecipeStep {
                 recipeStepContent
             } else {
@@ -334,10 +342,6 @@ struct TambahProdukLengkapSheet: View {
                             .buttonStyle(.plain)
                             .animation(.easeInOut(duration: 0.15), value: isFabricVariant)
                         }
-                    }
-
-                    if let err = errorMsg {
-                        errorBanner(err)
                     }
                 }
                 .padding(16)
@@ -569,15 +573,6 @@ struct TambahProdukLengkapSheet: View {
                     OuraSectionHeader(title: "Tenaga Kerja")
                 }
                 .listSectionSeparator(.hidden)
-
-                if let err = errorMsg {
-                    Section {
-                        Text(err)
-                            .font(.system(size: 13))
-                            .foregroundStyle(OuraTheme.Colors.dangerText)
-                            .listRowBackground(OuraTheme.Colors.dangerBg)
-                    }
-                }
             }
             .scrollContentBackground(.hidden)
             .background(OuraTheme.Colors.background)
