@@ -11,8 +11,8 @@ struct ProdukListView: View {
     @State private var showQRScanner = false
     @State private var showQRGenerator = false
     // Set right after "Simpan Tanpa Resep" creates a product with no price/stock/HPP yet — drives
-    // an auto-navigation into ProdukSizeDetailView so the user can fill those in immediately.
-    @State private var newlyCreatedSize: ProductSizeDetail?
+    // an auto-navigation into ProdukDetailView so the user can pick which size(s) to fill in.
+    @State private var newlyCreatedProduct: Product?
 
     private var filtered: [Product] {
         let active = products.filter { !$0.isArchived }
@@ -65,14 +65,14 @@ struct ProdukListView: View {
             }
         }
         .sheet(isPresented: $showAddProduct, onDismiss: { Task { await load() } }) {
-            TambahProdukLengkapSheet(onCreatedWithoutRecipe: { newlyCreatedSize = $0 })
+            TambahProdukLengkapSheet(onCreatedWithoutRecipe: { newlyCreatedProduct = $0 })
         }
-        .sheet(item: $newlyCreatedSize, onDismiss: { Task { await load() } }) { size in
+        .sheet(item: $newlyCreatedProduct, onDismiss: { Task { await load() } }) { product in
             NavigationStack {
-                ProdukSizeDetailView(productSize: size)
+                ProdukDetailView(product: product)
                     .toolbar {
                         ToolbarItem(placement: .cancellationAction) {
-                            Button("Tutup") { newlyCreatedSize = nil }
+                            Button("Tutup") { newlyCreatedProduct = nil }
                                 .foregroundStyle(OuraTheme.Colors.accent)
                         }
                     }
