@@ -148,7 +148,14 @@ private struct ProductGroupRow: View {
         let variants: [ProductSizeDetail]
         var id: String { sizeLabel }
         var totalStock: Int { variants.reduce(0) { $0 + $1.currentStockQty } }
-        var displayVariants: [ProductSizeDetail] { variants.filter { $0.fabricVariantName != nil } }
+        // Falls back to all variants when none have a fabric variant name (e.g. a size created
+        // without a resep) -- filtering to only fabric variants would leave this empty, silently
+        // zeroing out lowestPrice/isAnyHabis/isAnyMenipis below even when the size does have data.
+        // Matches ProdukSizeGroup.displayVariants in ProdukDetailView.swift.
+        var displayVariants: [ProductSizeDetail] {
+            let withFabric = variants.filter { $0.fabricVariantName != nil }
+            return withFabric.isEmpty ? variants : withFabric
+        }
         var isAnyHabis: Bool { displayVariants.contains { $0.currentStockQty == 0 } }
         var isAnyMenipis: Bool { displayVariants.contains { $0.isLowStock && $0.currentStockQty > 0 } }
         var lowestPrice: Double? { displayVariants.compactMap { $0.sellingPrice }.min() }
