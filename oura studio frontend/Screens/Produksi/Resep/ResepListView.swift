@@ -34,6 +34,11 @@ struct SpecGroup: Identifiable {
     }
 }
 
+private struct EditSheetItem: Identifiable {
+    let id = UUID()
+    let specGroups: [SpecGroup]
+}
+
 struct ResepListView: View {
     @EnvironmentObject private var api: APIService
 
@@ -42,8 +47,7 @@ struct ResepListView: View {
     @State private var errorMsg: String?
     @State private var searchText: String = ""
     @State private var showTambah = false
-    @State private var showEditSheet = false
-    @State private var editSpecGroups: [SpecGroup] = []
+    @State private var editSheetItem: EditSheetItem? = nil
 
     private var grouped: [(product: String, groups: [SpecGroup])] {
         let filtered = searchText.isEmpty
@@ -88,8 +92,8 @@ struct ResepListView: View {
         .sheet(isPresented: $showTambah, onDismiss: { Task { await load() } }) {
             TambahResepSheet()
         }
-        .sheet(isPresented: $showEditSheet, onDismiss: { Task { await load() } }) {
-            EditResepSheet(specGroups: editSpecGroups, onUpdate: {})
+        .sheet(item: $editSheetItem, onDismiss: { Task { await load() } }) { item in
+            EditResepSheet(specGroups: item.specGroups, onUpdate: {})
         }
     }
 
@@ -167,8 +171,7 @@ struct ResepListView: View {
                             .textCase(.none)
                         Spacer()
                         Button {
-                            editSpecGroups = group.groups
-                            showEditSheet = true
+                            editSheetItem = EditSheetItem(specGroups: group.groups)
                         } label: {
                             HStack(spacing: 3) {
                                 Image(systemName: "pencil")
