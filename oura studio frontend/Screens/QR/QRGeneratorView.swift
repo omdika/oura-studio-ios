@@ -28,9 +28,16 @@ struct QRGeneratorView: View {
     }
 
     private func filteredSizes(for product: Product) -> [ProductSizeDetail] {
-        let all = (sizesByProduct[product.id] ?? [])
-            .filter { !$0.isArchived }
-            .sorted { $0.displayLabel.localizedCompare($1.displayLabel) == .orderedAscending }
+        var all = (sizesByProduct[product.id] ?? []).filter { !$0.isArchived }
+
+        // If a size label has fabric variants, hide the parent entry (no fabricVariantName)
+        let labelsWithVariants = Set(all.compactMap { $0.fabricVariantName != nil ? $0.sizeLabel : nil })
+        all = all.filter { size in
+            guard size.fabricVariantName == nil else { return true }
+            return !labelsWithVariants.contains(size.sizeLabel)
+        }
+
+        all = all.sorted { $0.displayLabel.localizedCompare($1.displayLabel) == .orderedAscending }
         guard !searchText.isEmpty, !product.name.localizedCaseInsensitiveContains(searchText) else { return all }
         return all.filter { $0.displayLabel.localizedCaseInsensitiveContains(searchText) }
     }

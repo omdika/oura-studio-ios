@@ -74,6 +74,42 @@ struct ReportsView: View {
     }
 }
 
+// MARK: - Shared report state helpers
+
+private func reportErrorView(icon: String, message: String) -> some View {
+    VStack(spacing: 12) {
+        Image(systemName: "exclamationmark.triangle")
+            .font(.system(size: 32))
+            .foregroundStyle(OuraTheme.Colors.warningText)
+        Text("Gagal memuat laporan")
+            .font(.system(size: 15, weight: .semibold))
+            .foregroundStyle(OuraTheme.Colors.textPrimary)
+        Text(message)
+            .font(.system(size: 12))
+            .foregroundStyle(OuraTheme.Colors.textSecondary)
+            .multilineTextAlignment(.center)
+            .padding(.horizontal, 32)
+    }
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
+}
+
+private func reportEmptyView(icon: String, title: String, subtitle: String) -> some View {
+    VStack(spacing: 12) {
+        Image(systemName: icon)
+            .font(.system(size: 32))
+            .foregroundStyle(OuraTheme.Colors.textTertiary)
+        Text(title)
+            .font(.system(size: 15, weight: .semibold))
+            .foregroundStyle(OuraTheme.Colors.textPrimary)
+        Text(subtitle)
+            .font(.system(size: 13))
+            .foregroundStyle(OuraTheme.Colors.textSecondary)
+            .multilineTextAlignment(.center)
+            .padding(.horizontal, 32)
+    }
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
+}
+
 // MARK: - Sales Report Detail
 
 struct SalesReportDetailView: View {
@@ -206,11 +242,20 @@ struct MarginRankingView: View {
 
     @State private var ranking: [MarginRankingItem] = []
     @State private var isLoading = true
+    @State private var errorMsg: String?
 
     var body: some View {
         Group {
             if isLoading {
                 ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if let msg = errorMsg {
+                reportErrorView(icon: "trophy.fill", message: msg)
+            } else if ranking.isEmpty {
+                reportEmptyView(
+                    icon: "trophy.fill",
+                    title: "Belum ada data margin",
+                    subtitle: "Atur HPP dan harga jual di halaman produk agar ranking margin bisa ditampilkan"
+                )
             } else {
                 List {
                     ForEach(Array(ranking.enumerated()), id: \.element.id) { idx, item in
@@ -221,7 +266,7 @@ struct MarginRankingView: View {
                                 .frame(width: 28)
 
                             VStack(alignment: .leading, spacing: 4) {
-                                Text("\(item.productName) · \(item.sizeLabel)")
+                                Text(item.fabricVariantName.map { "\(item.productName) · \($0)" } ?? "\(item.productName) · \(item.sizeLabel)")
                                     .font(.system(size: 14, weight: .semibold))
                                     .foregroundStyle(OuraTheme.Colors.textPrimary)
                                 Text("HPP \(item.hpp.rupiahFormatted) · Jual \(item.sellingPrice.rupiahFormatted)")
@@ -252,7 +297,20 @@ struct MarginRankingView: View {
         }
         .navigationTitle("Ranking Margin")
         .navigationBarTitleDisplayMode(.inline)
-        .task { ranking = (try? await api.getMarginRanking()) ?? []; isLoading = false }
+        .task { await load() }
+    }
+
+    private func load() async {
+        isLoading = true
+        errorMsg = nil
+        do {
+            ranking = try await api.getMarginRanking()
+        } catch {
+            errorMsg = error.localizedDescription
+            ranking = []
+            print("🔴 [MarginRanking] error: \(error)")
+        }
+        isLoading = false
     }
 }
 
@@ -263,6 +321,7 @@ struct WasteReportView: View {
 
     @State private var wasteItems: [WasteByMaterial] = []
     @State private var isLoading = true
+    @State private var errorMsg: String?
     @State private var fromDate: Date = Calendar.current.date(byAdding: .day, value: -30, to: Date()) ?? Date()
     @State private var toDate: Date = Date()
 
@@ -280,6 +339,14 @@ struct WasteReportView: View {
 
                 if isLoading {
                     ProgressView().frame(maxWidth: .infinity).padding()
+                } else if let msg = errorMsg {
+                    reportErrorView(icon: "scissors", message: msg)
+                } else if wasteItems.isEmpty {
+                    reportEmptyView(
+                        icon: "scissors",
+                        title: "Belum ada data waste",
+                        subtitle: "Data waste diambil dari layout potong yang sudah dikonfirmasi di tab Produksi"
+                    )
                 } else {
                     VStack(spacing: 0) {
                         ForEach(wasteItems.sorted { $0.avgWastePct > $1.avgWastePct }) { item in
@@ -321,7 +388,14 @@ struct WasteReportView: View {
 
     private func load() async {
         isLoading = true
-        wasteItems = (try? await api.getWasteByMaterial(from: fromDate, to: toDate)) ?? []
+        errorMsg = nil
+        do {
+            wasteItems = try await api.getWasteByMaterial(from: fromDate, to: toDate)
+        } catch {
+            errorMsg = error.localizedDescription
+            wasteItems = []
+            print("🔴 [WasteReport] error: \(error)")
+        }
         isLoading = false
     }
 }
