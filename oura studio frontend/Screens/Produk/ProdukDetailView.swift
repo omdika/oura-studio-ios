@@ -980,8 +980,9 @@ struct ProdukSizeDetailView: View {
         let matMap      = Dictionary(uniqueKeysWithValues: materials.map { ($0.id, $0.currentAvgCost) })
         let settingsMap = Dictionary(uniqueKeysWithValues: settings.map { ($0.key, $0.value) })
 
+        // current_avg_cost is stored as Rp/cm; multiply directly by cutLengthCm in cm
         let fabricCost = spec.fabrics.reduce(0.0) { sum, fabric in
-            sum + (fabric.cutLengthCm / 100.0) * (matMap[fabric.materialId] ?? 0)
+            sum + fabric.cutLengthCm * (matMap[fabric.materialId] ?? 0)
         }
         let componentCost = spec.components.reduce(0.0) { sum, comp in
             sum + comp.qtyPerUnit * (matMap[comp.materialId] ?? 0)

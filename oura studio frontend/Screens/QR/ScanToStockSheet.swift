@@ -491,9 +491,9 @@ struct ScanToStockSheet: View {
         let matMap      = Dictionary(uniqueKeysWithValues: materials.map { ($0.id, $0.currentAvgCost) })
         let settingsMap = Dictionary(uniqueKeysWithValues: settings.map { ($0.key, $0.value) })
 
-        // Fabric cost — cutLengthCm/100 meters × avgCost per meter per fabric layer
+        // Fabric cost — cutLengthCm (cm) × avgCost (Rp/cm); current_avg_cost is stored as Rp/cm
         let fabricCost = spec.fabrics.reduce(0.0) { sum, fabric in
-            sum + (fabric.cutLengthCm / 100.0) * (matMap[fabric.materialId] ?? 0)
+            sum + fabric.cutLengthCm * (matMap[fabric.materialId] ?? 0)
         }
 
         // Hardware / component cost

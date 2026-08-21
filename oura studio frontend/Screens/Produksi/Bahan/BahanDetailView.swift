@@ -19,7 +19,8 @@ struct BahanDetailView: View {
     // MARK: - Derived
 
     private var avgCostLabel: String {
-        let val = material.currentAvgCost
+        // current_avg_cost is stored as Rp/cm; multiply ×100 to display as Rp/m
+        let val = material.category == .fabric ? material.currentAvgCost * 100 : material.currentAvgCost
         let unit = material.category == .fabric ? "/m" : "/\(material.usageUnit)"
         return "avg \(val.rupiahFormatted)\(unit)"
     }
