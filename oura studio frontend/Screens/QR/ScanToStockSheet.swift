@@ -29,6 +29,7 @@ struct ScanToStockSheet: View {
     @State private var isLoadingSpec: Bool = false
     @State private var hppFromSpec: Bool = false    // true when fields pre-filled from recipe estimate
     @State private var bahanDeductionSkipped: Bool = false  // true when addStockFromBahan returned 404
+    @State private var bahanDeductionError: String? = nil   // debug: server message from 404
 
     enum StockReason: String, CaseIterable {
         case production = "production"
@@ -167,21 +168,19 @@ struct ScanToStockSheet: View {
                 }
             }
 
-            // Error
-            if let err = errorMsg {
-                Section {
-                    Text(err)
-                        .font(.system(size: 13))
-                        .foregroundStyle(OuraTheme.Colors.dangerText)
-                        .listRowBackground(OuraTheme.Colors.dangerBg)
-                        .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
-                }
-            }
         }
         .scrollContentBackground(.hidden)
         .background(OuraTheme.Colors.background)
         .navigationTitle("Stok Masuk")
         .navigationBarTitleDisplayMode(.inline)
+        .alert("Gagal Simpan", isPresented: Binding(
+            get: { errorMsg != nil },
+            set: { if !$0 { errorMsg = nil } }
+        )) {
+            Button("OK", role: .cancel) { errorMsg = nil }
+        } message: {
+            Text(errorMsg ?? "")
+        }
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
                 Button("Batal") { dismiss() }
@@ -407,16 +406,25 @@ struct ScanToStockSheet: View {
                     .foregroundStyle(OuraTheme.Colors.accent)
             }
             if bahanDeductionSkipped {
-                HStack(alignment: .top, spacing: 8) {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .font(.system(size: 13))
-                        .foregroundStyle(OuraTheme.Colors.warningText)
-                    Text("Stok produk berhasil ditambah, tapi bahan belum bisa dikurangi otomatis. Fitur ini memerlukan update server.")
-                        .font(.system(size: 13))
-                        .foregroundStyle(OuraTheme.Colors.warningText)
-                        .multilineTextAlignment(.leading)
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(alignment: .top, spacing: 8) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.system(size: 13))
+                            .foregroundStyle(OuraTheme.Colors.warningText)
+                        Text("Stok produk berhasil ditambah, tapi bahan belum bisa dikurangi otomatis.")
+                            .font(.system(size: 13))
+                            .foregroundStyle(OuraTheme.Colors.warningText)
+                            .multilineTextAlignment(.leading)
+                    }
+                    if let errMsg = bahanDeductionError {
+                        Text("Server: \(errMsg)")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(OuraTheme.Colors.warningText.opacity(0.7))
+                            .padding(.leading, 21)
+                    }
                 }
                 .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .background(OuraTheme.Colors.warningBg)
                 .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.medium))
                 .padding(.horizontal, 24)
@@ -531,9 +539,24 @@ struct ScanToStockSheet: View {
                     _ = try await api.addStockFromBahan(
                         sku: size.productSku, sizeId: size.id, qty: qty, specId: spec.id)
                 } catch let apiErr as APIError {
-                    guard case .serverError(404, _) = apiErr else { throw apiErr }
-                    // Backend stock-from-bahan not yet deployed — stock added but bahan NOT deducted
+                    // 404 = endpoint not deployed; 400 multi-fabric = backend needs material_purchase_id
+                    // In both cases: fall back to plain adjustStock so stock is still recorded
+                    let shouldFallback: Bool
+                    let fallbackMsg: String
+                    if case .serverError(404, let msg) = apiErr {
+                        shouldFallback = true
+                        fallbackMsg = msg.isEmpty ? "Not Found" : msg
+                    } else if case .serverError(400, let msg) = apiErr,
+                              msg.lowercased().contains("multiple") || msg.lowercased().contains("fabric") {
+                        shouldFallback = true
+                        fallbackMsg = "Produk multi-kain belum didukung pengurangan otomatis"
+                    } else {
+                        shouldFallback = false
+                        fallbackMsg = ""
+                    }
+                    guard shouldFallback else { throw apiErr }
                     bahanDeductionSkipped = true
+                    bahanDeductionError = fallbackMsg
                     _ = try await api.adjustStock(
                         sku: size.productSku, sizeId: size.id, qty: qty,
                         reason: reason.rawValue, note: noteStr)
