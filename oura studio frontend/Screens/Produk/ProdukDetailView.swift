@@ -1,5 +1,18 @@
 import SwiftUI
 
+// MARK: - Size label ordering (shared with ProdukListView's own size-group sort)
+
+// Canonical XS→XXL progression. Labels outside this set (custom sizes like "Free Size", "32",
+// "One Size") sort alphabetically after all recognized sizes rather than before/interleaved.
+private let sizeLabelOrder: [String] = ["XXS", "XS", "S", "M", "L", "XL", "XXL", "XXXL"]
+
+func sizeLabelSortKey(_ label: String) -> (Int, String) {
+    if let idx = sizeLabelOrder.firstIndex(of: label.uppercased()) {
+        return (idx, "")
+    }
+    return (sizeLabelOrder.count, label)
+}
+
 // MARK: - Shared group model
 
 struct ProdukSizeGroup: Identifiable {
@@ -26,7 +39,7 @@ func makeSizeGroups(from sizes: [ProductSizeDetail]) -> [ProdukSizeGroup] {
         .map { label, variants in
             ProdukSizeGroup(sizeLabel: label, variants: variants.sorted { $0.displayLabel < $1.displayLabel })
         }
-        .sorted { $0.sizeLabel < $1.sizeLabel }
+        .sorted { sizeLabelSortKey($0.sizeLabel) < sizeLabelSortKey($1.sizeLabel) }
 }
 
 // MARK: - ProdukDetailView

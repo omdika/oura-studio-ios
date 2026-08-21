@@ -172,7 +172,7 @@ private struct ProductGroupRow: View {
                     variants: variants.sorted { $0.displayLabel < $1.displayLabel }
                 )
             }
-            .sorted { $0.sizeLabel < $1.sizeLabel }
+            .sorted { sizeLabelSortKey($0.sizeLabel) < sizeLabelSortKey($1.sizeLabel) }
     }
 
     var body: some View {
