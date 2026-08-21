@@ -152,6 +152,9 @@ private struct ProductGroupRow: View {
         var isAnyHabis: Bool { displayVariants.contains { $0.currentStockQty == 0 } }
         var isAnyMenipis: Bool { displayVariants.contains { $0.isLowStock && $0.currentStockQty > 0 } }
         var lowestPrice: Double? { displayVariants.compactMap { $0.sellingPrice }.min() }
+        // Flags a size that's completely unconfigured — no stock and no price set on any variant —
+        // e.g. right after "Simpan Tanpa Resep" before the user has filled anything in.
+        var needsSetup: Bool { totalStock == 0 && lowestPrice == nil }
     }
 
     private var groups: [SizeGroup] {
@@ -207,6 +210,11 @@ private struct ProductGroupRow: View {
                                     Text(group.sizeLabel)
                                         .font(.system(size: 13, weight: .medium))
                                         .foregroundStyle(OuraTheme.Colors.textPrimary)
+                                    if group.needsSetup {
+                                        Image(systemName: "star.fill")
+                                            .font(.system(size: 8))
+                                            .foregroundStyle(OuraTheme.Colors.warningText)
+                                    }
                                     if group.isAnyHabis {
                                         OuraTag(text: "Habis",
                                                 color: OuraTheme.Colors.dangerText,
@@ -228,6 +236,10 @@ private struct ProductGroupRow: View {
                                         Text(price.rupiahFormatted)
                                             .font(.system(size: 13, weight: .semibold))
                                             .foregroundStyle(OuraTheme.Colors.textPrimary)
+                                    } else {
+                                        Text("Belum ada harga")
+                                            .font(.system(size: 11, weight: .medium))
+                                            .foregroundStyle(OuraTheme.Colors.warningText)
                                     }
                                     Text("\(group.totalStock) pcs")
                                         .font(.system(size: 11))

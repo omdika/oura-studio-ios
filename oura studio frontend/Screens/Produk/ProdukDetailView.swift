@@ -15,6 +15,10 @@ struct ProdukSizeGroup: Identifiable {
     }
     var isAnyHabis: Bool { displayVariants.contains { $0.currentStockQty == 0 } }
     var isAnyMenipis: Bool { displayVariants.contains { $0.isLowStock && $0.currentStockQty > 0 } }
+    var lowestPrice: Double? { displayVariants.compactMap { $0.sellingPrice }.min() }
+    // Flags a size that's completely unconfigured — no stock and no price set on any variant —
+    // e.g. right after "Simpan Tanpa Resep" before the user has filled anything in.
+    var needsSetup: Bool { totalStock == 0 && lowestPrice == nil }
 }
 
 func makeSizeGroups(from sizes: [ProductSizeDetail]) -> [ProdukSizeGroup] {
@@ -244,6 +248,11 @@ private struct SizeGroupRow: View {
                     Text(group.sizeLabel)
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(OuraTheme.Colors.textPrimary)
+                    if group.needsSetup {
+                        Image(systemName: "star.fill")
+                            .font(.system(size: 9))
+                            .foregroundStyle(OuraTheme.Colors.warningText)
+                    }
                     if group.isAnyHabis {
                         OuraTag(text: "Habis",
                                 color: OuraTheme.Colors.dangerText,
@@ -262,12 +271,23 @@ private struct SizeGroupRow: View {
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 3) {
-                Text("\(group.totalStock) pcs")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(OuraTheme.Colors.textPrimary)
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 11))
-                    .foregroundStyle(OuraTheme.Colors.textTertiary)
+                if let price = group.lowestPrice {
+                    Text(price.rupiahFormatted)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(OuraTheme.Colors.textPrimary)
+                } else {
+                    Text("Belum ada harga")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(OuraTheme.Colors.warningText)
+                }
+                HStack(spacing: 4) {
+                    Text("\(group.totalStock) pcs")
+                        .font(.system(size: 11))
+                        .foregroundStyle(OuraTheme.Colors.textTertiary)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 10))
+                        .foregroundStyle(OuraTheme.Colors.textTertiary)
+                }
             }
         }
         .padding(.horizontal, 16)
