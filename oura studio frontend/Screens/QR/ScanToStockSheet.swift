@@ -481,26 +481,39 @@ struct ScanToStockSheet: View {
         relatedSpec = spec
 
         if let spec {
-            prefillHppFromSpec(spec, materials: materials, settings: settings)
+            await prefillHppFromSpec(spec, materials: materials, settings: settings)
         } else {
             deductBahan = false
         }
     }
 
-    private func prefillHppFromSpec(_ spec: PatternSpec, materials: [Material], settings: [SettingItem]) {
+    private func prefillHppFromSpec(_ spec: PatternSpec, materials: [Material], settings: [SettingItem]) async {
         let materialMap = Dictionary(uniqueKeysWithValues: materials.map { ($0.id, $0) })
         let settingsMap = Dictionary(uniqueKeysWithValues: settings.map { ($0.key, $0.value) })
 
+        // material.fabric_width_cm is an optional "typical width" hint that's frequently unset --
+        // fall back to the actual width_cm of a real purchase (always recorded) instead, so the
+        // estimate doesn't silently degrade to a "1 piece per row" assumption. See
+        // representativeFabricWidthCm's doc comment for why that fallback badly overestimates.
+        var purchasesByMaterial: [UUID: [MaterialPurchase]] = [:]
+        for fabric in spec.fabrics where purchasesByMaterial[fabric.materialId] == nil {
+            purchasesByMaterial[fabric.materialId] = (try? await api.getPurchases(materialId: fabric.materialId)) ?? []
+        }
+
         // Same per-piece nesting estimate as the cutting optimizer (see estimatedFabricCostPerPiece
         // doc comment) -- current_avg_cost is Rp/cm of roll length, divided by how many pieces fit
-        // across the material's typical fabric_width_cm, not just multiplied by cutLengthCm.
+        // across the roll's width, not just multiplied by cutLengthCm.
         let fabricCost = spec.fabrics.reduce(0.0) { sum, fabric in
             let material = materialMap[fabric.materialId]
+            let widthCm = representativeFabricWidthCm(
+                purchases: purchasesByMaterial[fabric.materialId] ?? [],
+                fallback: material?.fabricWidthCm
+            )
             return sum + estimatedFabricCostPerPiece(
                 cutWidthCm: fabric.cutWidthCm,
                 cutHeightCm: fabric.cutLengthCm,
                 rotationAllowed: fabric.rotationAllowed,
-                fabricWidthCm: material?.fabricWidthCm,
+                fabricWidthCm: widthCm,
                 costPerCm: material?.currentAvgCost ?? 0
             )
         }

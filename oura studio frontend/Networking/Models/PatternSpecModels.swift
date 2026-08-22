@@ -57,6 +57,25 @@ func estimatedFabricCostPerPiece(
     return feasibleCosts.min() ?? (costPerCm * cutHeightCm)
 }
 
+/// Picks a roll width for `estimatedFabricCostPerPiece`'s nesting calc, preferring the actual
+/// `width_cm` of a real purchase over `material.fabric_width_cm` (a separate, optional "typical
+/// width" hint that's frequently left unset). When it's unset, `estimatedFabricCostPerPiece`
+/// silently falls back to "one piece per row" -- a confirmed ~100x inflation in a real case (see
+/// backend `get_hpp_for_sale` docstring) -- whereas a purchase's width_cm is always recorded (it's
+/// a required field for fabric purchases). Among purchases with stock left, picks the one with the
+/// most remaining length, since that's the roll most likely to actually get cut next; falls back to
+/// any purchase's width, then to `fallback` (typically `material.fabricWidthCm`) if there are none.
+func representativeFabricWidthCm(purchases: [MaterialPurchase], fallback: Double?) -> Double? {
+    let withStock = purchases.filter { ($0.widthCm ?? 0) > 0 && ($0.remainingLengthCm ?? 0) > 0 }
+    if let mostStock = withStock.max(by: { ($0.remainingLengthCm ?? 0) < ($1.remainingLengthCm ?? 0) }) {
+        return mostStock.widthCm
+    }
+    if let anyWithWidth = purchases.first(where: { ($0.widthCm ?? 0) > 0 }) {
+        return anyWithWidth.widthCm
+    }
+    return fallback
+}
+
 struct PatternSpec: Codable, Identifiable {
     let id: UUID
     let productSizeId: UUID
