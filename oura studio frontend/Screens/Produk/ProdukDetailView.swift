@@ -1013,15 +1013,24 @@ struct ProdukSizeDetailView: View {
         relatedSpec = spec
         guard let spec else { return }
 
-        let matMap      = Dictionary(uniqueKeysWithValues: materials.map { ($0.id, $0.currentAvgCost) })
+        let materialMap = Dictionary(uniqueKeysWithValues: materials.map { ($0.id, $0) })
         let settingsMap = Dictionary(uniqueKeysWithValues: settings.map { ($0.key, $0.value) })
 
-        // current_avg_cost is stored as Rp/cm; multiply directly by cutLengthCm in cm
+        // Same per-piece nesting estimate as the cutting optimizer (see estimatedFabricCostPerPiece
+        // doc comment) -- current_avg_cost is Rp/cm of roll length, divided by how many pieces fit
+        // across the material's typical fabric_width_cm, not just multiplied by cutLengthCm.
         let fabricCost = spec.fabrics.reduce(0.0) { sum, fabric in
-            sum + fabric.cutLengthCm * (matMap[fabric.materialId] ?? 0)
+            let material = materialMap[fabric.materialId]
+            return sum + estimatedFabricCostPerPiece(
+                cutWidthCm: fabric.cutWidthCm,
+                cutHeightCm: fabric.cutLengthCm,
+                rotationAllowed: fabric.rotationAllowed,
+                fabricWidthCm: material?.fabricWidthCm,
+                costPerCm: material?.currentAvgCost ?? 0
+            )
         }
         let componentCost = spec.components.reduce(0.0) { sum, comp in
-            sum + comp.qtyPerUnit * (matMap[comp.materialId] ?? 0)
+            sum + comp.qtyPerUnit * (materialMap[comp.materialId]?.currentAvgCost ?? 0)
         }
         let pooled   = (settingsMap["pooled_material_rate:thread"] ?? 0)
                      + (settingsMap["pooled_material_rate:packaging"] ?? 0)
