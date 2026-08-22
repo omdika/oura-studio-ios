@@ -359,16 +359,20 @@ struct QRGeneratorView: View {
         let mmToPt: CGFloat = 72.0 / 25.4
         let qrSize: CGFloat = 18 * mmToPt  // 1.8 cm ≈ 51 pt
         // SKU line (smaller font) directly under the QR code, then the product-name/fabric/size
-        // caption below it. Worst case is 1 (SKU) + 3 (product name, jenis kain, ukuran) lines --
-        // sized generously (not exactly line-count × line-height) since drawing a caption block
-        // with zero headroom silently clips its last line instead of erroring.
+        // caption below it. The caption box is always sized for the worst case -- 3 lines (product
+        // name, jenis kain, ukuran) -- and kept that size even for 2-line items (no jenis kain).
+        // A previous version sized this box to each item's own line count, which shrank it for
+        // 2-line items and left too little headroom for 3-line items -- the last line (ukuran)
+        // came out clipped/missing in both cases. A fixed, generous box side-steps that regardless
+        // of exactly how much slack multi-line CGRect text drawing actually needs per line.
         let skuFontSize: CGFloat = 4.5
-        let skuLineH: CGFloat = 5.5
+        let skuLineH: CGFloat = 6.0
         let captionFontSize: CGFloat = 5.5
-        let captionLineH: CGFloat = 6.5
+        let captionLineH: CGFloat = 7.0
         let maxCaptionLines = 3
-        let labelH: CGFloat = skuLineH + CGFloat(maxCaptionLines) * captionLineH + 2
-        let cellH = qrSize + labelH + 4
+        let captionBoxH: CGFloat = CGFloat(maxCaptionLines) * captionLineH
+        let labelH: CGFloat = skuLineH + captionBoxH
+        let cellH = qrSize + labelH + 6
         let margin: CGFloat = 2 * mmToPt   // 2 mm ≈ 5.67 pt
         let gap: CGFloat = 0.5 * mmToPt    // 0.5 mm ≈ 1.42 pt
         let colSpacing: CGFloat = gap
@@ -407,7 +411,7 @@ struct QRGeneratorView: View {
                     .font: UIFont.systemFont(ofSize: skuFontSize),
                     .foregroundColor: UIColor.black
                 ]
-                let skuY = currentY + qrSize + 1
+                let skuY = currentY + qrSize + 2
                 size.productSku.draw(
                     with: CGRect(x: x, y: skuY, width: qrSize, height: skuLineH),
                     options: .usesLineFragmentOrigin,
@@ -415,11 +419,10 @@ struct QRGeneratorView: View {
                     context: nil
                 )
 
-                // Caption: product name / fabric variant (jenis kain, if any) / size label.
-                // Height is sized to the actual line count for this item (not a fixed constant),
-                // with headroom above the tight line-count × line-height minimum -- a box with
-                // zero headroom silently drops the last line for 3-line captions (fabric variant
-                // present) even though 2-line captions (no fabric variant) fit fine.
+                // Caption: product name / fabric variant (jenis kain, if any) / size label. Always
+                // drawn into the same fixed-size captionBoxH regardless of this item's actual line
+                // count -- see the comment above captionBoxH for why a per-item-sized box clipped
+                // the last line (ukuran) for both 2-line and 3-line captions.
                 var captionParts = [size.productName]
                 if let fabric = size.fabricVariantName { captionParts.append(fabric) }
                 captionParts.append(size.sizeLabel)
@@ -433,9 +436,8 @@ struct QRGeneratorView: View {
                     .foregroundColor: UIColor.black,
                     .paragraphStyle: ps
                 ]
-                let captionHeight = CGFloat(captionParts.count) * captionLineH + 2
                 label.draw(
-                    with: CGRect(x: x, y: skuY + skuLineH, width: qrSize, height: captionHeight),
+                    with: CGRect(x: x, y: skuY + skuLineH, width: qrSize, height: captionBoxH),
                     options: .usesLineFragmentOrigin,
                     attributes: attrs,
                     context: nil
