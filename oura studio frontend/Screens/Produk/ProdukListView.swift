@@ -53,15 +53,22 @@ struct ProdukListView: View {
         .task { await load() }
         .refreshable { await load() }
         .toolbar {
-            ToolbarItemGroup(placement: .primaryAction) {
+            // Split across leading/trailing (not grouped together on one side) so the two very
+            // similar-looking QR icons (qrcode.viewfinder vs qrcode) read as two distinct actions
+            // instead of blurring into what looks like a single control.
+            ToolbarItem(placement: .navigationBarLeading) {
                 Button { showQRScanner = true } label: {
                     Image(systemName: "qrcode.viewfinder")
                 }
                 .foregroundStyle(OuraTheme.Colors.accent)
+                .accessibilityLabel("Scan QR")
+            }
+            ToolbarItem(placement: .primaryAction) {
                 Button { showQRGenerator = true } label: {
                     Image(systemName: "qrcode")
                 }
                 .foregroundStyle(OuraTheme.Colors.accent)
+                .accessibilityLabel("Generator QR")
             }
         }
         .sheet(isPresented: $showAddProduct, onDismiss: { Task { await load() } }) {
