@@ -358,7 +358,16 @@ struct QRGeneratorView: View {
 
         let mmToPt: CGFloat = 72.0 / 25.4
         let qrSize: CGFloat = 18 * mmToPt  // 1.8 cm ≈ 51 pt
-        let labelH: CGFloat = 18
+        // SKU line (smaller font) directly under the QR code, then the product-name/fabric/size
+        // caption below it. Worst case is 1 (SKU) + 3 (product name, jenis kain, ukuran) lines --
+        // sized generously (not exactly line-count × line-height) since drawing a caption block
+        // with zero headroom silently clips its last line instead of erroring.
+        let skuFontSize: CGFloat = 4.5
+        let skuLineH: CGFloat = 5.5
+        let captionFontSize: CGFloat = 5.5
+        let captionLineH: CGFloat = 6.5
+        let maxCaptionLines = 3
+        let labelH: CGFloat = skuLineH + CGFloat(maxCaptionLines) * captionLineH + 2
         let cellH = qrSize + labelH + 4
         let margin: CGFloat = 2 * mmToPt   // 2 mm ≈ 5.67 pt
         let gap: CGFloat = 0.5 * mmToPt    // 0.5 mm ≈ 1.42 pt
@@ -393,22 +402,40 @@ struct QRGeneratorView: View {
                     }
                 }
 
-                // Build 3-line caption: product name / fabric variant / size label
+                // SKU — directly under the QR code, above the product-name caption, smaller font.
+                let skuAttrs: [NSAttributedString.Key: Any] = [
+                    .font: UIFont.systemFont(ofSize: skuFontSize),
+                    .foregroundColor: UIColor.black
+                ]
+                let skuY = currentY + qrSize + 1
+                size.productSku.draw(
+                    with: CGRect(x: x, y: skuY, width: qrSize, height: skuLineH),
+                    options: .usesLineFragmentOrigin,
+                    attributes: skuAttrs,
+                    context: nil
+                )
+
+                // Caption: product name / fabric variant (jenis kain, if any) / size label.
+                // Height is sized to the actual line count for this item (not a fixed constant),
+                // with headroom above the tight line-count × line-height minimum -- a box with
+                // zero headroom silently drops the last line for 3-line captions (fabric variant
+                // present) even though 2-line captions (no fabric variant) fit fine.
                 var captionParts = [size.productName]
                 if let fabric = size.fabricVariantName { captionParts.append(fabric) }
                 captionParts.append(size.sizeLabel)
                 let label = captionParts.joined(separator: "\n")
 
                 let ps = NSMutableParagraphStyle()
-                ps.minimumLineHeight = 6.0
-                ps.maximumLineHeight = 6.0
+                ps.minimumLineHeight = captionLineH
+                ps.maximumLineHeight = captionLineH
                 let attrs: [NSAttributedString.Key: Any] = [
-                    .font: UIFont.systemFont(ofSize: 5.5),
+                    .font: UIFont.systemFont(ofSize: captionFontSize),
                     .foregroundColor: UIColor.black,
                     .paragraphStyle: ps
                 ]
+                let captionHeight = CGFloat(captionParts.count) * captionLineH + 2
                 label.draw(
-                    with: CGRect(x: x, y: currentY + qrSize + 2, width: qrSize, height: labelH),
+                    with: CGRect(x: x, y: skuY + skuLineH, width: qrSize, height: captionHeight),
                     options: .usesLineFragmentOrigin,
                     attributes: attrs,
                     context: nil
