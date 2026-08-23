@@ -1423,6 +1423,36 @@ class MockAPIService {
         return SalesReport(points: points, totalRevenue: total, totalProfit: profit)
     }
 
+    func getSalesByProduct(from: Date, to: Date) async throws -> [SalesByProductItem] {
+        await delay()
+        let cal = Calendar.current
+        let startDay = cal.startOfDay(for: from)
+        let endDay   = cal.startOfDay(for: to)
+
+        var buckets: [UUID: (qty: Int, revenue: Double, profit: Double)] = [:]
+        for order in _salesOrders where order.status != "cancelled" {
+            let day = cal.startOfDay(for: order.soldAt)
+            guard day >= startDay && day <= endDay else { continue }
+            for item in order.items {
+                var b = buckets[item.productSizeId] ?? (0, 0, 0)
+                b.qty += item.qty
+                b.revenue += item.lineRevenue
+                b.profit += item.lineProfit
+                buckets[item.productSizeId] = b
+            }
+        }
+
+        let sizeMap = Dictionary(uniqueKeysWithValues: _productSizes.values.flatMap { $0 }.map { ($0.id, $0) })
+        return buckets.map { productSizeId, val -> SalesByProductItem in
+            let detail = sizeMap[productSizeId]
+            return SalesByProductItem(productSizeId: productSizeId,
+                                      productName: detail?.productName ?? "Produk",
+                                      sizeLabel: detail?.sizeLabel ?? "-",
+                                      fabricVariantName: detail?.fabricVariantName,
+                                      qtySold: val.qty, revenue: val.revenue, profit: val.profit)
+        }.sorted { $0.revenue > $1.revenue }
+    }
+
     func getMarginRanking() async throws -> [MarginRankingItem] {
         await delay()
         return _productSizes.values.flatMap({ $0 }).compactMap { detail -> MarginRankingItem? in

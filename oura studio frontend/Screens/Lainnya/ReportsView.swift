@@ -116,6 +116,7 @@ struct SalesReportDetailView: View {
     @EnvironmentObject private var api: APIService
 
     @State private var report: SalesReport?
+    @State private var byProduct: [SalesByProductItem] = []
     @State private var isLoading = true
     @State private var errorMsg: String?
     @State private var fromDate: Date = Calendar.current.date(byAdding: .day, value: -30, to: Date()) ?? Date()
@@ -202,6 +203,48 @@ struct SalesReportDetailView: View {
                         }
                         .ouraCard()
                     }
+
+                    VStack(alignment: .leading, spacing: 12) {
+                        OuraSectionHeader(title: "Per Barang")
+                        if byProduct.isEmpty {
+                            Text("Belum ada barang terjual di periode ini")
+                                .font(.system(size: 13))
+                                .foregroundStyle(OuraTheme.Colors.textTertiary)
+                                .padding(OuraTheme.Spacing.cardPad)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .ouraCard()
+                        } else {
+                            VStack(spacing: 0) {
+                                ForEach(byProduct) { item in
+                                    HStack {
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(item.displayLabel)
+                                                .font(.system(size: 13, weight: .medium))
+                                                .foregroundStyle(OuraTheme.Colors.textPrimary)
+                                            Text("\(item.qtySold) pcs terjual")
+                                                .font(.system(size: 11))
+                                                .foregroundStyle(OuraTheme.Colors.textTertiary)
+                                        }
+                                        Spacer()
+                                        VStack(alignment: .trailing, spacing: 2) {
+                                            Text(item.revenue.rupiahFormatted)
+                                                .font(.system(size: 13, weight: .semibold))
+                                                .foregroundStyle(OuraTheme.Colors.textPrimary)
+                                            Text("profit \(item.profit.rupiahFormatted)")
+                                                .font(.system(size: 11))
+                                                .foregroundStyle(item.profit >= 0 ? OuraTheme.Colors.greenAccent : OuraTheme.Colors.dangerText)
+                                        }
+                                    }
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 10)
+                                    if item.id != byProduct.last?.id {
+                                        Divider().padding(.leading, 16).overlay(OuraTheme.Colors.separator)
+                                    }
+                                }
+                            }
+                            .ouraCard()
+                        }
+                    }
                 }
             }
             .padding(.horizontal, OuraTheme.Spacing.horizontal)
@@ -226,8 +269,12 @@ struct SalesReportDetailView: View {
         errorMsg = nil
         do {
             report = try await api.getSalesReport(from: fromDate, to: toDate)
+            // Separate endpoint/call -- don't let a failure here blank out the period summary
+            // that already loaded successfully above.
+            byProduct = (try? await api.getSalesByProduct(from: fromDate, to: toDate)) ?? []
         } catch {
             report = nil
+            byProduct = []
             errorMsg = error.localizedDescription
             print("🔴 [SalesReport] load error: \(error)")
         }

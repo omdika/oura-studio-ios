@@ -22,6 +22,33 @@ struct SalesReport: Codable {
     let totalProfit: Double
 }
 
+struct SalesByProductItem: Codable, Identifiable {
+    let productSizeId: UUID
+    let productName: String
+    let sizeLabel: String
+    let fabricVariantName: String?
+    let qtySold: Int
+    let revenue: Double
+    let profit: Double
+
+    var id: UUID { productSizeId }
+
+    var displayLabel: String {
+        guard let fabric = fabricVariantName else { return "\(productName) · \(sizeLabel)" }
+        return "\(productName) · \(sizeLabel) · \(fabric)"
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case productSizeId = "product_size_id"
+        case productName = "product_name"
+        case sizeLabel = "size_label"
+        case fabricVariantName = "fabric_variant_name"
+        case qtySold = "qty_sold"
+        case revenue
+        case profit
+    }
+}
+
 struct MarginRankingItem: Codable, Identifiable {
     let productSizeId: UUID
     let productName: String

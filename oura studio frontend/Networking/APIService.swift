@@ -725,6 +725,12 @@ class APIService: ObservableObject {
         return try await get(path: "/reports/sales\(q)")
     }
 
+    func getSalesByProduct(from: Date, to: Date) async throws -> [SalesByProductItem] {
+        if useMock { return try await MockAPIService.shared.getSalesByProduct(from: from, to: to) }
+        let q = "?from=\(dateFmt.string(from: from))&to=\(dateFmt.string(from: to))"
+        return try await get(path: "/reports/sales-by-product\(q)")
+    }
+
     func getMarginRanking() async throws -> [MarginRankingItem] {
         if useMock { return try await MockAPIService.shared.getMarginRanking() }
         return try await get(path: "/reports/margin-ranking?sort=margin_pct")
