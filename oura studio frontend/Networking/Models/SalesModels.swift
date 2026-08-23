@@ -52,7 +52,9 @@ struct SalesOrder: Codable, Identifiable {
 struct SalesOrderItem: Codable, Identifiable {
     let id: UUID
     let productSizeId: UUID
-    // Backend omits these — enriched client-side or shown as fallback
+    // SalesOrderItemOut (backend) does include product_name/size_label directly -- these were
+    // previously left out of CodingKeys under a stale "backend omits these" assumption, so they
+    // always decoded to nil and every item silently showed "Produk · -" regardless of what sold.
     var salesOrderId: UUID? = nil
     var productName: String? = nil
     var sizeLabel: String? = nil
@@ -65,7 +67,9 @@ struct SalesOrderItem: Codable, Identifiable {
     enum CodingKeys: String, CodingKey {
         case id
         case productSizeId = "product_size_id"
-        // salesOrderId, productName, sizeLabel intentionally omitted — not in backend response
+        case productName = "product_name"
+        case sizeLabel = "size_label"
+        // salesOrderId intentionally omitted -- redundant with the order that already owns this item
         case qty
         case unitPrice = "unit_price"
         case discount
