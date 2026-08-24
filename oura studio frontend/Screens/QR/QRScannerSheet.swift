@@ -52,6 +52,7 @@ struct QRScannerSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     let mode: QRScanMode
+    var onProductSelected: ((ProductSizeDetail) -> Void)? = nil // NEW: Completion handler for single product selection
 
     @State private var scanState: ScanState = .scanning
     @State private var showSellSheet = false
@@ -85,7 +86,7 @@ struct QRScannerSheet: View {
                     unsupportedView
                 }
 
-                if mode == .sellOnly {
+                if mode == .sellOnly && onProductSelected == nil { // Only show cart overlay if not in single-product selection mode
                     cartModeOverlay
                 } else {
                     VStack {
@@ -446,9 +447,12 @@ struct QRScannerSheet: View {
     private func resolve(_ id: UUID) async {
         do {
             let size = try await api.getProductSizeById(id: id)
-            if mode == .sellOnly {
+            if let onSelect = onProductSelected { // NEW: If a handler is provided, use it
+                onSelect(size)
+                dismiss() // Dismiss the scanner sheet
+            } else if mode == .sellOnly {
                 addToCart(size)
-            } else {
+            } else { // .any or .stockInOnly
                 scanState = .resolved(size)
             }
         } catch {
