@@ -19,7 +19,7 @@ struct TambahPenjualanSheet: View {
     @State private var stockAdjustTarget: SaleItem? = nil
 
     private struct SaleItem: Identifiable {
-        let id = UUID()
+        let id = UUID() // Unique ID for ForEach, not for product identity
         var sizeId: UUID
         var productSku: String
         var displayName: String
@@ -29,6 +29,7 @@ struct TambahPenjualanSheet: View {
         var discount: Double? = nil
     }
 
+    // Menggunakan sizeId untuk identifikasi produk yang sudah dipilih
     private var selectedSizeIds: Set<UUID> { Set(items.map { $0.sizeId }) }
 
     private var totalRevenue: Double {
@@ -134,17 +135,9 @@ struct TambahPenjualanSheet: View {
         .sheet(isPresented: $showProductPicker) {
             ProductPickerSheet(
                 sizes: availableSizes,
-                alreadySelected: selectedSizeIds
+                alreadySelected: selectedSizeIds // Menggunakan sizeId untuk filter
             ) { size in
-                items.append(SaleItem(
-                    sizeId: size.id,
-                    productSku: size.productSku,
-                    displayName: "\(size.productName) · \(size.displayLabel)",
-                    maxQty: size.currentStockQty,
-                    qty: 1,
-                    unitPrice: size.sellingPrice,
-                    discount: nil
-                ))
+                addOrIncrementItem(size) // Panggil fungsi helper baru
             }
         }
         .sheet(item: $stockAdjustTarget) { target in
@@ -188,7 +181,6 @@ struct TambahPenjualanSheet: View {
                         .foregroundStyle(OuraTheme.Colors.textPrimary)
                     HStack(spacing: 4) {
                         Image(systemName: "cube.box")
-                            .font(.system(size: 10))
                         Text("Tersedia: \(item.wrappedValue.maxQty) pcs")
                             .font(.system(size: 12))
                     }
@@ -241,7 +233,12 @@ struct TambahPenjualanSheet: View {
 
                         Button {
                             let cur = Int(item.wrappedValue.qty ?? 0)
-                            item.wrappedValue.qty = Double(cur + 1)
+                            // Tambahkan pengecekan stok saat menginkrementasi
+                            if cur + 1 <= item.wrappedValue.maxQty {
+                                item.wrappedValue.qty = Double(cur + 1)
+                            } else {
+                                errorMsg = "Stok \(item.wrappedValue.displayName) sudah penuh (\(item.wrappedValue.maxQty) pcs)"
+                            }
                         } label: {
                             Image(systemName: "chevron.up")
                                 .font(.system(size: 10, weight: .semibold))
@@ -295,6 +292,33 @@ struct TambahPenjualanSheet: View {
     private func loadSizes() async {
         let all = (try? await api.getAllProductSizes()) ?? []
         availableSizes = all.filter { !$0.isArchived && $0.currentStockQty > 0 }
+    }
+
+    // Fungsi helper baru untuk menambah atau menginkrementasi item
+    private func addOrIncrementItem(_ size: ProductSizeDetail) {
+        if let idx = items.firstIndex(where: { $0.sizeId == size.id }) {
+            // Item sudah ada, inkrementasi kuantitas jika stok memungkinkan
+            let currentQty = Int(items[idx].qty ?? 0)
+            let newQty = currentQty + 1
+            if newQty <= items[idx].maxQty {
+                items[idx].qty = Double(newQty)
+                errorMsg = nil // Hapus pesan error jika berhasil inkrementasi
+            } else {
+                errorMsg = "Stok \(size.displayLabel) sudah penuh (\(items[idx].maxQty) pcs)"
+            }
+        } else {
+            // Item belum ada, tambahkan baru
+            items.append(SaleItem(
+                sizeId: size.id,
+                productSku: size.productSku,
+                displayName: "\(size.productName) · \(size.displayLabel)",
+                maxQty: size.currentStockQty,
+                qty: 1,
+                unitPrice: size.sellingPrice,
+                discount: nil
+            ))
+            errorMsg = nil // Hapus pesan error jika berhasil menambah item baru
+        }
     }
 
     private func save() async {
@@ -426,6 +450,7 @@ private struct ProductPickerSheet: View {
     @State private var searchText = ""
 
     private var pickable: [ProductSizeDetail] {
+        // Filter out items that are already selected based on their sizeId
         sizes.filter { !alreadySelected.contains($0.id) }
     }
 
