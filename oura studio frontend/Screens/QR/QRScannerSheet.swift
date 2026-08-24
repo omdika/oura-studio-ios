@@ -63,8 +63,12 @@ struct QRScannerSheet: View {
     @State private var showCheckoutSheet = false
     @State private var cartToast: String? = nil
 
+    // Manual search
+    @State private var showProductPicker = false
+    @State private var allAvailableSizes: [ProductSizeDetail] = [] // Untuk ProductPickerSheet
+
     private var isScanning: Bool {
-        scanState == .scanning && !showCheckoutSheet
+        scanState == .scanning && !showCheckoutSheet && !showProductPicker
     }
 
     private var cartTotal: Double {
@@ -130,6 +134,23 @@ struct QRScannerSheet: View {
                     .environmentObject(api)
             }
         }
+        .sheet(isPresented: $showProductPicker) {
+            ProductPickerSheet(
+                sizes: allAvailableSizes,
+                alreadySelected: Set(cartItems.map { $0.size.id }), // Hanya relevan untuk mode sellOnly
+                onSelect: { selectedSize in
+                    if mode == .sellOnly {
+                        addToCart(selectedSize)
+                    } else {
+                        scanState = .resolved(selectedSize)
+                    }
+                }
+            )
+            .environmentObject(api)
+        }
+        .task {
+            await loadAllSizes()
+        }
     }
 
     // MARK: - Cart mode overlay
@@ -164,6 +185,13 @@ struct QRScannerSheet: View {
                 Spacer()
 
                 switch scanState {
+                case .scanning:
+                    VStack(spacing: 12) {
+                        scanHint
+                        manualSearchButton
+                    }
+                    .transition(.opacity)
+                    .animation(.easeInOut(duration: 0.2), value: scanState)
                 case .resolving:
                     resolvingCard
                         .transition(.opacity)
@@ -176,9 +204,7 @@ struct QRScannerSheet: View {
                     EmptyView()
                 }
 
-                if cartItems.isEmpty {
-                    scanHint
-                } else {
+                if !cartItems.isEmpty {
                     cartBar
                 }
             }
@@ -238,7 +264,10 @@ struct QRScannerSheet: View {
     private var bottomOverlay: some View {
         switch scanState {
         case .scanning:
-            scanHint
+            VStack(spacing: 12) {
+                scanHint
+                manualSearchButton
+            }
         case .resolving:
             resolvingCard
         case .resolved(let size):
@@ -263,6 +292,28 @@ struct QRScannerSheet: View {
         .padding(.vertical, 14)
         .background(.ultraThinMaterial)
         .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.large))
+    }
+
+    private var manualSearchButton: some View {
+        Button {
+            showProductPicker = true
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 18))
+                    .foregroundStyle(OuraTheme.Colors.textSecondary)
+                Text("Cari Produk Manual")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(OuraTheme.Colors.textSecondary)
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 14)
+            .background(.ultraThinMaterial)
+            .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.large))
+            .overlay(RoundedRectangle(cornerRadius: OuraTheme.Radius.large)
+                .stroke(OuraTheme.Colors.border, lineWidth: 1))
+        }
+        .buttonStyle(.plain)
         .padding(.bottom, 44)
     }
 
@@ -486,6 +537,15 @@ struct QRScannerSheet: View {
         Task {
             try? await Task.sleep(nanoseconds: 1_800_000_000)
             withAnimation { cartToast = nil }
+        }
+    }
+
+    private func loadAllSizes() async {
+        do {
+            allAvailableSizes = try await api.getAllProductSizes()
+        } catch {
+            print("Failed to load all product sizes for picker: \(error)")
+            // Optionally set an error state or just leave the picker empty
         }
     }
 }
