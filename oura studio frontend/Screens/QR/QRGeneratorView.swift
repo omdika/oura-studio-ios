@@ -28,16 +28,16 @@ struct QRGeneratorView: View {
     }
 
     private func filteredSizes(for product: Product) -> [ProductSizeDetail] {
-        var all = (sizesByProduct[product.id] ?? []).filter { !$0.isArchived }
-
-        // If a size label has fabric variants, hide the parent entry (no fabricVariantName)
-        let labelsWithVariants = Set(all.compactMap { $0.fabricVariantName != nil ? $0.sizeLabel : nil })
-        all = all.filter { size in
-            guard size.fabricVariantName == nil else { return true }
-            return !labelsWithVariants.contains(size.sizeLabel)
-        }
-
-        all = all.sorted { $0.displayLabel.localizedCompare($1.displayLabel) == .orderedAscending }
+        // Reuses the same grouping/fallback ProdukSizeGroupView uses (makeSizeGroups +
+        // ProdukSizeGroup.displayVariants, in ProdukDetailView.swift) instead of this view's own
+        // separate "hide the parent row when variants exist" heuristic -- that heuristic only
+        // ever hid the fabric-less parent row and should have kept every real fabric variant, but
+        // in practice a size with multiple fabric variants (e.g. XS with Satin Pink AND Satin
+        // Hijau) was only showing one of them here while the Produk tab correctly showed both.
+        // Sharing the exact same grouping logic guarantees this list can't drift from what the
+        // Produk tab shows again, regardless of what the discrepancy actually was.
+        let groups = makeSizeGroups(from: sizesByProduct[product.id] ?? [])
+        let all = groups.flatMap { $0.displayVariants }
         guard !searchText.isEmpty, !product.name.localizedCaseInsensitiveContains(searchText) else { return all }
         return all.filter { $0.displayLabel.localizedCaseInsensitiveContains(searchText) }
     }
@@ -358,8 +358,24 @@ struct QRGeneratorView: View {
 
         let mmToPt: CGFloat = 72.0 / 25.4
         let qrSize: CGFloat = 18 * mmToPt  // 1.8 cm ≈ 51 pt
-        let labelH: CGFloat = 18
-        let cellH = qrSize + labelH + 4
+        // SKU line (smaller font) directly under the QR code, then the product-name/fabric/size
+        // caption below it. The caption box is always sized for the worst case -- 3 lines (product
+        // name, jenis kain, ukuran) -- and kept that size even for 2-line items (no jenis kain).
+        // Critically, captionBoxH also adds a flat buffer ON TOP of the exact lines×lineHeight
+        // total, not just the lines×lineHeight itself -- String.draw(with:CGRect...) hard-clips to
+        // the given rect, and an *exactly*-sized box (zero headroom) reliably clips the descenders
+        // of the last line even when the paragraph style's forced line height should "fit" on paper.
+        // That's why the 2-line case (no jenis kain) was fine even before this buffer was added
+        // (it had slack from being sized for the 3-line worst case) while the 3-line case, which
+        // used up the whole box exactly, kept dropping "ukuran" until this buffer was added too.
+        let skuFontSize: CGFloat = 4.5
+        let skuLineH: CGFloat = 6.0
+        let captionFontSize: CGFloat = 5.5
+        let captionLineH: CGFloat = 7.0
+        let maxCaptionLines = 3
+        let captionBoxH: CGFloat = CGFloat(maxCaptionLines) * captionLineH + 6
+        let labelH: CGFloat = skuLineH + captionBoxH
+        let cellH = qrSize + labelH + 6
         let margin: CGFloat = 2 * mmToPt   // 2 mm ≈ 5.67 pt
         let gap: CGFloat = 0.5 * mmToPt    // 0.5 mm ≈ 1.42 pt
         let colSpacing: CGFloat = gap
@@ -393,22 +409,38 @@ struct QRGeneratorView: View {
                     }
                 }
 
-                // Build 3-line caption: product name / fabric variant / size label
+                // SKU — directly under the QR code, above the product-name caption, smaller font.
+                let skuAttrs: [NSAttributedString.Key: Any] = [
+                    .font: UIFont.systemFont(ofSize: skuFontSize),
+                    .foregroundColor: UIColor.black
+                ]
+                let skuY = currentY + qrSize + 2
+                size.productSku.draw(
+                    with: CGRect(x: x, y: skuY, width: qrSize, height: skuLineH),
+                    options: .usesLineFragmentOrigin,
+                    attributes: skuAttrs,
+                    context: nil
+                )
+
+                // Caption: product name / fabric variant (jenis kain, if any) / size label. Always
+                // drawn into the same fixed-size captionBoxH regardless of this item's actual line
+                // count -- see the comment above captionBoxH for why a per-item-sized box clipped
+                // the last line (ukuran) for both 2-line and 3-line captions.
                 var captionParts = [size.productName]
                 if let fabric = size.fabricVariantName { captionParts.append(fabric) }
                 captionParts.append(size.sizeLabel)
                 let label = captionParts.joined(separator: "\n")
 
                 let ps = NSMutableParagraphStyle()
-                ps.minimumLineHeight = 6.0
-                ps.maximumLineHeight = 6.0
+                ps.minimumLineHeight = captionLineH
+                ps.maximumLineHeight = captionLineH
                 let attrs: [NSAttributedString.Key: Any] = [
-                    .font: UIFont.systemFont(ofSize: 5.5),
+                    .font: UIFont.systemFont(ofSize: captionFontSize),
                     .foregroundColor: UIColor.black,
                     .paragraphStyle: ps
                 ]
                 label.draw(
-                    with: CGRect(x: x, y: currentY + qrSize + 2, width: qrSize, height: labelH),
+                    with: CGRect(x: x, y: skuY + skuLineH, width: qrSize, height: captionBoxH),
                     options: .usesLineFragmentOrigin,
                     attributes: attrs,
                     context: nil

@@ -31,6 +31,12 @@ struct TambahProdukLengkapSheet: View {
     @EnvironmentObject private var api: APIService
     @Environment(\.dismiss) private var dismiss
 
+    // Called after "Simpan Tanpa Resep" creates the product, so the caller can immediately
+    // navigate to ProdukDetailView -- lands on the product's size list rather than jumping
+    // straight into one specific size, since the user (not this form) should pick which size(s)
+    // get an initial harga/stok/HPP.
+    var onCreatedWithoutRecipe: ((Product) -> Void)? = nil
+
     // MARK: — Step 1: product fields
     @State private var productName = ""
     @State private var sku = ""
@@ -115,6 +121,14 @@ struct TambahProdukLengkapSheet: View {
         VStack(spacing: 0) {
             header
             Divider().overlay(OuraTheme.Colors.separator)
+            // Fixed right below the header (not inside the scrollable content below) so a save
+            // failure is visible immediately, regardless of scroll position — previously this sat
+            // at the bottom of the form/list and could be scrolled out of view.
+            if let err = errorMsg {
+                errorBanner(err)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 10)
+            }
             if isOnRecipeStep {
                 recipeStepContent
             } else {
@@ -328,10 +342,6 @@ struct TambahProdukLengkapSheet: View {
                             .buttonStyle(.plain)
                             .animation(.easeInOut(duration: 0.15), value: isFabricVariant)
                         }
-                    }
-
-                    if let err = errorMsg {
-                        errorBanner(err)
                     }
                 }
                 .padding(16)
@@ -563,15 +573,6 @@ struct TambahProdukLengkapSheet: View {
                     OuraSectionHeader(title: "Tenaga Kerja")
                 }
                 .listSectionSeparator(.hidden)
-
-                if let err = errorMsg {
-                    Section {
-                        Text(err)
-                            .font(.system(size: 13))
-                            .foregroundStyle(OuraTheme.Colors.dangerText)
-                            .listRowBackground(OuraTheme.Colors.dangerBg)
-                    }
-                }
             }
             .scrollContentBackground(.hidden)
             .background(OuraTheme.Colors.background)
@@ -731,8 +732,11 @@ struct TambahProdukLengkapSheet: View {
     }
 
     private static func autoSKU(from name: String) -> String {
+        // Take up to 3 alphanumeric chars from each word, joined -- no overall cap, so every word
+        // (including the last one) is represented. A flat .prefix(8) on the joined string used to
+        // silently cut off trailing words for names with more than ~3 words.
         let words = name.uppercased().components(separatedBy: .whitespaces).filter { !$0.isEmpty }
-        return String(words.map { String($0.filter { $0.isLetter || $0.isNumber }.prefix(3)) }.joined().prefix(8))
+        return words.map { String($0.filter { $0.isLetter || $0.isNumber }.prefix(3)) }.joined()
     }
 
     // MARK: — Load
@@ -781,6 +785,7 @@ struct TambahProdukLengkapSheet: View {
             for size in selectedSizes {
                 _ = try await api.createProductSize(sku: product.sku, sizeLabel: size)
             }
+            onCreatedWithoutRecipe?(product)
             dismiss()
         } catch let e as APIError { errorMsg = e.errorDescription }
         catch { errorMsg = error.localizedDescription }

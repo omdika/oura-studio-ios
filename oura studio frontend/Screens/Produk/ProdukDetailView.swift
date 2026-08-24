@@ -1,5 +1,18 @@
 import SwiftUI
 
+// MARK: - Size label ordering (shared with ProdukListView's own size-group sort)
+
+// Canonical XS→XXL progression. Labels outside this set (custom sizes like "Free Size", "32",
+// "One Size") sort alphabetically after all recognized sizes rather than before/interleaved.
+private let sizeLabelOrder: [String] = ["XXS", "XS", "S", "M", "L", "XL", "XXL", "XXXL"]
+
+func sizeLabelSortKey(_ label: String) -> (Int, String) {
+    if let idx = sizeLabelOrder.firstIndex(of: label.uppercased()) {
+        return (idx, "")
+    }
+    return (sizeLabelOrder.count, label)
+}
+
 // MARK: - Shared group model
 
 struct ProdukSizeGroup: Identifiable {
@@ -15,6 +28,10 @@ struct ProdukSizeGroup: Identifiable {
     }
     var isAnyHabis: Bool { displayVariants.contains { $0.currentStockQty == 0 } }
     var isAnyMenipis: Bool { displayVariants.contains { $0.isLowStock && $0.currentStockQty > 0 } }
+    var lowestPrice: Double? { displayVariants.compactMap { $0.sellingPrice }.min() }
+    // Flags a size that's completely unconfigured — no stock and no price set on any variant —
+    // e.g. right after "Simpan Tanpa Resep" before the user has filled anything in.
+    var needsSetup: Bool { totalStock == 0 && lowestPrice == nil }
 }
 
 func makeSizeGroups(from sizes: [ProductSizeDetail]) -> [ProdukSizeGroup] {
@@ -22,7 +39,7 @@ func makeSizeGroups(from sizes: [ProductSizeDetail]) -> [ProdukSizeGroup] {
         .map { label, variants in
             ProdukSizeGroup(sizeLabel: label, variants: variants.sorted { $0.displayLabel < $1.displayLabel })
         }
-        .sorted { $0.sizeLabel < $1.sizeLabel }
+        .sorted { sizeLabelSortKey($0.sizeLabel) < sizeLabelSortKey($1.sizeLabel) }
 }
 
 // MARK: - ProdukDetailView
@@ -244,6 +261,11 @@ private struct SizeGroupRow: View {
                     Text(group.sizeLabel)
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(OuraTheme.Colors.textPrimary)
+                    if group.needsSetup {
+                        Image(systemName: "star.fill")
+                            .font(.system(size: 9))
+                            .foregroundStyle(OuraTheme.Colors.warningText)
+                    }
                     if group.isAnyHabis {
                         OuraTag(text: "Habis",
                                 color: OuraTheme.Colors.dangerText,
@@ -262,12 +284,23 @@ private struct SizeGroupRow: View {
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 3) {
-                Text("\(group.totalStock) pcs")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(OuraTheme.Colors.textPrimary)
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 11))
-                    .foregroundStyle(OuraTheme.Colors.textTertiary)
+                if let price = group.lowestPrice {
+                    Text(price.rupiahFormatted)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(OuraTheme.Colors.textPrimary)
+                } else {
+                    Text("Belum ada harga")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(OuraTheme.Colors.warningText)
+                }
+                HStack(spacing: 4) {
+                    Text("\(group.totalStock) pcs")
+                        .font(.system(size: 11))
+                        .foregroundStyle(OuraTheme.Colors.textTertiary)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 10))
+                        .foregroundStyle(OuraTheme.Colors.textTertiary)
+                }
             }
         }
         .padding(.horizontal, 16)
@@ -891,12 +924,15 @@ struct ProdukSizeDetailView: View {
     @State private var isEditing = false
     @State private var editSellingPrice: Double?
     @State private var editReorderMin: Double?
+    // Quick add-stock field shown inline in Edit mode -- always starts at nil/empty (it's a delta
+    // to add on save, not the current stock qty). The "+" button / TambahStokSheet flow (with
+    // bahan-deduction toggle) stays as the other, more capable way to add stock.
+    @State private var editAddStockQty: Double?
     @State private var editHppFabric: Double?
     @State private var editHppPooled: Double?
     @State private var editHppHardware: Double?
     @State private var editHppLabor: Double?
     @State private var editHppOverhead: Double?
-    @State private var showAdvisor = false
     @State private var isSaving = false
     @State private var showAddStock = false
     @State private var errorMsg: String?
@@ -977,15 +1013,37 @@ struct ProdukSizeDetailView: View {
         relatedSpec = spec
         guard let spec else { return }
 
-        let matMap      = Dictionary(uniqueKeysWithValues: materials.map { ($0.id, $0.currentAvgCost) })
+        let materialMap = Dictionary(uniqueKeysWithValues: materials.map { ($0.id, $0) })
         let settingsMap = Dictionary(uniqueKeysWithValues: settings.map { ($0.key, $0.value) })
 
-        // current_avg_cost is stored as Rp/cm; multiply directly by cutLengthCm in cm
+        // material.fabric_width_cm is an optional "typical width" hint that's frequently unset --
+        // fall back to the actual width_cm of a real purchase (always recorded) instead, so the
+        // estimate doesn't silently degrade to a "1 piece per row" assumption. See
+        // representativeFabricWidthCm's doc comment for why that fallback badly overestimates.
+        var purchasesByMaterial: [UUID: [MaterialPurchase]] = [:]
+        for fabric in spec.fabrics where purchasesByMaterial[fabric.materialId] == nil {
+            purchasesByMaterial[fabric.materialId] = (try? await api.getPurchases(materialId: fabric.materialId)) ?? []
+        }
+
+        // Same per-piece nesting estimate as the cutting optimizer (see estimatedFabricCostPerPiece
+        // doc comment) -- current_avg_cost is Rp/cm of roll length, divided by how many pieces fit
+        // across the roll's width, not just multiplied by cutLengthCm.
         let fabricCost = spec.fabrics.reduce(0.0) { sum, fabric in
-            sum + fabric.cutLengthCm * (matMap[fabric.materialId] ?? 0)
+            let material = materialMap[fabric.materialId]
+            let widthCm = representativeFabricWidthCm(
+                purchases: purchasesByMaterial[fabric.materialId] ?? [],
+                fallback: material?.fabricWidthCm
+            )
+            return sum + estimatedFabricCostPerPiece(
+                cutWidthCm: fabric.cutWidthCm,
+                cutHeightCm: fabric.cutLengthCm,
+                rotationAllowed: fabric.rotationAllowed,
+                fabricWidthCm: widthCm,
+                costPerCm: material?.currentAvgCost ?? 0
+            )
         }
         let componentCost = spec.components.reduce(0.0) { sum, comp in
-            sum + comp.qtyPerUnit * (matMap[comp.materialId] ?? 0)
+            sum + comp.qtyPerUnit * (materialMap[comp.materialId]?.currentAvgCost ?? 0)
         }
         let pooled   = (settingsMap["pooled_material_rate:thread"] ?? 0)
                      + (settingsMap["pooled_material_rate:packaging"] ?? 0)
@@ -1018,11 +1076,16 @@ struct ProdukSizeDetailView: View {
                     .background(OuraTheme.Colors.border).clipShape(Capsule())
             }
             Divider().overlay(OuraTheme.Colors.separator)
+            // stockRow (with its "Tambah" button) stays visible in both modes — previously it was
+            // only shown outside Edit, which made adding stock look unavailable while editing
+            // harga/HPP in the same session.
+            stockRow
             if isEditing {
+                Divider().overlay(OuraTheme.Colors.separator)
+                NumericInputField(label: "Tambah Stok (pcs)", value: $editAddStockQty, unit: "pcs")
                 CurrencyInputField(label: "Harga Jual", value: $editSellingPrice)
                 NumericInputField(label: "Reorder Min (pcs)", value: $editReorderMin, unit: "pcs")
             } else {
-                stockRow
                 if let fabric = size.fabricVariantName { infoRow("Jenis Kain", value: fabric) }
                 if let price = size.sellingPrice { infoRow("Harga Jual", value: price.rupiahFormatted) }
                 if let margin = size.marginPct { infoRow("Margin", value: String(format: "%.1f%%", margin * 100)) }
@@ -1181,45 +1244,31 @@ struct ProdukSizeDetailView: View {
 
     // MARK: - Price Advisor (always visible, uses shared component)
 
+    // PriceAdvisorSection (the shared component) already renders its own "Price Advisor"
+    // header with a lightbulb icon and its own expand/collapse chevron -- wrapping it in a
+    // second outer disclosure here made the user tap twice to see the margin/fee fields.
+    // Render it directly, same as ScanToStockSheet does.
+    @ViewBuilder
     private var priceAdvisorSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Button { withAnimation { showAdvisor.toggle() } } label: {
-                HStack {
-                    Image(systemName: "lightbulb.fill").foregroundStyle(OuraTheme.Colors.warningText)
-                    Text("Price Advisor").font(.system(size: 15, weight: .semibold)).foregroundStyle(OuraTheme.Colors.textPrimary)
-                    Spacer()
-                    Image(systemName: showAdvisor ? "chevron.up" : "chevron.down")
-                        .font(.system(size: 12)).foregroundStyle(OuraTheme.Colors.textTertiary)
-                }
-                .padding(OuraTheme.Spacing.cardPad)
-                .background(OuraTheme.Colors.warningBg)
-                .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.card))
-            }
-            .buttonStyle(.plain)
-
-            if showAdvisor {
-                if let hpp = effectiveHppForAdvisor {
-                    VStack(spacing: 0) {
-                        Divider().overlay(OuraTheme.Colors.separator)
-                        PriceAdvisorSection(hpp: hpp, itemLabel: size.displayLabel) { price in
-                            Task { await applyPrice(price) }
-                        }
-                    }
-                    .ouraCard()
-                } else {
-                    HStack(spacing: 8) {
-                        Image(systemName: "info.circle")
-                            .foregroundStyle(OuraTheme.Colors.textTertiary)
-                        Text("Isi HPP manual di atas untuk mengaktifkan Price Advisor.")
-                            .font(.system(size: 13))
-                            .foregroundStyle(OuraTheme.Colors.textSecondary)
-                    }
-                    .padding(12)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(OuraTheme.Colors.border.opacity(0.5))
-                    .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.medium))
+        if let hpp = effectiveHppForAdvisor {
+            VStack(spacing: 0) {
+                PriceAdvisorSection(hpp: hpp, itemLabel: size.displayLabel) { price in
+                    Task { await applyPrice(price) }
                 }
             }
+            .ouraCard()
+        } else {
+            HStack(spacing: 8) {
+                Image(systemName: "info.circle")
+                    .foregroundStyle(OuraTheme.Colors.textTertiary)
+                Text("Isi HPP manual di atas untuk mengaktifkan Price Advisor.")
+                    .font(.system(size: 13))
+                    .foregroundStyle(OuraTheme.Colors.textSecondary)
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(OuraTheme.Colors.border.opacity(0.5))
+            .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.medium))
         }
     }
 
@@ -1261,14 +1310,18 @@ struct ProdukSizeDetailView: View {
                 }
             }
             Spacer()
-            Button { showAddStock = true } label: {
-                HStack(spacing: 3) {
-                    Image(systemName: "plus.circle").font(.system(size: 12))
-                    Text("Tambah").font(.system(size: 12, weight: .medium))
+            // Hidden while editing -- "Tambah Stok (pcs)" below covers the quick case, and having
+            // both visible at once made it unclear which one to use.
+            if !isEditing {
+                Button { showAddStock = true } label: {
+                    HStack(spacing: 3) {
+                        Image(systemName: "plus.circle").font(.system(size: 12))
+                        Text("Tambah").font(.system(size: 12, weight: .medium))
+                    }
+                    .foregroundStyle(OuraTheme.Colors.accent)
                 }
-                .foregroundStyle(OuraTheme.Colors.accent)
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
         }
     }
 
@@ -1285,6 +1338,7 @@ struct ProdukSizeDetailView: View {
     private func startEdit() {
         editSellingPrice = size.sellingPrice
         editReorderMin = size.reorderMinQty
+        editAddStockQty = nil
         hppFromSpec = false
         if let manualHpp = size.manualHppBreakdown {
             editHppFabric   = manualHpp.fabric        > 0 ? manualHpp.fabric        : nil
@@ -1307,7 +1361,7 @@ struct ProdukSizeDetailView: View {
         isSaving = true; errorMsg = nil; defer { isSaving = false }
         let includeManualHpp = editHppTotal > 0 && size.latestHppBreakdown == nil
         do {
-            let updated = try await api.patchProductSize(sku: size.productSku, sizeId: size.id,
+            var updated = try await api.patchProductSize(sku: size.productSku, sizeId: size.id,
                 PatchProductSizeRequest(
                     sellingPrice: editSellingPrice,
                     reorderMinQty: editReorderMin,
@@ -1316,7 +1370,14 @@ struct ProdukSizeDetailView: View {
                     manualHppHardware: includeManualHpp ? (editHppHardware ?? 0) : nil,
                     manualHppLabor:    includeManualHpp ? (editHppLabor    ?? 0) : nil,
                     manualHppOverhead: includeManualHpp ? (editHppOverhead ?? 0) : nil))
+            // Quick add-stock field in Edit mode — plain adjustment, no bahan deduction (that stays
+            // the job of the "+" button / TambahStokSheet). Applied after the price/HPP patch so the
+            // returned detail (fetched fresh via GET, unlike the patch response) reflects both.
+            if let qty = editAddStockQty, qty > 0 {
+                updated = try await api.adjustStock(sku: size.productSku, sizeId: size.id, qty: Int(qty), reason: "adjustment")
+            }
             size = updated
+            editAddStockQty = nil
             withAnimation { isEditing = false }
         } catch let e as APIError { errorMsg = e.errorDescription }
         catch { errorMsg = error.localizedDescription }
@@ -1327,6 +1388,10 @@ struct ProdukSizeDetailView: View {
             _ = try await api.patchProductSize(sku: size.productSku, sizeId: size.id,
                 PatchProductSizeRequest(sellingPrice: price))
             await refreshSize()
+            // When Price Advisor is used while the Harga Jual field above is in Edit mode, that
+            // field reads from editSellingPrice (not size.sellingPrice) -- without this, refreshSize()
+            // updates `size` but the on-screen field stays stale until the user re-enters Edit.
+            if isEditing { editSellingPrice = price }
         } catch let e as APIError { errorMsg = e.errorDescription }
         catch { errorMsg = error.localizedDescription }
     }

@@ -862,17 +862,17 @@ private struct TambahProdukCepatSheet: View {
     }
 
     static func autoSKU(from name: String) -> String {
-        // Take up to 3 alphanumeric chars from each word, then cap at 8.
-        // "Scrunchie Waffle Merah" → "SCR"+"WAF"+"MER" = "SCRWAFME"
-        // "Scrunchie Satin" → "SCR"+"SAT" = "SCRSAT"
-        // Much less collision-prone than taking first 8 chars of the full name.
+        // Take up to 3 alphanumeric chars from each word, joined -- no overall cap, so every word
+        // (including the last one) is represented. A flat .prefix(8) on the joined string used to
+        // silently cut off trailing words for names with more than ~3 words, e.g.
+        // "Scrunchie Waffle Merah" → "SCR"+"WAF"+"MER" was truncated to "SCRWAFME", dropping the R.
         let words = name.uppercased()
             .components(separatedBy: .whitespaces)
             .filter { !$0.isEmpty }
         let parts = words.map { word in
             String(word.filter { $0.isLetter || $0.isNumber }.prefix(3))
         }
-        return String(parts.joined().prefix(8))
+        return parts.joined()
     }
 }
 

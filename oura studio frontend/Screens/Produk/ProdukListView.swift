@@ -10,6 +10,9 @@ struct ProdukListView: View {
     @State private var showAddProduct = false
     @State private var showQRScanner = false
     @State private var showQRGenerator = false
+    // Set right after "Simpan Tanpa Resep" creates a product with no price/stock/HPP yet — drives
+    // an auto-navigation into ProdukDetailView so the user can pick which size(s) to fill in.
+    @State private var newlyCreatedProduct: Product?
 
     private var filtered: [Product] {
         let active = products.filter { !$0.isArchived }
@@ -50,19 +53,37 @@ struct ProdukListView: View {
         .task { await load() }
         .refreshable { await load() }
         .toolbar {
-            ToolbarItemGroup(placement: .primaryAction) {
+            // Split across leading/trailing (not grouped together on one side) so the two very
+            // similar-looking QR icons (qrcode.viewfinder vs qrcode) read as two distinct actions
+            // instead of blurring into what looks like a single control.
+            ToolbarItem(placement: .navigationBarLeading) {
                 Button { showQRScanner = true } label: {
                     Image(systemName: "qrcode.viewfinder")
                 }
                 .foregroundStyle(OuraTheme.Colors.accent)
+                .accessibilityLabel("Scan QR")
+            }
+            ToolbarItem(placement: .primaryAction) {
                 Button { showQRGenerator = true } label: {
                     Image(systemName: "qrcode")
                 }
                 .foregroundStyle(OuraTheme.Colors.accent)
+                .accessibilityLabel("Generator QR")
             }
         }
         .sheet(isPresented: $showAddProduct, onDismiss: { Task { await load() } }) {
-            TambahProdukLengkapSheet()
+            TambahProdukLengkapSheet(onCreatedWithoutRecipe: { newlyCreatedProduct = $0 })
+        }
+        .sheet(item: $newlyCreatedProduct, onDismiss: { Task { await load() } }) { product in
+            NavigationStack {
+                ProdukDetailView(product: product)
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("Tutup") { newlyCreatedProduct = nil }
+                                .foregroundStyle(OuraTheme.Colors.accent)
+                        }
+                    }
+            }
         }
         .sheet(isPresented: $showQRScanner) {
             QRScannerSheet(mode: .stockInOnly)
@@ -134,10 +155,20 @@ private struct ProductGroupRow: View {
         let variants: [ProductSizeDetail]
         var id: String { sizeLabel }
         var totalStock: Int { variants.reduce(0) { $0 + $1.currentStockQty } }
-        var displayVariants: [ProductSizeDetail] { variants.filter { $0.fabricVariantName != nil } }
+        // Falls back to all variants when none have a fabric variant name (e.g. a size created
+        // without a resep) -- filtering to only fabric variants would leave this empty, silently
+        // zeroing out lowestPrice/isAnyHabis/isAnyMenipis below even when the size does have data.
+        // Matches ProdukSizeGroup.displayVariants in ProdukDetailView.swift.
+        var displayVariants: [ProductSizeDetail] {
+            let withFabric = variants.filter { $0.fabricVariantName != nil }
+            return withFabric.isEmpty ? variants : withFabric
+        }
         var isAnyHabis: Bool { displayVariants.contains { $0.currentStockQty == 0 } }
         var isAnyMenipis: Bool { displayVariants.contains { $0.isLowStock && $0.currentStockQty > 0 } }
         var lowestPrice: Double? { displayVariants.compactMap { $0.sellingPrice }.min() }
+        // Flags a size that's completely unconfigured — no stock and no price set on any variant —
+        // e.g. right after "Simpan Tanpa Resep" before the user has filled anything in.
+        var needsSetup: Bool { totalStock == 0 && lowestPrice == nil }
     }
 
     private var groups: [SizeGroup] {
@@ -148,7 +179,7 @@ private struct ProductGroupRow: View {
                     variants: variants.sorted { $0.displayLabel < $1.displayLabel }
                 )
             }
-            .sorted { $0.sizeLabel < $1.sizeLabel }
+            .sorted { sizeLabelSortKey($0.sizeLabel) < sizeLabelSortKey($1.sizeLabel) }
     }
 
     var body: some View {
@@ -193,6 +224,11 @@ private struct ProductGroupRow: View {
                                     Text(group.sizeLabel)
                                         .font(.system(size: 13, weight: .medium))
                                         .foregroundStyle(OuraTheme.Colors.textPrimary)
+                                    if group.needsSetup {
+                                        Image(systemName: "star.fill")
+                                            .font(.system(size: 8))
+                                            .foregroundStyle(OuraTheme.Colors.warningText)
+                                    }
                                     if group.isAnyHabis {
                                         OuraTag(text: "Habis",
                                                 color: OuraTheme.Colors.dangerText,
@@ -214,6 +250,10 @@ private struct ProductGroupRow: View {
                                         Text(price.rupiahFormatted)
                                             .font(.system(size: 13, weight: .semibold))
                                             .foregroundStyle(OuraTheme.Colors.textPrimary)
+                                    } else {
+                                        Text("Belum ada harga")
+                                            .font(.system(size: 11, weight: .medium))
+                                            .foregroundStyle(OuraTheme.Colors.warningText)
                                     }
                                     Text("\(group.totalStock) pcs")
                                         .font(.system(size: 11))

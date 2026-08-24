@@ -20,6 +20,62 @@ struct PatternFabric: Codable, Identifiable {
     }
 }
 
+/// Mirrors backend `estimate_fabric_cost_per_piece_from_rate` (app/services/cutting_optimizer.py) --
+/// the same per-piece nesting estimate the cutting optimizer and `get_hpp_for_sale`'s PatternSpec
+/// fallback tier use. Picks whichever allowed orientation packs more pieces across a hypothetical
+/// roll of `fabricWidthCm` (the material's typical/default width), which minimizes cost per piece;
+/// falls back to one full row per piece (no nesting) when `fabricWidthCm` is unknown or neither
+/// orientation fits at least one piece across the width.
+///
+/// Client-side estimates that skip this (e.g. `cutLengthCm * costPerCm` with no division by how
+/// many pieces fit across the roll's width) overstate fabric cost by roughly that pieces-per-row
+/// factor -- this is what keeps the "estimasi resep" HPP shown on the product page consistent with
+/// what Optimasi Resep would actually compute for the same spec.
+func estimatedFabricCostPerPiece(
+    cutWidthCm: Double,
+    cutHeightCm: Double,
+    rotationAllowed: Bool,
+    fabricWidthCm: Double?,
+    costPerCm: Double
+) -> Double {
+    guard costPerCm > 0 else { return 0 }
+    guard let fabricWidthCm, fabricWidthCm > 0 else { return costPerCm * cutHeightCm }
+
+    var feasibleCosts: [Double] = []
+    if cutWidthCm > 0 {
+        let normalPiecesPerRow = Int(fabricWidthCm / cutWidthCm)
+        if normalPiecesPerRow > 0 && cutHeightCm > 0 {
+            feasibleCosts.append(costPerCm * cutHeightCm / Double(normalPiecesPerRow))
+        }
+    }
+    if rotationAllowed, cutHeightCm > 0 {
+        let rotatedPiecesPerRow = Int(fabricWidthCm / cutHeightCm)
+        if rotatedPiecesPerRow > 0 && cutWidthCm > 0 {
+            feasibleCosts.append(costPerCm * cutWidthCm / Double(rotatedPiecesPerRow))
+        }
+    }
+    return feasibleCosts.min() ?? (costPerCm * cutHeightCm)
+}
+
+/// Picks a roll width for `estimatedFabricCostPerPiece`'s nesting calc, preferring the actual
+/// `width_cm` of a real purchase over `material.fabric_width_cm` (a separate, optional "typical
+/// width" hint that's frequently left unset). When it's unset, `estimatedFabricCostPerPiece`
+/// silently falls back to "one piece per row" -- a confirmed ~100x inflation in a real case (see
+/// backend `get_hpp_for_sale` docstring) -- whereas a purchase's width_cm is always recorded (it's
+/// a required field for fabric purchases). Among purchases with stock left, picks the one with the
+/// most remaining length, since that's the roll most likely to actually get cut next; falls back to
+/// any purchase's width, then to `fallback` (typically `material.fabricWidthCm`) if there are none.
+func representativeFabricWidthCm(purchases: [MaterialPurchase], fallback: Double?) -> Double? {
+    let withStock = purchases.filter { ($0.widthCm ?? 0) > 0 && ($0.remainingLengthCm ?? 0) > 0 }
+    if let mostStock = withStock.max(by: { ($0.remainingLengthCm ?? 0) < ($1.remainingLengthCm ?? 0) }) {
+        return mostStock.widthCm
+    }
+    if let anyWithWidth = purchases.first(where: { ($0.widthCm ?? 0) > 0 }) {
+        return anyWithWidth.widthCm
+    }
+    return fallback
+}
+
 struct PatternSpec: Codable, Identifiable {
     let id: UUID
     let productSizeId: UUID

@@ -44,6 +44,13 @@ struct ProductSizeBasic: Codable, Identifiable {
     let manualStockQty: Int?
     let latestHppBreakdown: HPPBreakdown?
     let marginPct: Double?
+    // v3.19: manual HPP override fields — were missing here, which silently dropped them on every
+    // decode of this list/create/patch response shape (see sizeDetailFromBasic in APIService.swift).
+    let manualHppFabric: Double?
+    let manualHppPooled: Double?
+    let manualHppHardware: Double?
+    let manualHppLabor: Double?
+    let manualHppOverhead: Double?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -58,6 +65,11 @@ struct ProductSizeBasic: Codable, Identifiable {
         case manualStockQty      = "manual_stock_qty"
         case latestHppBreakdown  = "latest_hpp_breakdown"
         case marginPct           = "margin_pct"
+        case manualHppFabric     = "manual_hpp_fabric"
+        case manualHppPooled     = "manual_hpp_pooled"
+        case manualHppHardware   = "manual_hpp_hardware"
+        case manualHppLabor      = "manual_hpp_labor"
+        case manualHppOverhead   = "manual_hpp_overhead"
     }
 }
 
