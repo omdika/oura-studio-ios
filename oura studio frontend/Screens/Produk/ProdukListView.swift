@@ -184,98 +184,100 @@ private struct ProductGroupRow: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Header → ProdukDetailView (product management)
-            NavigationLink(destination: ProdukDetailView(product: product, onProductChanged: onProductChanged)) {
-                HStack {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(product.name)
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(OuraTheme.Colors.textPrimary)
-                        Text(product.sku)
-                            .font(.system(size: 11, weight: .medium))
+        Group { // Added Group wrapper here to help with type inference
+            VStack(alignment: .leading, spacing: 0) {
+                // Header → ProdukDetailView (product management)
+                NavigationLink(destination: ProdukDetailView(product: product, onProductChanged: onProductChanged)) {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(product.name)
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundStyle(OuraTheme.Colors.textPrimary)
+                            Text(product.sku)
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundStyle(OuraTheme.Colors.textTertiary)
+                                .padding(.horizontal, 7).padding(.vertical, 2)
+                                .background(OuraTheme.Colors.border)
+                                .clipShape(Capsule())
+                        }
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 12, weight: .medium))
                             .foregroundStyle(OuraTheme.Colors.textTertiary)
-                            .padding(.horizontal, 7).padding(.vertical, 2)
-                            .background(OuraTheme.Colors.border)
-                            .clipShape(Capsule())
                     }
-                    Spacer()
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(OuraTheme.Colors.textTertiary)
+                    .padding(OuraTheme.Spacing.cardPad)
                 }
-                .padding(OuraTheme.Spacing.cardPad)
-            }
-            .buttonStyle(.plain)
+                .buttonStyle(.plain)
 
-            if !groups.isEmpty {
-                Divider().overlay(OuraTheme.Colors.separator)
-                    .padding(.horizontal, OuraTheme.Spacing.cardPad)
+                if !groups.isEmpty {
+                    Divider().overlay(OuraTheme.Colors.separator)
+                        .padding(.horizontal, OuraTheme.Spacing.cardPad)
 
-                VStack(spacing: 0) {
-                    ForEach(groups) { group in
-                        // Each size label row → ProdukSizeGroupView (fabric variants)
-                        NavigationLink(destination: ProdukSizeGroupView(product: product, sizeLabel: group.sizeLabel)) {
-                            HStack(spacing: 10) {
-                                HStack(spacing: 6) {
-                                    Rectangle()
-                                        .fill(OuraTheme.Colors.border)
-                                        .frame(width: 2, height: 14)
-                                        .clipShape(Capsule())
-                                    Text(group.sizeLabel)
-                                        .font(.system(size: 13, weight: .medium))
-                                        .foregroundStyle(OuraTheme.Colors.textPrimary)
-                                    if group.needsSetup {
-                                        Image(systemName: "star.fill")
-                                            .font(.system(size: 9))
-                                            .foregroundStyle(OuraTheme.Colors.warningText)
+                    VStack(spacing: 0) {
+                        ForEach(groups) { group in
+                            // Each size label row → ProdukSizeGroupView (fabric variants)
+                            NavigationLink(destination: ProdukSizeGroupView(product: product, sizeLabel: group.sizeLabel)) {
+                                HStack(spacing: 10) {
+                                    HStack(spacing: 6) {
+                                        Rectangle()
+                                            .fill(OuraTheme.Colors.border)
+                                            .frame(width: 2, height: 14)
+                                            .clipShape(Capsule())
+                                        Text(group.sizeLabel)
+                                            .font(.system(size: 13, weight: .medium))
+                                            .foregroundStyle(OuraTheme.Colors.textPrimary)
+                                        if group.needsSetup {
+                                            Image(systemName: "star.fill")
+                                                .font(.system(size: 9))
+                                                .foregroundStyle(OuraTheme.Colors.warningText)
+                                        }
+                                        if group.isAnyHabis {
+                                            OuraTag(text: "Habis",
+                                                    color: OuraTheme.Colors.dangerText,
+                                                    bg: OuraTheme.Colors.dangerBg)
+                                        } else if group.isAnyMenipis {
+                                            OuraTag(text: "Menipis",
+                                                    color: OuraTheme.Colors.warningText,
+                                                    bg: OuraTheme.Colors.warningBg)
+                                        }
+                                        if group.displayVariants.count > 1 {
+                                            Text("\(group.displayVariants.count) varian")
+                                                .font(.system(size: 11))
+                                                .foregroundStyle(OuraTheme.Colors.textTertiary)
+                                        }
                                     }
-                                    if group.isAnyHabis {
-                                        OuraTag(text: "Habis",
-                                                color: OuraTheme.Colors.dangerText,
-                                                bg: OuraTheme.Colors.dangerBg)
-                                    } else if group.isAnyMenipis {
-                                        OuraTag(text: "Menipis",
-                                                color: OuraTheme.Colors.warningText,
-                                                bg: OuraTheme.Colors.warningBg)
-                                    }
-                                    if group.displayVariants.count > 1 {
-                                        Text("\(group.displayVariants.count) varian")
+                                    Spacer()
+                                    VStack(alignment: .trailing, spacing: 1) {
+                                        if let price = group.lowestPrice {
+                                            Text(price.rupiahFormatted)
+                                                .font(.system(size: 13, weight: .semibold))
+                                                .foregroundStyle(OuraTheme.Colors.textPrimary)
+                                        } else {
+                                            Text("Belum ada harga")
+                                                .font(.system(size: 11, weight: .medium))
+                                                .foregroundStyle(OuraTheme.Colors.warningText)
+                                        }
+                                        Text("\(group.totalStock) pcs")
                                             .font(.system(size: 11))
                                             .foregroundStyle(OuraTheme.Colors.textTertiary)
                                     }
                                 }
-                                Spacer()
-                                VStack(alignment: .trailing, spacing: 1) {
-                                    if let price = group.lowestPrice {
-                                        Text(price.rupiahFormatted)
-                                            .font(.system(size: 13, weight: .semibold))
-                                            .foregroundStyle(OuraTheme.Colors.textPrimary)
-                                    } else {
-                                        Text("Belum ada harga")
-                                            .font(.system(size: 11, weight: .medium))
-                                            .foregroundStyle(OuraTheme.Colors.warningText)
-                                    }
-                                    Text("\(group.totalStock) pcs")
-                                        .font(.system(size: 11))
-                                        .foregroundStyle(OuraTheme.Colors.textTertiary)
-                                }
+                                .padding(.horizontal, OuraTheme.Spacing.cardPad)
+                                .padding(.vertical, 9)
                             }
-                            .padding(.horizontal, OuraTheme.Spacing.cardPad)
-                            .padding(.vertical, 9)
-                        }
-                        .buttonStyle(.plain)
+                            .buttonStyle(.plain)
 
-                        if group.id != groups.last?.id {
-                            Divider()
-                                .padding(.leading, OuraTheme.Spacing.cardPad + 18)
-                                .overlay(OuraTheme.Colors.separator)
+                            if group.id != groups.last?.id {
+                                Divider()
+                                    .padding(.leading, OuraTheme.Spacing.cardPad + 18)
+                                    .overlay(OuraTheme.Colors.separator)
+                            }
                         }
                     }
                 }
             }
+        } // End of Group
         .ouraCard()
         .padding(.horizontal, OuraTheme.Spacing.horizontal)
-        }
     }
 }
