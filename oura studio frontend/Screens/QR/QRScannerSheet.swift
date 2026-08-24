@@ -52,6 +52,8 @@ struct QRScannerSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     let mode: QRScanMode
+    // NEW: Closure to pass scanned items back to the parent sheet (e.g., TambahPenjualanSheet)
+    var onItemsAdded: (([ProductSizeDetail], [Int]) -> Void)? = nil
 
     @State private var scanState: ScanState = .scanning
     @State private var showSellSheet = false
@@ -109,6 +111,10 @@ struct QRScannerSheet: View {
                 cartItems: $cartItems,
                 onSuccess: {
                     appState.dashboardNeedsRefresh = true
+                    // NEW: Pass the scanned items back to the parent sheet
+                    let sizes = cartItems.map { $0.size }
+                    let quantities = cartItems.map { $0.qty }
+                    onItemsAdded?(sizes, quantities)
                     dismiss()
                 }
             )
@@ -586,10 +592,11 @@ private struct QRCartCheckoutSheet: View {
                 }
                 .listSectionSeparator(.hidden)
 
-                if cartItems.contains(where: { $0.size.latestHppBreakdown == nil }) {
+                // NEW: HPP warning banner
+                if cartItems.contains(where: { $0.size.effectiveHppBreakdown == nil }) {
                     Section {
                         Label {
-                            Text("Satu atau lebih produk belum punya riwayat batch produksi. Profit akan dihitung dari estimasi resep pola, bukan HPP aktual.")
+                            Text("Satu atau lebih produk belum punya HPP. Profit akan dihitung dari estimasi resep pola atau 0.")
                                 .font(.system(size: 12))
                                 .foregroundStyle(OuraTheme.Colors.textSecondary)
                         } icon: {

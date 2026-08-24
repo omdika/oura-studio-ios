@@ -17,7 +17,7 @@ struct TambahPenjualanSheet: View {
     @State private var isSaving = false
     @State private var errorMsg: String?
     @State private var stockAdjustTarget: SaleItem? = nil
-    @State private var showQRScanner = false // NEW: State for QR scanner sheet
+    @State private var showQRScanner = false
 
     private struct SaleItem: Identifiable {
         let id = UUID()
@@ -102,7 +102,7 @@ struct TambahPenjualanSheet: View {
                 }
                 .listRowBackground(OuraTheme.Colors.surfaceCard)
 
-                // NEW: Scan QR button
+                // Scan QR button
                 Button { showQRScanner = true } label: {
                     Label("Scan QR", systemImage: "qrcode.viewfinder")
                         .font(.system(size: 14, weight: .medium))
@@ -170,10 +170,29 @@ struct TambahPenjualanSheet: View {
             }
             .environmentObject(api)
         }
-        // NEW: QR Scanner Sheet
+        // MODIFIED: Pass onItemsAdded closure to QRScannerSheet
         .sheet(isPresented: $showQRScanner, onDismiss: { Task { await loadSizes() } }) {
-            QRScannerSheet(mode: .sellOnly)
-                .environmentObject(api)
+            QRScannerSheet(mode: .sellOnly) { scannedSizes, scannedQuantities in
+                for (index, size) in scannedSizes.enumerated() {
+                    let qty = scannedQuantities[index]
+                    // Check if item already exists in the list, update quantity if so
+                    if let existingIndex = items.firstIndex(where: { $0.sizeId == size.id }) {
+                        items[existingIndex].qty = Double(Int(items[existingIndex].qty ?? 0) + qty)
+                    } else {
+                        // Add new item
+                        items.append(SaleItem(
+                            sizeId: size.id,
+                            productSku: size.productSku,
+                            displayName: "\(size.productName) · \(size.displayLabel)",
+                            maxQty: size.currentStockQty,
+                            qty: Double(qty),
+                            unitPrice: size.sellingPrice,
+                            discount: nil
+                        ))
+                    }
+                }
+            }
+            .environmentObject(api)
         }
 
         NavigationStack {
