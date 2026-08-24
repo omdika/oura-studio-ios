@@ -8,7 +8,7 @@ struct ProdukListView: View {
     @State private var isLoading = true
     @State private var searchText: String = ""
     @State private var showAddProduct = false
-    @State private var showQRScanner = false
+    @State private var showQRScanner = false // Existing state for QR scanner
     @State private var showQRGenerator = false
     // Set right after "Simpan Tanpa Resep" creates a product with no price/stock/HPP yet — drives
     // an auto-navigation into ProdukDetailView so the user can pick which size(s) to fill in.
@@ -85,7 +85,8 @@ struct ProdukListView: View {
                     }
             }
         }
-        .sheet(isPresented: $showQRScanner) {
+        // MODIFIED: Added onDismiss to reload data
+        .sheet(isPresented: $showQRScanner, onDismiss: { Task { await load() } }) {
             QRScannerSheet(mode: .stockInOnly)
                 .environmentObject(api)
         }
@@ -226,7 +227,7 @@ private struct ProductGroupRow: View {
                                         .foregroundStyle(OuraTheme.Colors.textPrimary)
                                     if group.needsSetup {
                                         Image(systemName: "star.fill")
-                                            .font(.system(size: 8))
+                                            .font(.system(size: 9))
                                             .foregroundStyle(OuraTheme.Colors.warningText)
                                     }
                                     if group.isAnyHabis {
@@ -273,8 +274,8 @@ private struct ProductGroupRow: View {
                     }
                 }
             }
-        }
         .ouraCard()
+        .padding(.horizontal, OuraTheme.Spacing.horizontal)
+        }
     }
 }
-

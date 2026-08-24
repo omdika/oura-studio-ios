@@ -17,6 +17,7 @@ struct TambahPenjualanSheet: View {
     @State private var isSaving = false
     @State private var errorMsg: String?
     @State private var stockAdjustTarget: SaleItem? = nil
+    @State private var showQRScanner = false // NEW: State for QR scanner sheet
 
     private struct SaleItem: Identifiable {
         let id = UUID()
@@ -100,6 +101,15 @@ struct TambahPenjualanSheet: View {
                         .foregroundStyle(OuraTheme.Colors.accent)
                 }
                 .listRowBackground(OuraTheme.Colors.surfaceCard)
+
+                // NEW: Scan QR button
+                Button { showQRScanner = true } label: {
+                    Label("Scan QR", systemImage: "qrcode.viewfinder")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(OuraTheme.Colors.accent)
+                }
+                .listRowBackground(OuraTheme.Colors.surfaceCard)
+
             } header: { OuraSectionHeader(title: "Produk Dijual") }
             .listSectionSeparator(.hidden)
 
@@ -160,6 +170,11 @@ struct TambahPenjualanSheet: View {
             }
             .environmentObject(api)
         }
+        // NEW: QR Scanner Sheet
+        .sheet(isPresented: $showQRScanner, onDismiss: { Task { await loadSizes() } }) {
+            QRScannerSheet(mode: .sellOnly)
+                .environmentObject(api)
+        }
 
         NavigationStack {
             content
@@ -210,18 +225,22 @@ struct TambahPenjualanSheet: View {
                     Text("Qty")
                         .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(OuraTheme.Colors.textSecondary)
-                    HStack(spacing: 0) {
+                    HStack(spacing: 0) { // This HStack is the stepper container
                         Button {
                             let cur = Int(item.wrappedValue.qty ?? 1)
                             if cur > 1 { item.wrappedValue.qty = Double(cur - 1) }
                         } label: {
-                            Image(systemName: "chevron.down")
-                                .font(.system(size: 10, weight: .semibold))
-                                .foregroundStyle(OuraTheme.Colors.accent)
-                                .frame(width: 26, height: 40)
+                            Image(systemName: "minus") // Changed icon
+                                .font(.system(size: 12, weight: .semibold)) // Adjusted font size
+                                .foregroundStyle(OuraTheme.Colors.textPrimary) // Adjusted color
+                                .frame(width: 28, height: 28) // Adjusted frame
                                 .contentShape(Rectangle())
                         }
                         .buttonStyle(.borderless)
+
+                        Divider()
+                            .frame(width: 1, height: 20) // Thin vertical divider
+                            .overlay(OuraTheme.Colors.separator)
 
                         TextField("", text: Binding(
                             get: { item.wrappedValue.qty.map { "\(Int($0))" } ?? "" },
@@ -235,22 +254,27 @@ struct TambahPenjualanSheet: View {
                         ))
                         .keyboardType(.numberPad)
                         .multilineTextAlignment(.center)
-                        .font(.system(size: 15))
+                        .font(.system(size: 15, weight: .semibold)) // Added weight for quantity text
                         .foregroundStyle(OuraTheme.Colors.textPrimary)
-                        .frame(width: 32)
+                        .frame(minWidth: 32) // Let it expand a bit more
+
+                        Divider()
+                            .frame(width: 1, height: 20) // Thin vertical divider
+                            .overlay(OuraTheme.Colors.separator)
 
                         Button {
                             let cur = Int(item.wrappedValue.qty ?? 0)
                             item.wrappedValue.qty = Double(cur + 1)
                         } label: {
-                            Image(systemName: "chevron.up")
-                                .font(.system(size: 10, weight: .semibold))
-                                .foregroundStyle(OuraTheme.Colors.accent)
-                                .frame(width: 26, height: 40)
+                            Image(systemName: "plus") // Changed icon
+                                .font(.system(size: 12, weight: .semibold)) // Adjusted font size
+                                .foregroundStyle(OuraTheme.Colors.textPrimary) // Adjusted color
+                                .frame(width: 28, height: 28) // Adjusted frame
                                 .contentShape(Rectangle())
                         }
                         .buttonStyle(.borderless)
                     }
+                    .frame(width: 120) // Fixed width for the stepper control
                     .background(OuraTheme.Colors.surfaceSheet)
                     .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.medium))
                     .overlay(
