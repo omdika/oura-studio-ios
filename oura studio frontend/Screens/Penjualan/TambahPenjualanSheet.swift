@@ -17,6 +17,7 @@ struct TambahPenjualanSheet: View {
     @State private var isSaving = false
     @State private var errorMsg: String?
     @State private var stockAdjustTarget: SaleItem? = nil
+    @State private var showQRScannerForAddItem = false // NEW: State for QR scanner sheet
 
     private struct SaleItem: Identifiable {
         let id = UUID()
@@ -94,12 +95,28 @@ struct TambahPenjualanSheet: View {
                     itemCard(item: $item)
                 }
 
-                Button { showProductPicker = true } label: {
-                    Label("Tambah Produk", systemImage: "plus.circle.fill")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(OuraTheme.Colors.accent)
+                // NEW: HStack to contain both "Tambah Produk" and "Scan QR" buttons
+                HStack {
+                    Button { showProductPicker = true } label: {
+                        Label("Tambah Produk", systemImage: "plus.circle.fill")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(OuraTheme.Colors.accent)
+                            .frame(maxWidth: .infinity, alignment: .leading) // Make it take available space
+                    }
+                    .buttonStyle(.plain) // Ensure it behaves like a normal button within HStack
+
+                    Button { showQRScannerForAddItem = true } label: { // NEW QR Button
+                        Image(systemName: "qrcode.viewfinder")
+                            .font(.system(size: 18))
+                            .foregroundStyle(OuraTheme.Colors.accent)
+                            .frame(width: 44, height: 44) // Fixed size for the icon button
+                            .background(OuraTheme.Colors.accentLight)
+                            .clipShape(Circle())
+                    }
+                    .buttonStyle(.plain) // Ensure it behaves like a normal button
                 }
-                .listRowBackground(OuraTheme.Colors.surfaceCard)
+                .listRowBackground(OuraTheme.Colors.surfaceCard) // Apply to HStack
+                .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16)) // Apply to HStack
             } header: { OuraSectionHeader(title: "Produk Dijual") }
             .listSectionSeparator(.hidden)
 
@@ -157,6 +174,21 @@ struct TambahPenjualanSheet: View {
                 if let idx = items.firstIndex(where: { $0.id == target.id }) {
                     items[idx].maxQty = newQty
                 }
+            }
+            .environmentObject(api)
+        }
+        // NEW: Sheet for QR Scanner
+        .sheet(isPresented: $showQRScannerForAddItem) {
+            QRScannerSheet(mode: .any) { scannedSize in
+                items.append(SaleItem(
+                    sizeId: scannedSize.id,
+                    productSku: scannedSize.productSku,
+                    displayName: "\(scannedSize.productName) · \(scannedSize.displayLabel)",
+                    maxQty: scannedSize.currentStockQty,
+                    qty: 1,
+                    unitPrice: scannedSize.sellingPrice,
+                    discount: nil
+                ))
             }
             .environmentObject(api)
         }
