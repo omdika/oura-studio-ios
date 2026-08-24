@@ -457,12 +457,7 @@ struct QRScannerSheet: View {
     }
 
     private func addToCart(_ size: ProductSizeDetail) {
-        guard size.currentStockQty >= 1 else {
-            cartToast = "Stok habis — \(size.productName) belum diisi stok"
-            scanState = .scanning
-            scheduleToastDismiss()
-            return
-        }
+        // Check if item already exists in cart
         if let idx = cartItems.firstIndex(where: { $0.size.id == size.id }) {
             let newQty = cartItems[idx].qty + 1
             guard newQty <= size.currentStockQty else {
@@ -474,6 +469,13 @@ struct QRScannerSheet: View {
             cartItems[idx].qty = newQty
             cartToast = "\(size.productName) · \(size.displayLabel) (\(newQty)×)"
         } else {
+            // New item, check initial stock
+            guard size.currentStockQty >= 1 else {
+                cartToast = "Stok habis — \(size.productName) belum diisi stok"
+                scanState = .scanning
+                scheduleToastDismiss()
+                return
+            }
             cartItems.append(CartItem(size: size))
             cartToast = "\(size.productName) · \(size.displayLabel) ditambahkan"
         }
