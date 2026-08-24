@@ -1,0 +1,416 @@
+import SwiftUI
+
+struct TambahPenjualanSheet: View {
+    @EnvironmentObject private var api: APIService
+    @EnvironmentObject private var appState: AppState
+    @Environment(\.dismiss) private var dismiss
+
+    var onSave: (() -> Void)? = nil
+
+    @State private var availableSizes: [ProductSizeDetail] = []
+    @State private var customerName: String = ""
+    @State private var selectedMethod: PaymentMethod = .cash
+    @State private var marketplaceFeePct: Double? = nil
+    @State private var items: [SaleItem] = []
+    @State private var isOrderPaid: Bool = true
+    @State private var showProductPicker = false
+    @State private var isSaving = false
+    @State private var errorMsg: String?
+    @State private var stockAdjustTarget: SaleItem? = nil
+
+    private struct SaleItem: Identifiable {
+        let id = UUID()
+        var sizeId: UUID
+        var productSku: String
+        var displayName: String
+        var maxQty: Int
+        var qty: Double? = 1
+        var unitPrice: Double? = nil
+        var discount: Double? = nil
+    }
+
+    private var selectedSizeIds: Set<UUID> { Set(items.map { $0.sizeId }) }
+
+    private var totalRevenue: Double {
+        items.reduce(0.0) { sum, item in
+            let price = (item.unitPrice ?? 0) - (item.discount ?? 0)
+            return sum + price * (item.qty ?? 1)
+        }
+    }
+
+    private var canSave: Bool {
+        !items.isEmpty &&
+        items.allSatisfy {
+            let qty = Int($0.qty ?? 0)
+            return qty > 0 && qty <= $0.maxQty && ($0.unitPrice ?? 0) > 0
+        }
+    }
+
+    var body: some View {
+        let content = Form {
+            Section {
+                TextField("Nama pelanggan (opsional)", text: $customerName)
+                    .listRowBackground(OuraTheme.Colors.surfaceCard)
+
+                Picker("Pembayaran", selection: $selectedMethod) {
+                    ForEach(PaymentMethod.allCases, id: \.rawValue) {
+                        Text($0.displayName).tag($0)
+                    }
+                }
+                .tint(OuraTheme.Colors.accent)
+                .listRowBackground(OuraTheme.Colors.surfaceCard)
+
+                if selectedMethod == .marketplace {
+                    NumericInputField(label: "Fee Marketplace (%)", value: $marketplaceFeePct, unit: "%")
+                        .listRowBackground(OuraTheme.Colors.surfaceCard)
+                        .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
+                }
+
+                Toggle(isOn: $isOrderPaid) {
+                    HStack(spacing: 6) {
+                        Image(systemName: isOrderPaid ? "checkmark.circle.fill" : "circle")
+                            .foregroundStyle(isOrderPaid ? OuraTheme.Colors.greenAccent : OuraTheme.Colors.textTertiary)
+                            .font(.system(size: 15))
+                        Text("Sudah Lunas")
+                            .font(.system(size: 15))
+                            .foregroundStyle(OuraTheme.Colors.textPrimary)
+                    }
+                }
+                .tint(OuraTheme.Colors.greenAccent)
+                .listRowBackground(OuraTheme.Colors.surfaceCard)
+            } header: { OuraSectionHeader(title: "Info Penjualan") }
+            .listSectionSeparator(.hidden)
+
+            Section {
+                if items.isEmpty {
+                    Text("Belum ada produk ditambahkan.")
+                        .font(.system(size: 13))
+                        .foregroundStyle(OuraTheme.Colors.textSecondary)
+                        .listRowBackground(OuraTheme.Colors.background)
+                        .listRowInsets(EdgeInsets(top: 12, leading: 16, bottom: 12, trailing: 16))
+                }
+
+                ForEach($items) { $item in
+                    itemCard(item: $item)
+                }
+
+                Button { showProductPicker = true } label: {
+                    Label("Tambah Produk", systemImage: "plus.circle.fill")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(OuraTheme.Colors.accent)
+                }
+                .listRowBackground(OuraTheme.Colors.surfaceCard)
+            } header: { OuraSectionHeader(title: "Produk Dijual") }
+            .listSectionSeparator(.hidden)
+
+            if totalRevenue > 0 {
+                Section {
+                    HStack {
+                        Text("Total Pendapatan")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(OuraTheme.Colors.textPrimary)
+                        Spacer()
+                        Text(totalRevenue.rupiahFormatted)
+                            .font(.system(size: 17, weight: .bold))
+                            .foregroundStyle(OuraTheme.Colors.accent)
+                    }
+                    .listRowBackground(OuraTheme.Colors.surfaceCard)
+                } header: { OuraSectionHeader(title: "Ringkasan") }
+                .listSectionSeparator(.hidden)
+            }
+
+            if let err = errorMsg {
+                Section {
+                    Text(err)
+                        .font(.system(size: 13))
+                        .foregroundStyle(OuraTheme.Colors.dangerText)
+                        .listRowBackground(OuraTheme.Colors.dangerBg)
+                }
+            }
+        }
+        .scrollContentBackground(.hidden)
+        .background(OuraTheme.Colors.background)
+        .task { await loadSizes() }
+        .sheet(isPresented: $showProductPicker) {
+            ProductPickerSheet( // ProductPickerSheet sekarang public
+                sizes: availableSizes,
+                alreadySelected: selectedSizeIds
+            ) { size in
+                items.append(SaleItem(
+                    sizeId: size.id,
+                    productSku: size.productSku,
+                    displayName: "\(size.productName) · \(size.displayLabel)",
+                    maxQty: size.currentStockQty,
+                    qty: 1,
+                    unitPrice: size.sellingPrice,
+                    discount: nil
+                ))
+            }
+        }
+        .sheet(item: $stockAdjustTarget) { target in
+            QuickAdjustStokSheet(
+                sizeId: target.sizeId,
+                productSku: target.productSku,
+                displayName: target.displayName,
+                currentStock: target.maxQty
+            ) { newQty in
+                if let idx = items.firstIndex(where: { $0.id == target.id }) {
+                    items[idx].maxQty = newQty
+                }
+            }
+            .environmentObject(api)
+        }
+
+        NavigationStack {
+            content
+                .navigationTitle("Catat Penjualan")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Batal") { dismiss() }.foregroundStyle(OuraTheme.Colors.accent)
+                    }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Simpan") { Task { await save() } }
+                            .foregroundStyle(canSave ? OuraTheme.Colors.accent : OuraTheme.Colors.textDisabled)
+                            .disabled(!canSave || isSaving)
+                    }
+                }
+        }
+    }
+
+    @ViewBuilder
+    private func itemCard(item: Binding<SaleItem>) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(item.wrappedValue.displayName)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(OuraTheme.Colors.textPrimary)
+                    HStack(spacing: 4) {
+                        Image(systemName: "cube.box")
+                            .font(.system(size: 10))
+                        Text("Tersedia: \(item.wrappedValue.maxQty) pcs")
+                            .font(.system(size: 12))
+                    }
+                    .foregroundStyle(OuraTheme.Colors.textTertiary)
+                }
+                Spacer()
+                Button {
+                    items.removeAll { $0.id == item.wrappedValue.id }
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 20))
+                        .foregroundStyle(OuraTheme.Colors.textTertiary)
+                }
+                .buttonStyle(.borderless)
+            }
+
+            HStack(alignment: .top, spacing: 10) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Qty")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(OuraTheme.Colors.textSecondary)
+                    HStack(spacing: 0) {
+                        Button {
+                            let cur = Int(item.wrappedValue.qty ?? 1)
+                            if cur > 1 { item.wrappedValue.qty = Double(cur - 1) }
+                        } label: {
+                            Image(systemName: "chevron.down")
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundStyle(OuraTheme.Colors.accent)
+                                .frame(width: 26, height: 40)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.borderless)
+
+                        TextField("", text: Binding(
+                            get: { item.wrappedValue.qty.map { "\(Int($0))" } ?? "" },
+                            set: { str in
+                                if let v = Int(str), v > 0 {
+                                    item.wrappedValue.qty = Double(v)
+                                } else if str.isEmpty {
+                                    item.wrappedValue.qty = nil
+                                }
+                            }
+                        ))
+                        .keyboardType(.numberPad)
+                        .multilineTextAlignment(.center)
+                        .font(.system(size: 15))
+                        .foregroundStyle(OuraTheme.Colors.textPrimary)
+                        .frame(width: 32)
+
+                        Button {
+                            let cur = Int(item.wrappedValue.qty ?? 0)
+                            item.wrappedValue.qty = Double(cur + 1)
+                        } label: {
+                            Image(systemName: "chevron.up")
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundStyle(OuraTheme.Colors.accent)
+                                .frame(width: 26, height: 40)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.borderless)
+                    }
+                    .background(OuraTheme.Colors.surfaceSheet)
+                    .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.medium))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: OuraTheme.Radius.medium)
+                            .stroke(OuraTheme.Colors.border, lineWidth: 1)
+                    )
+                }
+                .frame(maxWidth: 90)
+
+                CurrencyInputField(label: "Harga Satuan", value: item.unitPrice)
+                CurrencyInputField(label: "Diskon", value: item.discount)
+                    .frame(maxWidth: 100)
+            }
+
+            // Over-stock warning
+            if let qty = item.wrappedValue.qty, Int(qty) > item.wrappedValue.maxQty {
+                HStack(spacing: 6) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 11))
+                        .foregroundStyle(OuraTheme.Colors.warningText)
+                    Text("Stok tidak cukup (tersedia \(item.wrappedValue.maxQty) pcs)")
+                        .font(.system(size: 12))
+                        .foregroundStyle(OuraTheme.Colors.warningText)
+                    Spacer()
+                    Button("Tambah Stok") {
+                        stockAdjustTarget = item.wrappedValue
+                    }
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(OuraTheme.Colors.accent)
+                    .buttonStyle(.borderless)
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 7)
+                .background(OuraTheme.Colors.warningBg)
+                .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.small))
+            }
+        }
+        .listRowBackground(OuraTheme.Colors.surfaceCard)
+        .listRowInsets(EdgeInsets(top: 12, leading: 16, bottom: 12, trailing: 16))
+    }
+
+    private func loadSizes() async {
+        let all = (try? await api.getAllProductSizes()) ?? []
+        availableSizes = all.filter { !$0.isArchived && $0.currentStockQty > 0 }
+    }
+
+    private func save() async {
+        isSaving = true; errorMsg = nil; defer { isSaving = false }
+        let reqItems = items.compactMap { item -> CreateSalesOrderRequest.ItemInput? in
+            guard let qty = item.qty, qty > 0, Int(qty) <= item.maxQty,
+                  let price = item.unitPrice, price > 0
+            else { return nil }
+            return CreateSalesOrderRequest.ItemInput(
+                productSizeId: item.sizeId,
+                qty: Int(qty),
+                unitPrice: price,
+                discount: item.discount
+            )
+        }
+        let req = CreateSalesOrderRequest(
+            customerName: customerName.isEmpty ? nil : customerName,
+            paymentMethod: selectedMethod.rawValue,
+            marketplaceFeePct: selectedMethod == .marketplace ? marketplaceFeePct.map { $0 / 100 } : nil,
+            items: reqItems
+        )
+        do {
+            let order = try await api.createSalesOrder(req)
+            if isOrderPaid { _ = try? await api.markSalesOrderPaid(id: order.id) }
+            onSave?()
+            appState.dashboardNeedsRefresh = true
+            dismiss()
+        } catch let e as APIError { errorMsg = e.errorDescription }
+        catch { errorMsg = error.localizedDescription }
+    }
+}
+
+// MARK: - Quick stock adjustment sheet
+
+private struct QuickAdjustStokSheet: View {
+    @EnvironmentObject private var api: APIService
+    @Environment(\.dismiss) private var dismiss
+
+    let sizeId: UUID
+    let productSku: String
+    let displayName: String
+    let currentStock: Int
+    let onSuccess: (Int) -> Void
+
+    @State private var addQty: Double? = nil
+    @State private var isSaving = false
+    @State private var errorMsg: String? = nil
+
+    private var addQtyInt: Int { Int(addQty ?? 0) }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    LabeledContent("Produk", value: displayName)
+                        .listRowBackground(OuraTheme.Colors.surfaceCard)
+                    LabeledContent("Stok saat ini") {
+                        Text("\(currentStock) pcs")
+                            .foregroundStyle(OuraTheme.Colors.textPrimary)
+                    }
+                    .listRowBackground(OuraTheme.Colors.surfaceCard)
+                } header: { OuraSectionHeader(title: "Info Stok") }
+
+                Section {
+                    NumericInputField(label: "Jumlah yang ditambah (pcs)", value: $addQty)
+                        .listRowBackground(OuraTheme.Colors.surfaceCard)
+                        .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
+                } header: { OuraSectionHeader(title: "Tambah Stok") }
+                  footer: {
+                      if addQtyInt > 0 {
+                          Text("Stok baru: \(currentStock + addQtyInt) pcs")
+                              .font(.system(size: 12))
+                              .foregroundStyle(OuraTheme.Colors.textSecondary)
+                      }
+                  }
+
+                if let err = errorMsg {
+                    Section {
+                        Text(err)
+                            .font(.system(size: 13))
+                            .foregroundStyle(OuraTheme.Colors.dangerText)
+                            .listRowBackground(OuraTheme.Colors.dangerBg)
+                    }
+                }
+            }
+            .scrollContentBackground(.hidden)
+            .background(OuraTheme.Colors.background)
+            .navigationTitle("Tambah Stok")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Batal") { dismiss() }.foregroundStyle(OuraTheme.Colors.accent)
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Simpan") { Task { await save() } }
+                        .foregroundStyle(addQtyInt > 0 && !isSaving ? OuraTheme.Colors.accent : OuraTheme.Colors.textDisabled)
+                        .disabled(addQtyInt <= 0 || isSaving)
+                }
+            }
+        }
+        .presentationDetents([.medium])
+    }
+
+    private func save() async {
+        guard addQtyInt > 0 else { return }
+        isSaving = true; errorMsg = nil; defer { isSaving = false }
+        do {
+            let updated = try await api.adjustStock(
+                sku: productSku,
+                sizeId: sizeId,
+                qty: addQtyInt,
+                reason: "sales_adjustment"
+            )
+            onSuccess(updated.currentStockQty)
+            dismiss()
+        } catch let e as APIError { errorMsg = e.errorDescription }
+        catch { errorMsg = error.localizedDescription }
+    }
+}
