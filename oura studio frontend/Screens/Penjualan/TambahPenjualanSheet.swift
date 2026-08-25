@@ -20,7 +20,7 @@ struct TambahPenjualanSheet: View {
 
     // MARK: - QR Scan additions
     @State private var showQRScanner = false
-    @State private var scanToast: String? = nil
+    @State private var scanToast: ToastMessage? = nil // Changed to ToastMessage
 
     private struct SaleItem: Identifiable {
         let id = UUID()
@@ -212,10 +212,10 @@ struct TambahPenjualanSheet: View {
                 VStack {
                     if let toast = scanToast {
                         HStack(spacing: 8) {
-                            Image(systemName: "checkmark.circle.fill")
+                            Image(systemName: toast.iconName) // Dynamic icon
                                 .font(.system(size: 14))
-                                .foregroundStyle(OuraTheme.Colors.greenAccent)
-                            Text(toast)
+                                .foregroundStyle(toast.iconColor) // Dynamic color
+                            Text(toast.text)
                                 .font(.system(size: 14, weight: .medium))
                                 .foregroundStyle(.white)
                         }
@@ -357,7 +357,11 @@ struct TambahPenjualanSheet: View {
     private func handleScannedProduct(_ size: ProductSizeDetail) {
         // Check stock availability
         guard size.currentStockQty > 0 else {
-            scanToast = "Stok habis untuk \(size.displayLabel)"
+            scanToast = ToastMessage(
+                text: "Stok habis untuk \(size.displayLabel)",
+                iconName: "xmark.circle.fill", // Red cross for stock out
+                iconColor: OuraTheme.Colors.dangerText
+            )
             scheduleToastDismiss()
             return
         }
@@ -367,9 +371,17 @@ struct TambahPenjualanSheet: View {
             let currentQty = Int(items[index].qty ?? 0)
             if currentQty < size.currentStockQty {
                 items[index].qty = Double(currentQty + 1)
-                scanToast = "Kuantitas \(size.displayLabel) bertambah (\(currentQty + 1)×)"
+                scanToast = ToastMessage(
+                    text: "Kuantitas \(size.displayLabel) bertambah (\(currentQty + 1)×)",
+                    iconName: "checkmark.circle.fill", // Green checkmark for success
+                    iconColor: OuraTheme.Colors.greenAccent
+                )
             } else {
-                scanToast = "Stok penuh untuk \(size.displayLabel) (\(size.currentStockQty) pcs)"
+                scanToast = ToastMessage(
+                    text: "Stok penuh untuk \(size.displayLabel) (\(size.currentStockQty) pcs)",
+                    iconName: "xmark.circle.fill", // Red cross for stock full
+                    iconColor: OuraTheme.Colors.dangerText
+                )
             }
         } else {
             // New product, add to list
@@ -382,7 +394,11 @@ struct TambahPenjualanSheet: View {
                 unitPrice: size.sellingPrice,
                 discount: nil
             ))
-            scanToast = "\(size.productName) · \(size.displayLabel) ditambahkan"
+            scanToast = ToastMessage(
+                text: "\(size.productName) · \(size.displayLabel) ditambahkan",
+                iconName: "checkmark.circle.fill", // Green checkmark for success
+                iconColor: OuraTheme.Colors.greenAccent
+            )
         }
         scheduleToastDismiss()
     }
@@ -639,4 +655,12 @@ private struct ProductPickerSheet: View {
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
     }
+}
+
+// MARK: - Toast Message Struct
+private struct ToastMessage: Identifiable {
+    let id = UUID()
+    let text: String
+    let iconName: String
+    let iconColor: Color
 }
