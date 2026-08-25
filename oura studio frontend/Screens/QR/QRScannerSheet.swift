@@ -62,6 +62,7 @@ struct QRScannerSheet: View {
 
     // Cart mode (sellOnly)
     @State private var cartItems: [CartItem] = []
+    @State private var showCheckoutSheet = false // Pastikan deklarasi ini ada
     @State private var cartToast: String? = nil
 
     private var isScanning: Bool {
@@ -747,12 +748,12 @@ private struct CartItemRowView: View {
     @FocusState private var priceFocused: Bool
 
     private var displayPrice: String {
-        guard !priceDigits.isEmpty, let num = Double(priceDigits) else { return "" }
+        guard !priceDigits.isEmpty, let num = Double(digits.replacingOccurrences(of: ".", with: "")) else { return "" }
         let fmt = NumberFormatter()
         fmt.numberStyle = .decimal
         fmt.groupingSeparator = "."
         fmt.maximumFractionDigits = 0
-        return fmt.string(from: NSNumber(value: num)) ?? priceDigits
+        return fmt.string(from: NSNumber(value: num)) ?? digits
     }
 
     var body: some View {
