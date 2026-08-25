@@ -24,7 +24,7 @@ enum APIError: LocalizedError {
 class APIService: ObservableObject {
     static let shared = APIService()
 
-    var baseURL: String = "https://oura-backend-seoul-763614853578.asia-northeast3.run.app/api/v1"
+    var baseURL: String = "https://ourastudiobackendseoul-763614853578.asia-northeast3.run.app/api/v1"
     var authToken: String? = nil
     var useMock: Bool = false
     var onUnauthorized: (() -> Void)? = nil

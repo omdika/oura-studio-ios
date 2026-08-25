@@ -52,6 +52,12 @@ struct QRScannerSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     let mode: QRScanMode
+    var onSelect: ((ProductSizeDetail) -> Void)? = nil
+
+    init(mode: QRScanMode, onSelect: ((ProductSizeDetail) -> Void)? = nil) {
+        self.mode = mode
+        self.onSelect = onSelect
+    }
 
     @State private var scanState: ScanState = .scanning
     @State private var showSellSheet = false
@@ -446,7 +452,10 @@ struct QRScannerSheet: View {
     private func resolve(_ id: UUID) async {
         do {
             let size = try await api.getProductSizeById(id: id)
-            if mode == .sellOnly {
+            if let onSelect = onSelect {
+                onSelect(size)
+                dismiss()
+            } else if mode == .sellOnly {
                 addToCart(size)
             } else {
                 scanState = .resolved(size)

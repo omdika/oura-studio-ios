@@ -14,6 +14,7 @@ struct TambahPenjualanSheet: View {
     @State private var items: [SaleItem] = []
     @State private var isOrderPaid: Bool = true
     @State private var showProductPicker = false
+    @State private var showQRScanner = false
     @State private var isSaving = false
     @State private var errorMsg: String?
     @State private var stockAdjustTarget: SaleItem? = nil
@@ -94,10 +95,22 @@ struct TambahPenjualanSheet: View {
                     itemCard(item: $item)
                 }
 
-                Button { showProductPicker = true } label: {
-                    Label("Tambah Produk", systemImage: "plus.circle.fill")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(OuraTheme.Colors.accent)
+                HStack {
+                    Button { showProductPicker = true } label: {
+                        Label("Tambah Produk", systemImage: "plus.circle.fill")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(OuraTheme.Colors.accent)
+                    }
+                    .buttonStyle(.borderless)
+
+                    Spacer()
+
+                    Button { showQRScanner = true } label: {
+                        Label("Scan QR", systemImage: "qrcode.viewfinder")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(OuraTheme.Colors.accent)
+                    }
+                    .buttonStyle(.borderless)
                 }
                 .listRowBackground(OuraTheme.Colors.surfaceCard)
             } header: { OuraSectionHeader(title: "Produk Dijual") }
@@ -136,16 +149,14 @@ struct TambahPenjualanSheet: View {
                 sizes: availableSizes,
                 alreadySelected: selectedSizeIds
             ) { size in
-                items.append(SaleItem(
-                    sizeId: size.id,
-                    productSku: size.productSku,
-                    displayName: "\(size.productName) · \(size.displayLabel)",
-                    maxQty: size.currentStockQty,
-                    qty: 1,
-                    unitPrice: size.sellingPrice,
-                    discount: nil
-                ))
+                addProductSize(size)
             }
+        }
+        .sheet(isPresented: $showQRScanner) {
+            QRScannerSheet(mode: .sellOnly) { size in
+                addProductSize(size)
+            }
+            .environmentObject(api)
         }
         .sheet(item: $stockAdjustTarget) { target in
             QuickAdjustStokSheet(
@@ -290,6 +301,25 @@ struct TambahPenjualanSheet: View {
         }
         .listRowBackground(OuraTheme.Colors.surfaceCard)
         .listRowInsets(EdgeInsets(top: 12, leading: 16, bottom: 12, trailing: 16))
+    }
+
+    private func addProductSize(_ size: ProductSizeDetail) {
+        if let idx = items.firstIndex(where: { $0.sizeId == size.id }) {
+            let currentQty = Int(items[idx].qty ?? 1)
+            if currentQty < size.currentStockQty {
+                items[idx].qty = Double(currentQty + 1)
+            }
+        } else {
+            items.append(SaleItem(
+                sizeId: size.id,
+                productSku: size.productSku,
+                displayName: "\(size.productName) · \(size.displayLabel)",
+                maxQty: size.currentStockQty,
+                qty: 1,
+                unitPrice: size.sellingPrice,
+                discount: nil
+            ))
+        }
     }
 
     private func loadSizes() async {
