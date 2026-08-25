@@ -50,7 +50,7 @@ private struct CartItem: Identifiable {
 struct QRScannerSheet: View {
     @EnvironmentObject private var api: APIService
     @EnvironmentObject private var appState: AppState
-    @Environment(\.dismiss) private var dismiss
+    @Environment(\.dismiss) private var dismiss // Tambahkan environment dismiss
 
     let mode: QRScanMode
     var onProductScanned: ((ProductSizeDetail) -> Void)? = nil // NEW: Callback for addToExistingSale mode
@@ -491,7 +491,7 @@ struct QRScannerSheet: View {
                 addToCart(size)
             } else if mode == .addToExistingSale { // NEW: Call callback and reset to scanning
                 onProductScanned?(size)
-                scanState = .scanning
+                dismiss() // Dismiss the sheet after scanning and processing
             } else {
                 scanState = .resolved(size)
             }
