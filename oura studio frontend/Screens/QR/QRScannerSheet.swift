@@ -8,6 +8,7 @@ enum QRScanMode {
     case any
     case sellOnly
     case stockInOnly
+    case addToExistingSale // NEW: For adding to an already open sales sheet
 }
 
 // MARK: - Scan State
@@ -52,6 +53,7 @@ struct QRScannerSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     let mode: QRScanMode
+    var onProductScanned: ((ProductSizeDetail) -> Void)? = nil // NEW: Callback for addToExistingSale mode
 
     @State private var scanState: ScanState = .scanning
     @State private var showSellSheet = false
@@ -60,7 +62,6 @@ struct QRScannerSheet: View {
 
     // Cart mode (sellOnly)
     @State private var cartItems: [CartItem] = []
-    @State private var showCheckoutSheet = false
     @State private var cartToast: String? = nil
 
     private var isScanning: Bool {
@@ -85,9 +86,16 @@ struct QRScannerSheet: View {
                     unsupportedView
                 }
 
+                // MARK: - Conditional overlay based on mode
                 if mode == .sellOnly {
                     cartModeOverlay
-                } else {
+                } else if mode == .addToExistingSale { // NEW: Overlay for addToExistingSale mode
+                    VStack {
+                        Spacer()
+                        addToExistingSaleOverlay
+                            .animation(.easeInOut(duration: 0.25), value: scanState)
+                    }
+                } else { // Existing bottomOverlay for .any, .stockInOnly
                     VStack {
                         Spacer()
                         bottomOverlay
@@ -248,6 +256,21 @@ struct QRScannerSheet: View {
         }
     }
 
+    // MARK: - NEW: Overlay for addToExistingSale mode
+    @ViewBuilder
+    private var addToExistingSaleOverlay: some View {
+        switch scanState {
+        case .scanning:
+            scanHintForAddToExistingSale
+        case .resolving:
+            resolvingCard
+        case .error(let msg):
+            errorCard(msg)
+        case .resolved(_): // Resolved state is transient for this mode, immediately goes back to scanning
+            EmptyView()
+        }
+    }
+
     private var scanHint: some View {
         HStack(spacing: 10) {
             Image(systemName: "qrcode.viewfinder")
@@ -256,6 +279,23 @@ struct QRScannerSheet: View {
             Text(mode == .sellOnly
                  ? "Scan QR untuk tambah ke keranjang"
                  : "Arahkan kamera ke QR code produk")
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(OuraTheme.Colors.textPrimary)
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 14)
+        .background(.ultraThinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.large))
+        .padding(.bottom, 44)
+    }
+
+    // MARK: - NEW: Scan hint for addToExistingSale mode
+    private var scanHintForAddToExistingSale: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "qrcode.viewfinder")
+                .font(.system(size: 18))
+                .foregroundStyle(OuraTheme.Colors.accent)
+            Text("Scan QR untuk tambah produk ke penjualan")
                 .font(.system(size: 14, weight: .medium))
                 .foregroundStyle(OuraTheme.Colors.textPrimary)
         }
@@ -448,6 +488,9 @@ struct QRScannerSheet: View {
             let size = try await api.getProductSizeById(id: id)
             if mode == .sellOnly {
                 addToCart(size)
+            } else if mode == .addToExistingSale { // NEW: Call callback and reset to scanning
+                onProductScanned?(size)
+                scanState = .scanning
             } else {
                 scanState = .resolved(size)
             }
