@@ -19,6 +19,19 @@ struct ReportsView: View {
                 .listRowInsets(EdgeInsets(top: 12, leading: 16, bottom: 12, trailing: 16))
                 .listRowSeparatorTint(OuraTheme.Colors.separator)
 
+                NavigationLink(destination: SalesByProductRankingView()) {
+                    reportRow(
+                        icon: "crown.fill",
+                        title: "Ranking Penjualan Produk",
+                        subtitle: "Varian produk paling laris terjual",
+                        color: OuraTheme.Colors.purple,
+                        bg: OuraTheme.Colors.purpleBg
+                    )
+                }
+                .listRowBackground(OuraTheme.Colors.surfaceCard)
+                .listRowInsets(EdgeInsets(top: 12, leading: 16, bottom: 12, trailing: 16))
+                .listRowSeparatorTint(OuraTheme.Colors.separator)
+
                 NavigationLink(destination: MarginRankingView()) {
                     reportRow(
                         icon: "trophy.fill",
@@ -624,5 +637,99 @@ private struct DateRangePickerSheet: View {
         let startOfThisMonth = cal.date(from: cal.dateComponents([.year, .month], from: now)) ?? now
         to = cal.date(byAdding: .day, value: -1, to: startOfThisMonth) ?? now
         from = cal.date(from: cal.dateComponents([.year, .month], from: to)) ?? to
+    }
+}
+
+// MARK: - Sales By Product Ranking
+
+struct SalesByProductRankingView: View {
+    @EnvironmentObject private var api: APIService
+
+    @State private var items: [SalesByProductItem] = []
+    @State private var isLoading = true
+    @State private var errorMsg: String?
+    @State private var fromDate: Date = Calendar.current.date(byAdding: .day, value: -30, to: Date()) ?? Date()
+    @State private var toDate: Date = Date()
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: OuraTheme.Spacing.sectionGap) {
+                VStack(alignment: .leading, spacing: 10) {
+                    OuraSectionHeader(title: "Rentang Waktu")
+                    DateRangeField(from: $fromDate, to: $toDate) {
+                        Task { await load() }
+                    }
+                }
+                .padding(OuraTheme.Spacing.cardPad)
+                .ouraCard()
+
+                if isLoading {
+                    ProgressView().frame(maxWidth: .infinity).padding()
+                } else if let msg = errorMsg {
+                    reportErrorView(icon: "crown.fill", message: msg)
+                } else if items.isEmpty {
+                    reportEmptyView(
+                        icon: "crown.fill",
+                        title: "Belum ada data penjualan",
+                        subtitle: "Data penjualan akan muncul setelah ada pesanan selesai pada periode ini"
+                    )
+                } else {
+                    VStack(spacing: 0) {
+                        ForEach(Array(items.enumerated()), id: \.element.id) { idx, item in
+                            HStack(spacing: 12) {
+                                Text("#\(idx + 1)")
+                                    .font(.system(size: 14, weight: .bold))
+                                    .foregroundStyle(idx < 3 ? OuraTheme.Colors.accent : OuraTheme.Colors.textTertiary)
+                                    .frame(width: 28)
+
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(item.displayLabel)
+                                        .font(.system(size: 14, weight: .semibold))
+                                        .foregroundStyle(OuraTheme.Colors.textPrimary)
+                                    Text("Pendapatan: \(item.revenue.rupiahFormatted) · Profit: \(item.profit.rupiahFormatted)")
+                                        .font(.system(size: 12))
+                                        .foregroundStyle(OuraTheme.Colors.textSecondary)
+                                }
+                                Spacer()
+                                VStack(alignment: .trailing, spacing: 2) {
+                                    Text("\(item.qtySold) unit")
+                                        .font(.system(size: 14, weight: .bold))
+                                        .foregroundStyle(OuraTheme.Colors.accent)
+                                    Text("terjual")
+                                        .font(.system(size: 10))
+                                        .foregroundStyle(OuraTheme.Colors.textTertiary)
+                                }
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 12)
+                            if idx < items.count - 1 {
+                                Divider().padding(.leading, 16).overlay(OuraTheme.Colors.separator)
+                            }
+                        }
+                    }
+                    .ouraCard()
+                }
+            }
+            .padding(.horizontal, OuraTheme.Spacing.horizontal)
+            .padding(.top, 12)
+            .padding(.bottom, 32)
+        }
+        .background(OuraTheme.Colors.background)
+        .navigationTitle("Ranking Penjualan")
+        .navigationBarTitleDisplayMode(.inline)
+        .task { await load() }
+    }
+
+    private func load() async {
+        isLoading = true
+        errorMsg = nil
+        do {
+            items = try await api.getSalesByProduct(from: fromDate, to: toDate)
+        } catch {
+            errorMsg = error.localizedDescription
+            items = []
+            print("🔴 [SalesByProductRanking] error: \(error)")
+        }
+        isLoading = false
     }
 }
