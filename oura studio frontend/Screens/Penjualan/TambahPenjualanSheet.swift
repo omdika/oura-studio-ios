@@ -20,7 +20,7 @@ struct TambahPenjualanSheet: View {
 
     // MARK: - QR Scan additions
     @State private var showQRScanner = false
-    @State private var scanToast: ToastMessage? = nil // Changed to ToastMessage
+    @State private var scanToast: ToastMessage? = nil
 
     private struct SaleItem: Identifiable {
         let id = UUID()
@@ -206,6 +206,9 @@ struct TambahPenjualanSheet: View {
                                     .disabled(!canSave)
                             }
                         }
+                    }
+                    .onTapGesture { // MARK: - Dismiss keyboard on tap outside
+                        self.hideKeyboard()
                     }
 
                 // MARK: - Scan Toast Overlay
@@ -663,4 +666,11 @@ private struct ToastMessage: Identifiable {
     let text: String
     let iconName: String
     let iconColor: Color
+}
+
+// MARK: - View Extension for Keyboard Dismissal
+extension View {
+    func hideKeyboard() {
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+    }
 }
