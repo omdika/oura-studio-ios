@@ -18,6 +18,10 @@ struct TambahPenjualanSheet: View {
     @State private var errorMsg: String?
     @State private var stockAdjustTarget: SaleItem? = nil
 
+    // MARK: - QR Scan additions
+    @State private var showQRScanner = false
+    @State private var scanToast: ToastMessage? = nil
+
     private struct SaleItem: Identifiable {
         let id = UUID()
         var sizeId: UUID
@@ -94,12 +98,28 @@ struct TambahPenjualanSheet: View {
                     itemCard(item: $item)
                 }
 
-                Button { showProductPicker = true } label: {
-                    Label("Tambah Produk", systemImage: "plus.circle.fill")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(OuraTheme.Colors.accent)
+                // MARK: - QR Scan button added here
+                HStack {
+                    Button { showProductPicker = true } label: {
+                        Label("Tambah Produk", systemImage: "plus.circle.fill")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(OuraTheme.Colors.accent)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .buttonStyle(.plain)
+
+                    Button { showQRScanner = true } label: {
+                        Image(systemName: "qrcode.viewfinder")
+                            .font(.system(size: 20))
+                            .foregroundStyle(OuraTheme.Colors.accent)
+                            .padding(8)
+                            .background(OuraTheme.Colors.accentLight)
+                            .clipShape(Circle())
+                    }
+                    .buttonStyle(.plain)
                 }
                 .listRowBackground(OuraTheme.Colors.surfaceCard)
+                .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
             } header: { OuraSectionHeader(title: "Produk Dijual") }
             .listSectionSeparator(.hidden)
 
@@ -160,21 +180,60 @@ struct TambahPenjualanSheet: View {
             }
             .environmentObject(api)
         }
+        // MARK: - QR Scanner Sheet
+        .sheet(isPresented: $showQRScanner) {
+            QRScannerSheet(mode: .addToExistingSale) { scannedSize in
+                handleScannedProduct(scannedSize)
+            }
+            .environmentObject(api)
+        }
 
         NavigationStack {
-            content
-                .navigationTitle("Catat Penjualan")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("Batal") { dismiss() }.foregroundStyle(OuraTheme.Colors.accent)
+            ZStack(alignment: .top) { // ZStack for toast overlay
+                content
+                    .navigationTitle("Catat Penjualan")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("Batal") { dismiss() }.foregroundStyle(OuraTheme.Colors.accent)
+                        }
+                        ToolbarItem(placement: .confirmationAction) {
+                            if isSaving {
+                                ProgressView().tint(OuraTheme.Colors.accent)
+                            } else {
+                                Button("Simpan") { Task { await save() } }
+                                    .foregroundStyle(canSave ? OuraTheme.Colors.accent : OuraTheme.Colors.textDisabled)
+                                    .disabled(!canSave)
+                            }
+                        }
                     }
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button("Simpan") { Task { await save() } }
-                            .foregroundStyle(canSave ? OuraTheme.Colors.accent : OuraTheme.Colors.textDisabled)
-                            .disabled(!canSave || isSaving)
+                    .onTapGesture { // MARK: - Dismiss keyboard on tap outside
+                        self.hideKeyboard()
                     }
+
+                // MARK: - Scan Toast Overlay
+                VStack {
+                    if let toast = scanToast {
+                        HStack(spacing: 8) {
+                            Image(systemName: toast.iconName) // Dynamic icon
+                                .font(.system(size: 14))
+                                .foregroundStyle(toast.iconColor) // Dynamic color
+                            Text(toast.text)
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundStyle(.white)
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 10)
+                        .background(Color.black.opacity(0.72))
+                        .clipShape(Capsule())
+                        .padding(.top, 8)
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                    }
+                    Spacer()
                 }
+                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: scanToast != nil)
+                .zIndex(10)
+            }
         }
     }
 
@@ -295,6 +354,63 @@ struct TambahPenjualanSheet: View {
     private func loadSizes() async {
         let all = (try? await api.getAllProductSizes()) ?? []
         availableSizes = all.filter { !$0.isArchived && $0.currentStockQty > 0 }
+    }
+
+    // MARK: - Handle Scanned Product
+    private func handleScannedProduct(_ size: ProductSizeDetail) {
+        // Check stock availability
+        guard size.currentStockQty > 0 else {
+            scanToast = ToastMessage(
+                text: "Stok habis untuk \(size.displayLabel)",
+                iconName: "xmark.circle.fill", // Red cross for stock out
+                iconColor: OuraTheme.Colors.dangerText
+            )
+            scheduleToastDismiss()
+            return
+        }
+
+        if let index = items.firstIndex(where: { $0.sizeId == size.id }) {
+            // Product already in list, increment quantity
+            let currentQty = Int(items[index].qty ?? 0)
+            if currentQty < size.currentStockQty {
+                items[index].qty = Double(currentQty + 1)
+                scanToast = ToastMessage(
+                    text: "Kuantitas \(size.displayLabel) bertambah (\(currentQty + 1)×)",
+                    iconName: "checkmark.circle.fill", // Green checkmark for success
+                    iconColor: OuraTheme.Colors.greenAccent
+                )
+            } else {
+                scanToast = ToastMessage(
+                    text: "Stok penuh untuk \(size.displayLabel) (\(size.currentStockQty) pcs)",
+                    iconName: "xmark.circle.fill", // Red cross for stock full
+                    iconColor: OuraTheme.Colors.dangerText
+                )
+            }
+        } else {
+            // New product, add to list
+            items.append(SaleItem(
+                sizeId: size.id,
+                productSku: size.productSku,
+                displayName: "\(size.productName) · \(size.displayLabel)",
+                maxQty: size.currentStockQty,
+                qty: 1,
+                unitPrice: size.sellingPrice,
+                discount: nil
+            ))
+            scanToast = ToastMessage(
+                text: "\(size.productName) · \(size.displayLabel) ditambahkan",
+                iconName: "checkmark.circle.fill", // Green checkmark for success
+                iconColor: OuraTheme.Colors.greenAccent
+            )
+        }
+        scheduleToastDismiss()
+    }
+
+    private func scheduleToastDismiss() {
+        Task {
+            try? await Task.sleep(nanoseconds: 1_800_000_000)
+            withAnimation { scanToast = nil }
+        }
     }
 
     private func save() async {
@@ -541,5 +657,20 @@ private struct ProductPickerSheet: View {
         }
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
+    }
+}
+
+// MARK: - Toast Message Struct
+private struct ToastMessage: Identifiable {
+    let id = UUID()
+    let text: String
+    let iconName: String
+    let iconColor: Color
+}
+
+// MARK: - View Extension for Keyboard Dismissal
+extension View {
+    func hideKeyboard() {
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
     }
 }
