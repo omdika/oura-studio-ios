@@ -71,6 +71,7 @@ struct DateRangePickerSheet: View {
                 // Preset chips
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
+                        chip("Hari Ini") { applyToday() }
                         chip("7 Hari") { applyDays(7) }
                         chip("30 Hari") { applyDays(30) }
                         chip("Bulan Ini") { applyThisMonth() }
@@ -173,5 +174,11 @@ struct DateRangePickerSheet: View {
         let startOfThisMonth = cal.date(from: cal.dateComponents([.year, .month], from: now)) ?? now
         to = cal.date(byAdding: .day, value: -1, to: startOfThisMonth) ?? now
         from = cal.date(from: cal.dateComponents([.year, .month], from: to)) ?? to
+    }
+
+    private func applyToday() {
+        let now = Date()
+        from = now
+        to = now
     }
 }
