@@ -30,6 +30,18 @@ struct ProdukListView: View {
         }
     }
 
+    private var totalProductsCount: Int {
+        products.filter { !$0.isArchived }.count
+    }
+
+    private var totalStockQty: Int {
+        allSizes.filter { !$0.isArchived }.reduce(0) { $0 + $1.currentStockQty }
+    }
+
+    private var outOfStockCount: Int {
+        allSizes.filter { !$0.isArchived && $0.currentStockQty == 0 }.count
+    }
+
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
             Group {
@@ -95,9 +107,66 @@ struct ProdukListView: View {
         }
     }
 
+    private var summaryHeaderView: some View {
+        HStack(spacing: 10) {
+            statCard(
+                icon: "tag.fill",
+                title: "Total Produk",
+                value: "\(totalProductsCount)",
+                color: OuraTheme.Colors.blueAccent,
+                bg: OuraTheme.Colors.blueBg
+            )
+
+            statCard(
+                icon: "shippingbox.fill",
+                title: "Total Stok",
+                value: "\(totalStockQty) pcs",
+                color: OuraTheme.Colors.accent,
+                bg: OuraTheme.Colors.accentLight
+            )
+
+            statCard(
+                icon: "slash.circle.fill",
+                title: "Stok Kosong",
+                value: "\(outOfStockCount) var",
+                color: OuraTheme.Colors.dangerText,
+                bg: OuraTheme.Colors.dangerBg
+            )
+        }
+    }
+
+    private func statCard(icon: String, title: String, value: String, color: Color, bg: Color) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                Image(systemName: icon)
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(color)
+                    .frame(width: 22, height: 22)
+                    .background(bg)
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+
+                Text(title)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(OuraTheme.Colors.textSecondary)
+                    .lineLimit(1)
+            }
+
+            Text(value)
+                .font(.system(size: 16, weight: .bold))
+                .foregroundStyle(OuraTheme.Colors.textPrimary)
+                .lineLimit(1)
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .ouraCard()
+    }
+
     private var productList: some View {
         ScrollView {
             VStack(spacing: 12) {
+                summaryHeaderView
+                    .padding(.bottom, 4)
+
                 ForEach(filtered) { product in
                     let sizes = allSizes.filter { $0.productId == product.id && !$0.isArchived }
                     ProductGroupRow(

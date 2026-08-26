@@ -14,7 +14,8 @@ This doc is structured for three audiences reading in parallel:
 
 | Version | Date | Changed by | Summary |
 |---|---|---|---|
-| v3.22 | 2026-08-25 | Frontend+Backend | **PLANNED: Ranking Penjualan per Produk di halaman Lainnya.** Menambahkan menu baru "Ranking Penjualan Produk" di bawah "Laporan Penjualan" di tab Lainnya. Menghubungkan visualisasi data dengan endpoint baru `/reports/sales-by-product` pada backend API. Rincian spesifikasi: `doc/versions/v3.22.md`. |
+| v3.23 | 2026-08-25 | Frontend | **IMPLEMENTED: Ringkasan Statistik Produk di ProdukListView.** Menambahkan kartu statistik horizontal (Total Jenis Produk, Total Stok, dan Varian Stok Kosong) di bagian paling atas daftar produk. Rincian spesifikasi: `doc/versions/v3.23.md`. |
+| v3.22 | 2026-08-25 | Frontend+Backend | **IMPLEMENTED: Ranking Penjualan per Produk di halaman Lainnya.** Menambahkan menu baru "Ranking Penjualan Produk" di bawah "Laporan Penjualan" di tab Lainnya. Menghubungkan visualisasi data dengan endpoint baru `/reports/sales-by-product` pada backend API. Rincian spesifikasi: `doc/versions/v3.22.md`. |
 | v3.21 | 2026-08-21 | Design | **PLANNED: Arsip Bahan (Material Archive).** Fitur menyembunyikan bahan discontinued tanpa merusak resep/produksi historis. Tambah toggle filter di BahanListView dan banner di BahanDetailView. Lihat `doc/versions/v3.21.md`. |
 | v3.20 | 2026-08-20 | Frontend+Backend | **IMPLEMENTED: Bugfix Session.** Memperbaiki 5 bug frontend (formula HPP 100x terlalu kecil, filter parent size QR, race condition sheet resep, format margin % di dashboard, empty state Laporan) dan 2 bug backend (margin-ranking dan avg_margin_pct). Lihat `doc/versions/v3.20.md`. |
 | v3.19 | 2026-08-20 | Frontend+Backend | **IMPLEMENTED: HPP Manual Override + Enhanced ScanToStock.** Fitur pengisian komponen HPP manual dari ScanToStock dan ProdukSizeDetailView sebagai fallback saat batch produksi belum ada. Lihat `doc/versions/v3.19.md`. |
