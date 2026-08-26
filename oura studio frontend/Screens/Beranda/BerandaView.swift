@@ -31,25 +31,26 @@ struct BerandaView: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: OuraTheme.Spacing.sectionGap) {
-                        headerSection
-                        salesCard
-                        quickActionsSection
-                        if let dash = dashboard, !dash.lowStockAlerts.isEmpty {
-                            stockAlertsSection(dash.lowStockAlerts)
-                        }
+            ScrollView {
+                VStack(alignment: .leading, spacing: OuraTheme.Spacing.sectionGap) {
+                    headerSection
+                    salesCard
+                    
+                    // Sales Capsule Section is now placed prominently at the top under salesCard,
+                    // enlarged 2x with highly striking glowing emerald gradient colors!
+                    salesCapsuleSection
+                    
+                    quickActionsSection
+                    if let dash = dashboard, !dash.lowStockAlerts.isEmpty {
+                        stockAlertsSection(dash.lowStockAlerts)
                     }
-                    .padding(.horizontal, OuraTheme.Spacing.horizontal)
-                    .padding(.top, 8)
-                    .padding(.bottom, 24)
                 }
-                .refreshable { await loadDashboard() }
-
-                salesCapsuleSection
+                .padding(.horizontal, OuraTheme.Spacing.horizontal)
+                .padding(.top, 8)
+                .padding(.bottom, 32)
             }
             .background(OuraTheme.Colors.background)
+            .refreshable { await loadDashboard() }
             .navigationBarHidden(true)
             .sheet(isPresented: $showTambahPembelian) {
                 TambahPembelianSheet(preselectedMaterial: nil)
@@ -293,46 +294,47 @@ struct BerandaView: View {
         .buttonStyle(.plain)
     }
 
-    // MARK: - Sales Capsule Bottom Section
+    // MARK: - Sales Capsule Top Section (2x Larger, Vivid Green Gradient)
 
     private var salesCapsuleSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        let greenGrad = LinearGradient(
+            colors: [Color(red: 0.18, green: 0.68, blue: 0.38), Color(red: 0.08, green: 0.48, blue: 0.24)],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+        return VStack(alignment: .leading, spacing: 10) {
             Text("KASIR PENJUALAN KILAT")
-                .font(.system(size: 10, weight: .bold))
+                .font(.system(size: 11, weight: .bold))
                 .foregroundStyle(OuraTheme.Colors.textTertiary)
                 .kerning(1.2)
-                .padding(.horizontal, OuraTheme.Spacing.horizontal)
             
-            HStack(spacing: 12) {
+            HStack(spacing: 14) {
                 // Catat Penjualan (Manual)
                 Button {
                     showTambahPenjualan = true
                 } label: {
-                    HStack(spacing: 10) {
+                    VStack(spacing: 12) {
                         Image(systemName: "bag.badge.plus")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundStyle(OuraTheme.Colors.greenAccent)
-                            .frame(width: 38, height: 38)
-                            .background(OuraTheme.Colors.greenBg)
-                            .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.medium))
+                            .font(.system(size: 32, weight: .bold))
+                            .foregroundStyle(.white)
+                            .frame(width: 68, height: 68)
+                            .background(.white.opacity(0.18))
+                            .clipShape(Circle())
                         
-                        VStack(alignment: .leading, spacing: 2) {
+                        VStack(spacing: 4) {
                             Text("Catat Penjualan")
-                                .font(.system(size: 13, weight: .bold))
-                                .foregroundStyle(OuraTheme.Colors.textPrimary)
+                                .font(.system(size: 14, weight: .heavy))
+                                .foregroundStyle(.white)
                             Text("Input Manual")
-                                .font(.system(size: 10))
-                                .foregroundStyle(OuraTheme.Colors.textSecondary)
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundStyle(.white.opacity(0.8))
                         }
-                        Spacer()
                     }
-                    .padding(10)
-                    .background(OuraTheme.Colors.surfaceCard)
-                    .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.card))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: OuraTheme.Radius.card)
-                            .stroke(OuraTheme.Colors.border, lineWidth: 0.75)
-                    )
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 20)
+                    .background(greenGrad)
+                    .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.card + 4))
+                    .shadow(color: Color(red: 0.15, green: 0.55, blue: 0.30).opacity(0.25), radius: 10, x: 0, y: 5)
                 }
                 .buttonStyle(.plain)
                 
@@ -340,45 +342,32 @@ struct BerandaView: View {
                 Button {
                     showQRScanner = true
                 } label: {
-                    HStack(spacing: 10) {
+                    VStack(spacing: 12) {
                         Image(systemName: "qrcode.viewfinder")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundStyle(OuraTheme.Colors.accent)
-                            .frame(width: 38, height: 38)
-                            .background(OuraTheme.Colors.accentLight)
-                            .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.medium))
+                            .font(.system(size: 32, weight: .bold))
+                            .foregroundStyle(.white)
+                            .frame(width: 68, height: 68)
+                            .background(.white.opacity(0.18))
+                            .clipShape(Circle())
                         
-                        VStack(alignment: .leading, spacing: 2) {
+                        VStack(spacing: 4) {
                             Text("Scan & Jual")
-                                .font(.system(size: 13, weight: .bold))
-                                .foregroundStyle(OuraTheme.Colors.textPrimary)
+                                .font(.system(size: 14, weight: .heavy))
+                                .foregroundStyle(.white)
                             Text("Pindai QR")
-                                .font(.system(size: 10))
-                                .foregroundStyle(OuraTheme.Colors.textSecondary)
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundStyle(.white.opacity(0.8))
                         }
-                        Spacer()
                     }
-                    .padding(10)
-                    .background(OuraTheme.Colors.surfaceCard)
-                    .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.card))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: OuraTheme.Radius.card)
-                            .stroke(OuraTheme.Colors.border, lineWidth: 0.75)
-                    )
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 20)
+                    .background(greenGrad)
+                    .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.card + 4))
+                    .shadow(color: Color(red: 0.15, green: 0.55, blue: 0.30).opacity(0.25), radius: 10, x: 0, y: 5)
                 }
                 .buttonStyle(.plain)
             }
-            .padding(.horizontal, OuraTheme.Spacing.horizontal)
         }
-        .padding(.vertical, 14)
-        .background(OuraTheme.Colors.surfaceSheet)
-        .overlay(
-            VStack {
-                Divider().overlay(OuraTheme.Colors.separator)
-                Spacer()
-            }
-        )
-        .shadow(color: Color.black.opacity(0.04), radius: 8, x: 0, y: -4)
     }
 
     // MARK: - Data

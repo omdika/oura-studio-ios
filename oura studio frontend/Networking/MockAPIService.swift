@@ -1498,7 +1498,7 @@ class MockAPIService {
         return _productSizes.values.flatMap({ $0 }).compactMap { detail -> LowStockAlert? in
             guard let min = detail.reorderMinQty,
                   Double(detail.currentStockQty) < min else { return nil }
-            return LowStockAlert(id: UUID(), productSizeId: detail.id,
+            return LowStockAlert(productSizeId: detail.id,
                                  productName: detail.productName, sizeLabel: detail.sizeLabel,
                                  currentStockQty: detail.currentStockQty, reorderMinQty: min)
         }

@@ -135,15 +135,15 @@ struct WasteByMaterial: Codable, Identifiable {
 }
 
 struct LowStockAlert: Codable, Identifiable {
-    let id: UUID
     let productSizeId: UUID
     let productName: String
     let sizeLabel: String
     let currentStockQty: Int
-    let reorderMinQty: Double
+    let reorderMinQty: Double?
+
+    var id: UUID { productSizeId }
 
     enum CodingKeys: String, CodingKey {
-        case id
         case productSizeId = "product_size_id"
         case productName = "product_name"
         case sizeLabel = "size_label"
