@@ -10,57 +10,71 @@ struct PenjualanListView: View {
     @State private var editingOrder: SalesOrder? = nil
     @State private var orderToDelete: SalesOrder? = nil
     @State private var showQRScanner = false
+    @State private var fromDate: Date = Calendar.current.date(byAdding: .day, value: -30, to: Date()) ?? Date()
+    @State private var toDate: Date = Date()
 
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
-            Group {
-                if isLoading {
-                    ProgressView()
+            VStack(spacing: 0) {
+                // Date Range Selector
+                DateRangeField(from: $fromDate, to: $toDate) {
+                    Task { await load() }
+                }
+                .padding(.horizontal, OuraTheme.Spacing.horizontal)
+                .padding(.top, 12)
+                .padding(.bottom, 4)
+
+                Group {
+                    if isLoading {
+                        ProgressView()
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else if orders.isEmpty {
+                        VStack(spacing: 12) {
+                            Image(systemName: "bag")
+                                .font(.system(size: 40))
+                                .foregroundStyle(OuraTheme.Colors.textTertiary)
+                            Text("Belum ada penjualan")
+                                .font(.system(size: 15, weight: .medium))
+                                .foregroundStyle(OuraTheme.Colors.textSecondary)
+                            Text("Tidak ada transaksi dalam periode ini, ketuk + untuk mencatat penjualan baru")
+                                .font(.system(size: 13))
+                                .foregroundStyle(OuraTheme.Colors.textTertiary)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal, 32)
+                        }
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if orders.isEmpty {
-                    VStack(spacing: 12) {
-                        Image(systemName: "bag")
-                            .font(.system(size: 40))
-                            .foregroundStyle(OuraTheme.Colors.textTertiary)
-                        Text("Belum ada penjualan")
-                            .font(.system(size: 15, weight: .medium))
-                            .foregroundStyle(OuraTheme.Colors.textSecondary)
-                        Text("Ketuk + untuk mencatat penjualan baru")
-                            .font(.system(size: 13))
-                            .foregroundStyle(OuraTheme.Colors.textTertiary)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else {
-                    List {
-                        ForEach(groupedOrders, id: \.date) { group in
-                            Section {
-                                ForEach(group.orders) { order in
-                                    Button { editingOrder = order } label: {
-                                        OrderRow(order: order)
-                                    }
-                                    .buttonStyle(.plain)
-                                    .listRowBackground(OuraTheme.Colors.surfaceCard)
-                                    .listRowInsets(EdgeInsets(top: 12, leading: 16, bottom: 12, trailing: 16))
-                                    .listRowSeparatorTint(OuraTheme.Colors.separator)
-                                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                                        Button(role: .destructive) {
-                                            orderToDelete = order
-                                        } label: {
-                                            Label("Hapus", systemImage: "trash")
+                    } else {
+                        List {
+                            ForEach(groupedOrders, id: \.date) { group in
+                                Section {
+                                    ForEach(group.orders) { order in
+                                        Button { editingOrder = order } label: {
+                                            OrderRow(order: order)
+                                        }
+                                        .buttonStyle(.plain)
+                                        .listRowBackground(OuraTheme.Colors.surfaceCard)
+                                        .listRowInsets(EdgeInsets(top: 12, leading: 16, bottom: 12, trailing: 16))
+                                        .listRowSeparatorTint(OuraTheme.Colors.separator)
+                                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                                            Button(role: .destructive) {
+                                                orderToDelete = order
+                                            } label: {
+                                                Label("Hapus", systemImage: "trash")
+                                            }
                                         }
                                     }
+                                } header: {
+                                    Text(group.date)
+                                        .font(.system(size: 13, weight: .bold))
+                                        .foregroundStyle(OuraTheme.Colors.textSecondary)
+                                        .textCase(.none)
                                 }
-                            } header: {
-                                Text(group.date)
-                                    .font(.system(size: 13, weight: .bold))
-                                    .foregroundStyle(OuraTheme.Colors.textSecondary)
-                                    .textCase(.none)
                             }
                         }
+                        .listStyle(.insetGrouped)
+                        .scrollContentBackground(.hidden)
+                        .background(OuraTheme.Colors.background)
                     }
-                    .listStyle(.insetGrouped)
-                    .scrollContentBackground(.hidden)
-                    .background(OuraTheme.Colors.background)
                 }
             }
 
@@ -133,7 +147,7 @@ struct PenjualanListView: View {
 
     private func load() async {
         isLoading = true
-        orders = (try? await api.getSalesOrders()) ?? []
+        orders = (try? await api.getSalesOrders(from: fromDate, to: toDate)) ?? []
         isLoading = false
     }
 

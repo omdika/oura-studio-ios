@@ -662,9 +662,13 @@ class APIService: ObservableObject {
 
     // MARK: - Sales
 
-    func getSalesOrders() async throws -> [SalesOrder] {
+    func getSalesOrders(from: Date? = nil, to: Date? = nil) async throws -> [SalesOrder] {
         if useMock { return try await MockAPIService.shared.getSalesOrders() }
-        return try await get(path: "/sales-orders")
+        var path = "/sales-orders"
+        if let from = from, let to = to {
+            path += "?from=\(dateFmt.string(from: from))&to=\(dateFmt.string(from: to))"
+        }
+        return try await get(path: path)
     }
 
     func getSalesOrder(id: UUID) async throws -> SalesOrder {
