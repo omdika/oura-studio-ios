@@ -498,32 +498,44 @@ struct SalesByProductRankingView: View {
                 } else {
                     VStack(spacing: 0) {
                         ForEach(Array(items.enumerated()), id: \.element.id) { idx, item in
-                            HStack(spacing: 12) {
-                                Text("#\(idx + 1)")
-                                    .font(.system(size: 14, weight: .bold))
-                                    .foregroundStyle(idx < 3 ? OuraTheme.Colors.accent : OuraTheme.Colors.textTertiary)
-                                    .frame(width: 28)
-
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(item.displayLabel)
-                                        .font(.system(size: 14, weight: .semibold))
-                                        .foregroundStyle(OuraTheme.Colors.textPrimary)
-                                    Text("Pendapatan: \(item.revenue.rupiahFormatted) · Profit: \(item.profit.rupiahFormatted)")
-                                        .font(.system(size: 12))
-                                        .foregroundStyle(OuraTheme.Colors.textSecondary)
-                                }
-                                Spacer()
-                                VStack(alignment: .trailing, spacing: 2) {
-                                    Text("\(item.qtySold) unit")
+                            NavigationLink(destination: LazySizeDetailView(sizeId: item.productSizeId)) {
+                                HStack(spacing: 12) {
+                                    Text("#\(idx + 1)")
                                         .font(.system(size: 14, weight: .bold))
-                                        .foregroundStyle(OuraTheme.Colors.accent)
-                                    Text("terjual")
-                                        .font(.system(size: 10))
-                                        .foregroundStyle(OuraTheme.Colors.textTertiary)
+                                        .foregroundStyle(idx < 3 ? OuraTheme.Colors.accent : OuraTheme.Colors.textTertiary)
+                                        .frame(width: 28)
+
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(item.displayLabel)
+                                            .font(.system(size: 14, weight: .semibold))
+                                            .foregroundStyle(OuraTheme.Colors.textPrimary)
+                                        Text("Pendapatan: \(item.revenue.rupiahFormatted) · Profit: \(item.profit.rupiahFormatted)")
+                                            .font(.system(size: 12))
+                                            .foregroundStyle(OuraTheme.Colors.textSecondary)
+                                        if item.currentStockQty == 0 {
+                                            Text("Stok saat ini: Habis")
+                                                .font(.system(size: 11, weight: .semibold))
+                                                .foregroundStyle(OuraTheme.Colors.dangerText)
+                                        } else {
+                                            Text("Stok saat ini: \(item.currentStockQty) pcs")
+                                                .font(.system(size: 11))
+                                                .foregroundStyle(OuraTheme.Colors.textTertiary)
+                                        }
+                                    }
+                                    Spacer()
+                                    VStack(alignment: .trailing, spacing: 2) {
+                                        Text("\(item.qtySold) unit")
+                                            .font(.system(size: 14, weight: .bold))
+                                            .foregroundStyle(OuraTheme.Colors.accent)
+                                        Text("terjual")
+                                            .font(.system(size: 10))
+                                            .foregroundStyle(OuraTheme.Colors.textTertiary)
+                                    }
                                 }
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 12)
                             }
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 12)
+                            .buttonStyle(.plain)
                             if idx < items.count - 1 {
                                 Divider().padding(.leading, 16).overlay(OuraTheme.Colors.separator)
                             }
@@ -553,5 +565,54 @@ struct SalesByProductRankingView: View {
             print("🔴 [SalesByProductRanking] error: \(error)")
         }
         isLoading = false
+    }
+}
+
+// MARK: - Lazy Size Detail View Wrapper
+
+struct LazySizeDetailView: View {
+    @EnvironmentObject private var api: APIService
+    let sizeId: UUID
+
+    @State private var sizeDetail: ProductSizeDetail? = nil
+    @State private var isLoading = true
+    @State private var errorMsg: String? = nil
+
+    var body: some View {
+        Group {
+            if isLoading {
+                VStack {
+                    ProgressView()
+                    Text("Memuat detail produk...")
+                        .font(.system(size: 13))
+                        .foregroundStyle(OuraTheme.Colors.textSecondary)
+                        .padding(.top, 8)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if let error = errorMsg {
+                VStack(spacing: 12) {
+                    Image(systemName: "exclamationmark.triangle")
+                        .font(.system(size: 32))
+                        .foregroundStyle(OuraTheme.Colors.warningText)
+                    Text("Gagal memuat")
+                        .font(.system(size: 15, weight: .semibold))
+                    Text(error)
+                        .font(.system(size: 13))
+                        .foregroundStyle(OuraTheme.Colors.textSecondary)
+                }
+                .padding()
+            } else if let size = sizeDetail {
+                ProdukSizeDetailView(productSize: size)
+            }
+        }
+        .background(OuraTheme.Colors.background)
+        .task {
+            do {
+                sizeDetail = try await api.getProductSizeById(id: sizeId)
+            } catch {
+                errorMsg = error.localizedDescription
+            }
+            isLoading = false
+        }
     }
 }

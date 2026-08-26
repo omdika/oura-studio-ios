@@ -30,6 +30,7 @@ struct SalesByProductItem: Codable, Identifiable {
     let qtySold: Int
     let revenue: Double
     let profit: Double
+    let currentStockQty: Int
 
     var id: UUID { productSizeId }
 
@@ -46,6 +47,7 @@ struct SalesByProductItem: Codable, Identifiable {
         case qtySold = "qty_sold"
         case revenue
         case profit
+        case currentStockQty = "current_stock_qty"
     }
 }
 

@@ -1449,7 +1449,8 @@ class MockAPIService {
                                       productName: detail?.productName ?? "Produk",
                                       sizeLabel: detail?.sizeLabel ?? "-",
                                       fabricVariantName: detail?.fabricVariantName,
-                                      qtySold: val.qty, revenue: val.revenue, profit: val.profit)
+                                      qtySold: val.qty, revenue: val.revenue, profit: val.profit,
+                                      currentStockQty: detail?.currentStockQty ?? 0)
         }.sorted { $0.revenue > $1.revenue }
     }
 
