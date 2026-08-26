@@ -33,12 +33,9 @@ struct BerandaView: View {
         NavigationStack {
             VStack(spacing: 0) {
                 ScrollView {
-                    VStack(alignment: .leading, spacing: OuraTheme.Spacing.sectionGap) {
+                    VStack(alignment: .leading, spacing: 14) {
                         headerSection
                         salesCard
-                        
-                        // Kasir Penjualan Kilat (Terpuncak & Diperbesar 2x Lipat, Emerald & Terracotta GRadient!)
-                        salesCapsuleSection
                         
                         quickActionsSection
                         
@@ -48,11 +45,11 @@ struct BerandaView: View {
                     }
                     .padding(.horizontal, OuraTheme.Spacing.horizontal)
                     .padding(.top, 8)
-                    .padding(.bottom, 24)
+                    .padding(.bottom, 16)
                 }
                 .refreshable { await loadDashboard() }
 
-                // The bottom floating bar is removed from here since the capsule is placed at the top!
+                salesCapsuleSection
             }
             .background(OuraTheme.Colors.background)
             .navigationBarHidden(true)
