@@ -329,13 +329,7 @@ class APIService: ObservableObject {
 
     func getAllProductSizes() async throws -> [ProductSizeDetail] {
         if useMock { return try await MockAPIService.shared.getAllProductSizes() }
-        let products = try await getProducts()
-        var all: [ProductSizeDetail] = []
-        for p in products {
-            let basic: [ProductSizeBasic] = (try? await get(path: "/products/\(p.sku)/sizes")) ?? []
-            all.append(contentsOf: basic.map { sizeDetailFromBasic($0, sku: p.sku, productName: p.name) })
-        }
-        return all
+        return try await get(path: "/product-sizes")
     }
 
     func getProductSizeById(id: UUID) async throws -> ProductSizeDetail {
