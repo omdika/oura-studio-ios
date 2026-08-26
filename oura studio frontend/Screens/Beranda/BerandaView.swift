@@ -38,7 +38,9 @@ struct BerandaView: View {
                     
                     quickActionsSection
                     
-                    if let dash = dashboard, !dash.lowStockAlerts.isEmpty {
+                    if isLoading {
+                        stockAlertsSkeletonSection
+                    } else if let dash = dashboard, !dash.lowStockAlerts.isEmpty {
                         stockAlertsSection(dash.lowStockAlerts)
                     }
                     
@@ -160,6 +162,59 @@ struct BerandaView: View {
     }
 
     // MARK: - Stock alerts (Horizontal Scroll - Super Thin & Extended 50% horizontally)
+
+    private var stockAlertsSkeletonSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                OuraSectionHeader(title: "Peringatan Stok")
+                Spacer()
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(OuraTheme.Colors.textSecondary.opacity(0.1))
+                    .frame(width: 42, height: 12)
+            }
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 10) {
+                    stockAlertSkeletonCard
+                    stockAlertSkeletonCard
+                }
+                .padding(.vertical, 2)
+                .padding(.horizontal, 2)
+            }
+        }
+    }
+
+    private var stockAlertSkeletonCard: some View {
+        HStack(spacing: 10) {
+            Circle()
+                .fill(OuraTheme.Colors.textSecondary.opacity(0.12))
+                .frame(width: 14, height: 14)
+            
+            VStack(alignment: .leading, spacing: 4) {
+                RoundedRectangle(cornerRadius: 3)
+                    .fill(OuraTheme.Colors.textSecondary.opacity(0.12))
+                    .frame(width: 110, height: 10)
+                RoundedRectangle(cornerRadius: 3)
+                    .fill(OuraTheme.Colors.textSecondary.opacity(0.08))
+                    .frame(width: 130, height: 8)
+            }
+            
+            Spacer()
+            
+            RoundedRectangle(cornerRadius: 6)
+                .fill(OuraTheme.Colors.textSecondary.opacity(0.08))
+                .frame(width: 48, height: 18)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .frame(width: 260, height: 46)
+        .background(OuraTheme.Colors.surfaceCard)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(OuraTheme.Colors.border, lineWidth: 0.75)
+        )
+    }
 
     private func stockAlertsSection(_ alerts: [LowStockAlert]) -> some View {
         VStack(alignment: .leading, spacing: 8) {

@@ -12,19 +12,27 @@ struct BahanListView: View {
     @State private var hasLoadedOnce = false
     @State private var selectedCategory: MaterialCategory? = nil
     @State private var selectedFabricFamily: String? = nil
+    @State private var showArchived = false
+    @State private var showArchiveAlert = false
+    @State private var archiveAlertMessage = ""
+    @State private var materialToArchive: Material? = nil
+    @State private var isLoadingConditions = false
 
     private let pageSize = 15
 
     private var fabricFamilies: [String] {
         let fams = materials
-            .filter { !$0.isArchived && $0.category == .fabric }
+            .filter { (showArchived ? true : !$0.isArchived) && $0.category == .fabric }
             .compactMap { $0.fabricFamily }
         var seen = Set<String>()
         return fams.filter { seen.insert($0).inserted }.sorted()
     }
 
     private var filtered: [Material] {
-        var base = materials.filter { !$0.isArchived }
+        var base = materials
+        if !showArchived {
+            base = base.filter { !$0.isArchived }
+        }
         if let cat = selectedCategory {
             base = base.filter { $0.category == cat }
             if cat == .fabric, let fam = selectedFabricFamily {
@@ -85,6 +93,74 @@ struct BahanListView: View {
         .onChange(of: searchText) { displayCount = pageSize }
         .onChange(of: selectedCategory) { displayCount = pageSize }
         .onChange(of: selectedFabricFamily) { displayCount = pageSize }
+        .onChange(of: showArchived) { displayCount = pageSize }
+        .alert(materialToArchive.map { "Arsipkan \($0.name)?" } ?? "Arsipkan Bahan?", isPresented: $showArchiveAlert) {
+            Button("Batal", role: .cancel) {
+                materialToArchive = nil
+            }
+            Button("Arsipkan", role: .destructive) {
+                if let m = materialToArchive {
+                    Task {
+                        do {
+                            _ = try await api.archiveMaterial(id: m.id)
+                            await load(silent: true)
+                        } catch {
+                            errorMsg = error.localizedDescription
+                        }
+                    }
+                }
+            }
+        } message: {
+            Text(archiveAlertMessage)
+        }
+        .overlay {
+            if isLoadingConditions {
+                Color.black.opacity(0.15)
+                    .ignoresSafeArea()
+                ProgressView("Memeriksa bahan...")
+                    .padding()
+                    .background(Color(.systemBackground))
+                    .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.medium))
+                    .shadow(radius: 10)
+            }
+        }
+    }
+
+    private func checkArchiveConditions(for material: Material) async {
+        isLoadingConditions = true
+        archiveAlertMessage = ""
+        do {
+            let purchases = try await api.getPurchases(materialId: material.id)
+            let specs = try await api.getPatternSpecs()
+            
+            let sisaLength = purchases.compactMap { $0.remainingLengthCm }.reduce(0, +)
+            let hasRemainingStock = sisaLength > 0
+            
+            let matchingSpecs = specs.filter { spec in
+                spec.fabrics.contains(where: { $0.materialId == material.id }) ||
+                spec.components.contains(where: { $0.materialId == material.id })
+            }
+            
+            var warnings: [String] = []
+            if hasRemainingStock {
+                let sisaStr = material.category == .fabric ? String(format: "%.0f cm", sisaLength) : String(format: "%.0f unit", sisaLength)
+                warnings.append("Masih ada \(sisaStr) sisa di pembelian — stok ini tidak akan bisa digunakan setelah bahan diarsipkan.")
+            }
+            if !matchingSpecs.isEmpty {
+                warnings.append("Dipakai di \(matchingSpecs.count) resep aktif. Resep akan tetap tersimpan tapi tidak bisa dioptimasi sampai bahan diganti atau di-unarchive.")
+            }
+            
+            if warnings.isEmpty {
+                archiveAlertMessage = "Bahan tidak akan muncul di daftar dan tidak bisa dibeli atau diresepkan lagi. Data historis tetap tersimpan."
+            } else {
+                archiveAlertMessage = warnings.joined(separator: "\n\n")
+            }
+            materialToArchive = material
+            showArchiveAlert = true
+        } catch {
+            errorMsg = "Gagal memproses kondisi arsip: \(error.localizedDescription)"
+        }
+        isLoadingConditions = false
     }
 
     // MARK: - Header
@@ -162,6 +238,9 @@ struct BahanListView: View {
                         }
                     }
                 }
+                filterChip(showArchived ? "⊘ Sembunyikan Arsip" : "⊘ Tampilkan Diarsipkan", isSelected: showArchived) {
+                    showArchived.toggle()
+                }
             }
             .padding(.horizontal, OuraTheme.Spacing.horizontal)
         }
@@ -217,6 +296,32 @@ struct BahanListView: View {
                 .listRowBackground(OuraTheme.Colors.surfaceCard)
                 .listRowInsets(EdgeInsets(top: 13, leading: 16, bottom: 13, trailing: 16))
                 .listRowSeparatorTint(OuraTheme.Colors.separator)
+                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                    if material.isArchived {
+                        Button {
+                            Task {
+                                do {
+                                    _ = try await api.unarchiveMaterial(id: material.id)
+                                    await load(silent: true)
+                                } catch {
+                                    errorMsg = error.localizedDescription
+                                }
+                            }
+                        } label: {
+                            Label("Batalkan Arsip", systemImage: "arrow.uturn.backward")
+                        }
+                        .tint(.blue)
+                    } else {
+                        Button {
+                            Task {
+                                await checkArchiveConditions(for: material)
+                            }
+                        } label: {
+                            Label("Arsipkan", systemImage: "archivebox")
+                        }
+                        .tint(.red)
+                    }
+                }
             }
 
             if displayed.count < filtered.count {

@@ -199,6 +199,14 @@ class APIService: ObservableObject {
         return try await patch(path: "/materials/\(id)", body: req)
     }
 
+    func archiveMaterial(id: UUID) async throws -> Material {
+        try await patchMaterial(id: id, PatchMaterialRequest(isArchived: true))
+    }
+
+    func unarchiveMaterial(id: UUID) async throws -> Material {
+        try await patchMaterial(id: id, PatchMaterialRequest(isArchived: false))
+    }
+
     func getPurchases(materialId: UUID) async throws -> [MaterialPurchase] {
         if useMock { return try await MockAPIService.shared.getPurchases(materialId: materialId) }
         return try await get(path: "/materials/\(materialId)/purchases")
