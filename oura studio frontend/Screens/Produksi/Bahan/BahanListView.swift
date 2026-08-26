@@ -90,10 +90,10 @@ struct BahanListView: View {
         .onChange(of: showTambah) { showing in
             if !showing { Task { await load(silent: true) } }
         }
-        .onChange(of: searchText) { displayCount = pageSize }
-        .onChange(of: selectedCategory) { displayCount = pageSize }
-        .onChange(of: selectedFabricFamily) { displayCount = pageSize }
-        .onChange(of: showArchived) { displayCount = pageSize }
+        .onChange(of: searchText) { _ in displayCount = pageSize }
+        .onChange(of: selectedCategory) { _ in displayCount = pageSize }
+        .onChange(of: selectedFabricFamily) { _ in displayCount = pageSize }
+        .onChange(of: showArchived) { _ in displayCount = pageSize }
         .alert(materialToArchive.map { "Arsipkan \($0.name)?" } ?? "Arsipkan Bahan?", isPresented: $showArchiveAlert) {
             Button("Batal", role: .cancel) {
                 materialToArchive = nil
