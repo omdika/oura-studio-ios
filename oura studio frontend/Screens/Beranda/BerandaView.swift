@@ -31,26 +31,26 @@ struct BerandaView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: OuraTheme.Spacing.sectionGap) {
-                    headerSection
-                    salesCard
-                    
-                    // Sales Capsule Section is now placed prominently at the top under salesCard,
-                    // enlarged 2x with highly striking glowing emerald gradient colors!
-                    salesCapsuleSection
-                    
-                    quickActionsSection
-                    if let dash = dashboard, !dash.lowStockAlerts.isEmpty {
-                        stockAlertsSection(dash.lowStockAlerts)
+            VStack(spacing: 0) {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 14) {
+                        headerSection
+                        salesCard
+                        quickActionsSection
+                        if let dash = dashboard, !dash.lowStockAlerts.isEmpty {
+                            stockAlertsSection(dash.lowStockAlerts)
+                        }
                     }
+                    .padding(.horizontal, OuraTheme.Spacing.horizontal)
+                    .padding(.top, 8)
+                    .padding(.bottom, 16)
                 }
-                .padding(.horizontal, OuraTheme.Spacing.horizontal)
-                .padding(.top, 8)
-                .padding(.bottom, 32)
+                .scrollDisabled(true) // locks it on screen without scrolling
+                .refreshable { await loadDashboard() }
+
+                salesCapsuleSection
             }
             .background(OuraTheme.Colors.background)
-            .refreshable { await loadDashboard() }
             .navigationBarHidden(true)
             .sheet(isPresented: $showTambahPembelian) {
                 TambahPembelianSheet(preselectedMaterial: nil)
@@ -158,25 +158,25 @@ struct BerandaView: View {
         .foregroundStyle(.white.opacity(0.9))
     }
 
-    // MARK: - Stock alerts (Horizontal Scroll)
+    // MARK: - Stock alerts (Horizontal Scroll - Super Thin)
 
     private func stockAlertsSection(_ alerts: [LowStockAlert]) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 8) {
             HStack {
                 OuraSectionHeader(title: "Peringatan Stok")
                 Spacer()
                 Text("\(alerts.count) item")
-                    .font(.system(size: 12, weight: .medium))
+                    .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(OuraTheme.Colors.textTertiary)
             }
 
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 12) {
+                HStack(spacing: 10) {
                     ForEach(alerts) { alert in
                         stockAlertCard(alert)
                     }
                 }
-                .padding(.vertical, 4)
+                .padding(.vertical, 2)
                 .padding(.horizontal, 2)
             }
         }
@@ -184,45 +184,47 @@ struct BerandaView: View {
 
     private func stockAlertCard(_ alert: LowStockAlert) -> some View {
         let isOut = alert.currentStockQty == 0
-        return VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Text("Ukuran \(alert.sizeLabel)")
+        return HStack(spacing: 8) {
+            Image(systemName: "exclamationmark.circle.fill")
+                .font(.system(size: 14))
+                .foregroundStyle(isOut ? OuraTheme.Colors.dangerText : OuraTheme.Colors.warningText)
+            
+            VStack(alignment: .leading, spacing: 1) {
+                Text(alert.productName)
                     .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(OuraTheme.Colors.textTertiary)
-                Spacer()
-                OuraTag(
-                    text: isOut ? "Habis" : "Menipis",
-                    color: isOut ? OuraTheme.Colors.dangerText : OuraTheme.Colors.warningText,
-                    bg:    isOut ? OuraTheme.Colors.dangerBg   : OuraTheme.Colors.warningBg
-                )
+                    .foregroundStyle(OuraTheme.Colors.textPrimary)
+                    .lineLimit(1)
+                Text("Ukuran \(alert.sizeLabel) · \(alert.currentStockQty) pcs")
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundStyle(isOut ? OuraTheme.Colors.dangerText : OuraTheme.Colors.textSecondary)
             }
             
-            Text(alert.productName)
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(OuraTheme.Colors.textPrimary)
-                .lineLimit(1)
+            Spacer()
             
-            Text("\(alert.currentStockQty) pcs tersisa")
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(isOut ? OuraTheme.Colors.dangerText : OuraTheme.Colors.textSecondary)
+            OuraTag(
+                text: isOut ? "Habis" : "Menipis",
+                color: isOut ? OuraTheme.Colors.dangerText : OuraTheme.Colors.warningText,
+                bg:    isOut ? OuraTheme.Colors.dangerBg   : OuraTheme.Colors.warningBg
+            )
         }
-        .padding(12)
-        .frame(width: 165)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .frame(width: 175, height: 46)
         .background(OuraTheme.Colors.surfaceCard)
-        .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.card))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
         .overlay(
-            RoundedRectangle(cornerRadius: OuraTheme.Radius.card)
+            RoundedRectangle(cornerRadius: 12)
                 .stroke(OuraTheme.Colors.border, lineWidth: 0.75)
         )
     }
 
-    // MARK: - Quick actions (Simetris 2x2 Grid)
+    // MARK: - Quick actions (Simetris 2x2 Grid - Small Compact)
 
     private var quickActionsSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 8) {
             OuraSectionHeader(title: "Aksi Cepat")
 
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
                 quickActionTile(
                     icon: "cart.badge.plus",
                     title: "Beli Bahan",
@@ -270,31 +272,34 @@ struct BerandaView: View {
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
-            VStack(spacing: 10) {
+            HStack(spacing: 8) {
                 Image(systemName: icon)
-                    .font(.system(size: 22, weight: .medium))
+                    .font(.system(size: 13, weight: .bold))
                     .foregroundStyle(color)
-                    .frame(width: 52, height: 52)
+                    .frame(width: 32, height: 32)
                     .background(bg)
-                    .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.standard))
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                
                 Text(title)
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(size: 11, weight: .bold))
                     .foregroundStyle(OuraTheme.Colors.textPrimary)
-                    .multilineTextAlignment(.center)
+                    .lineLimit(1)
+                
+                Spacer()
             }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 16)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
             .background(OuraTheme.Colors.surfaceCard)
-            .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.card))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
             .overlay(
-                RoundedRectangle(cornerRadius: OuraTheme.Radius.card)
+                RoundedRectangle(cornerRadius: 12)
                     .stroke(OuraTheme.Colors.border, lineWidth: 0.75)
             )
         }
         .buttonStyle(.plain)
     }
 
-    // MARK: - Sales Capsule Top Section (2x Larger, Vivid Green Gradient)
+    // MARK: - Sales Capsule Bottom Section (2x Larger, Vivid Green Gradient)
 
     private var salesCapsuleSection: some View {
         let greenGrad = LinearGradient(
@@ -304,37 +309,38 @@ struct BerandaView: View {
         )
         return VStack(alignment: .leading, spacing: 10) {
             Text("KASIR PENJUALAN KILAT")
-                .font(.system(size: 11, weight: .bold))
+                .font(.system(size: 10, weight: .bold))
                 .foregroundStyle(OuraTheme.Colors.textTertiary)
                 .kerning(1.2)
+                .padding(.horizontal, OuraTheme.Spacing.horizontal)
             
-            HStack(spacing: 14) {
+            HStack(spacing: 12) {
                 // Catat Penjualan (Manual)
                 Button {
                     showTambahPenjualan = true
                 } label: {
                     VStack(spacing: 12) {
                         Image(systemName: "bag.badge.plus")
-                            .font(.system(size: 32, weight: .bold))
+                            .font(.system(size: 26, weight: .bold))
                             .foregroundStyle(.white)
-                            .frame(width: 68, height: 68)
+                            .frame(width: 52, height: 52)
                             .background(.white.opacity(0.18))
                             .clipShape(Circle())
                         
-                        VStack(spacing: 4) {
+                        VStack(spacing: 2) {
                             Text("Catat Penjualan")
-                                .font(.system(size: 14, weight: .heavy))
+                                .font(.system(size: 12, weight: .heavy))
                                 .foregroundStyle(.white)
                             Text("Input Manual")
-                                .font(.system(size: 11, weight: .medium))
+                                .font(.system(size: 9, weight: .medium))
                                 .foregroundStyle(.white.opacity(0.8))
                         }
                     }
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 20)
+                    .padding(.vertical, 14)
                     .background(greenGrad)
-                    .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.card + 4))
-                    .shadow(color: Color(red: 0.15, green: 0.55, blue: 0.30).opacity(0.25), radius: 10, x: 0, y: 5)
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                    .shadow(color: Color(red: 0.15, green: 0.55, blue: 0.30).opacity(0.20), radius: 6, x: 0, y: 3)
                 }
                 .buttonStyle(.plain)
                 
@@ -344,30 +350,40 @@ struct BerandaView: View {
                 } label: {
                     VStack(spacing: 12) {
                         Image(systemName: "qrcode.viewfinder")
-                            .font(.system(size: 32, weight: .bold))
+                            .font(.system(size: 26, weight: .bold))
                             .foregroundStyle(.white)
-                            .frame(width: 68, height: 68)
+                            .frame(width: 52, height: 52)
                             .background(.white.opacity(0.18))
                             .clipShape(Circle())
                         
-                        VStack(spacing: 4) {
+                        VStack(spacing: 2) {
                             Text("Scan & Jual")
-                                .font(.system(size: 14, weight: .heavy))
+                                .font(.system(size: 12, weight: .heavy))
                                 .foregroundStyle(.white)
                             Text("Pindai QR")
-                                .font(.system(size: 11, weight: .medium))
+                                .font(.system(size: 9, weight: .medium))
                                 .foregroundStyle(.white.opacity(0.8))
                         }
                     }
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 20)
+                    .padding(.vertical, 14)
                     .background(greenGrad)
-                    .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.card + 4))
-                    .shadow(color: Color(red: 0.15, green: 0.55, blue: 0.30).opacity(0.25), radius: 10, x: 0, y: 5)
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                    .shadow(color: Color(red: 0.15, green: 0.55, blue: 0.30).opacity(0.20), radius: 6, x: 0, y: 3)
                 }
                 .buttonStyle(.plain)
             }
+            .padding(.horizontal, OuraTheme.Spacing.horizontal)
         }
+        .padding(.vertical, 12)
+        .background(OuraTheme.Colors.surfaceSheet)
+        .overlay(
+            VStack {
+                Divider().overlay(OuraTheme.Colors.separator)
+                Spacer()
+            }
+        )
+        .shadow(color: Color.black.opacity(0.04), radius: 6, x: 0, y: -3)
     }
 
     // MARK: - Data
