@@ -31,26 +31,26 @@ struct BerandaView: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 14) {
-                        headerSection
-                        salesCard
-                        
-                        quickActionsSection
-                        
-                        if let dash = dashboard, !dash.lowStockAlerts.isEmpty {
-                            stockAlertsSection(dash.lowStockAlerts)
-                        }
+            ScrollView {
+                VStack(alignment: .leading, spacing: OuraTheme.Spacing.sectionGap) {
+                    headerSection
+                    salesCard
+                    
+                    quickActionsSection
+                    
+                    if let dash = dashboard, !dash.lowStockAlerts.isEmpty {
+                        stockAlertsSection(dash.lowStockAlerts)
                     }
-                    .padding(.horizontal, OuraTheme.Spacing.horizontal)
-                    .padding(.top, 8)
-                    .padding(.bottom, 16)
+                    
+                    // Modul Kasir Penjualan Kilat kini berada di dalam ScrollView,
+                    // di urutan terbawah, sehingga sejajar 100% simetris secara horizontal!
+                    salesCapsuleSection
                 }
-                .refreshable { await loadDashboard() }
-
-                salesCapsuleSection
+                .padding(.horizontal, OuraTheme.Spacing.horizontal)
+                .padding(.top, 8)
+                .padding(.bottom, 16)
             }
+            .refreshable { await loadDashboard() }
             .background(OuraTheme.Colors.background)
             .navigationBarHidden(true)
             .sheet(isPresented: $showTambahPembelian) {
@@ -300,7 +300,7 @@ struct BerandaView: View {
         .buttonStyle(.plain)
     }
 
-    // MARK: - Sales Capsule Top Section (2x Larger, Emerald vs Terracotta Contrast GRadient)
+    // MARK: - Sales Capsule Bottom Section (Vivid Emerald vs Terracotta Contrast Gradient)
 
     private var salesCapsuleSection: some View {
         let greenGrad = LinearGradient(
@@ -319,33 +319,33 @@ struct BerandaView: View {
                 .foregroundStyle(OuraTheme.Colors.textTertiary)
                 .kerning(1.2)
             
-            HStack(spacing: 14) {
+            HStack(spacing: 12) {
                 // Catat Penjualan (Manual)
                 Button {
                     showTambahPenjualan = true
                 } label: {
                     VStack(spacing: 12) {
                         Image(systemName: "bag.badge.plus")
-                            .font(.system(size: 32, weight: .bold))
+                            .font(.system(size: 26, weight: .bold))
                             .foregroundStyle(.white)
-                            .frame(width: 68, height: 68)
+                            .frame(width: 52, height: 52)
                             .background(.white.opacity(0.18))
                             .clipShape(Circle())
                         
-                        VStack(spacing: 4) {
+                        VStack(spacing: 2) {
                             Text("Catat Penjualan")
-                                .font(.system(size: 14, weight: .heavy))
+                                .font(.system(size: 12, weight: .heavy))
                                 .foregroundStyle(.white)
                             Text("Input Manual")
-                                .font(.system(size: 11, weight: .medium))
+                                .font(.system(size: 9, weight: .medium))
                                 .foregroundStyle(.white.opacity(0.8))
                         }
                     }
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 20)
+                    .padding(.vertical, 14)
                     .background(greenGrad)
-                    .clipShape(RoundedRectangle(cornerRadius: 18))
-                    .shadow(color: Color(red: 0.15, green: 0.55, blue: 0.30).opacity(0.25), radius: 10, x: 0, y: 5)
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                    .shadow(color: Color(red: 0.15, green: 0.55, blue: 0.30).opacity(0.20), radius: 6, x: 0, y: 3)
                 }
                 .buttonStyle(.plain)
                 
@@ -355,30 +355,31 @@ struct BerandaView: View {
                 } label: {
                     VStack(spacing: 12) {
                         Image(systemName: "qrcode.viewfinder")
-                            .font(.system(size: 32, weight: .bold))
+                            .font(.system(size: 26, weight: .bold))
                             .foregroundStyle(.white)
-                            .frame(width: 68, height: 68)
+                            .frame(width: 52, height: 52)
                             .background(.white.opacity(0.18))
                             .clipShape(Circle())
                         
-                        VStack(spacing: 4) {
+                        VStack(spacing: 2) {
                             Text("Scan & Jual")
-                                .font(.system(size: 14, weight: .heavy))
+                                .font(.system(size: 12, weight: .heavy))
                                 .foregroundStyle(.white)
                             Text("Pindai QR")
-                                .font(.system(size: 11, weight: .medium))
+                                .font(.system(size: 9, weight: .medium))
                                 .foregroundStyle(.white.opacity(0.8))
                         }
                     }
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 20)
+                    .padding(.vertical, 14)
                     .background(terracottaGrad)
-                    .clipShape(RoundedRectangle(cornerRadius: 18))
-                    .shadow(color: Color(red: 0.75, green: 0.24, blue: 0.12).opacity(0.25), radius: 10, x: 0, y: 5)
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                    .shadow(color: Color(red: 0.75, green: 0.24, blue: 0.12).opacity(0.20), radius: 6, x: 0, y: 3)
                 }
                 .buttonStyle(.plain)
             }
         }
+        .padding(.bottom, 12)
     }
 
     // MARK: - Data
