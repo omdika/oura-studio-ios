@@ -31,21 +31,25 @@ struct BerandaView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: OuraTheme.Spacing.sectionGap) {
-                    headerSection
-                    salesCard
-                    quickActionsSection
-                    if let dash = dashboard, !dash.lowStockAlerts.isEmpty {
-                        stockAlertsSection(dash.lowStockAlerts)
+            VStack(spacing: 0) {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: OuraTheme.Spacing.sectionGap) {
+                        headerSection
+                        salesCard
+                        quickActionsSection
+                        if let dash = dashboard, !dash.lowStockAlerts.isEmpty {
+                            stockAlertsSection(dash.lowStockAlerts)
+                        }
                     }
+                    .padding(.horizontal, OuraTheme.Spacing.horizontal)
+                    .padding(.top, 8)
+                    .padding(.bottom, 24)
                 }
-                .padding(.horizontal, OuraTheme.Spacing.horizontal)
-                .padding(.top, 8)
-                .padding(.bottom, 32)
+                .refreshable { await loadDashboard() }
+
+                salesCapsuleSection
             }
             .background(OuraTheme.Colors.background)
-            .refreshable { await loadDashboard() }
             .navigationBarHidden(true)
             .sheet(isPresented: $showTambahPembelian) {
                 TambahPembelianSheet(preselectedMaterial: nil)
@@ -153,10 +157,10 @@ struct BerandaView: View {
         .foregroundStyle(.white.opacity(0.9))
     }
 
-    // MARK: - Stock alerts
+    // MARK: - Stock alerts (Horizontal Scroll)
 
     private func stockAlertsSection(_ alerts: [LowStockAlert]) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 10) {
             HStack {
                 OuraSectionHeader(title: "Peringatan Stok")
                 Spacer()
@@ -165,68 +169,53 @@ struct BerandaView: View {
                     .foregroundStyle(OuraTheme.Colors.textTertiary)
             }
 
-            let shown = Array(alerts.prefix(alertDisplayCount))
-            VStack(spacing: 0) {
-                ForEach(Array(shown.enumerated()), id: \.element.id) { idx, alert in
-                    stockAlertRow(alert)
-                    if idx < shown.count - 1 {
-                        Divider()
-                            .padding(.leading, OuraTheme.Spacing.listItemH)
-                            .overlay(OuraTheme.Colors.separator)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 12) {
+                    ForEach(alerts) { alert in
+                        stockAlertCard(alert)
                     }
                 }
-            }
-            .ouraCard(OuraTheme.Radius.card)
-
-            if alertDisplayCount < alerts.count {
-                Button {
-                    alertDisplayCount += 4
-                } label: {
-                    Text("Muat Lebih Banyak (\(alerts.count - alertDisplayCount) lagi) ↓")
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(OuraTheme.Colors.textSecondary)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
-                        .background(OuraTheme.Colors.surfaceCard)
-                        .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.medium))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: OuraTheme.Radius.medium)
-                                .stroke(OuraTheme.Colors.border, lineWidth: 0.75)
-                        )
-                }
-                .buttonStyle(.plain)
+                .padding(.vertical, 4)
+                .padding(.horizontal, 2)
             }
         }
     }
 
-    private func stockAlertRow(_ alert: LowStockAlert) -> some View {
-        HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 3) {
-                Text(alert.productName)
-                    .font(.system(size: 14.5, weight: .semibold))
-                    .foregroundStyle(OuraTheme.Colors.textPrimary)
+    private func stockAlertCard(_ alert: LowStockAlert) -> some View {
+        let isOut = alert.currentStockQty == 0
+        return VStack(alignment: .leading, spacing: 6) {
+            HStack {
                 Text("Ukuran \(alert.sizeLabel)")
-                    .font(.system(size: 12))
-                    .foregroundStyle(OuraTheme.Colors.textSecondary)
-            }
-            Spacer()
-            VStack(alignment: .trailing, spacing: 3) {
-                let isOut = alert.currentStockQty == 0
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(OuraTheme.Colors.textTertiary)
+                Spacer()
                 OuraTag(
                     text: isOut ? "Habis" : "Menipis",
                     color: isOut ? OuraTheme.Colors.dangerText : OuraTheme.Colors.warningText,
                     bg:    isOut ? OuraTheme.Colors.dangerBg   : OuraTheme.Colors.warningBg
                 )
-                Text("\(alert.currentStockQty) pcs")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(OuraTheme.Colors.textTertiary)
             }
+            
+            Text(alert.productName)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(OuraTheme.Colors.textPrimary)
+                .lineLimit(1)
+            
+            Text("\(alert.currentStockQty) pcs tersisa")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(isOut ? OuraTheme.Colors.dangerText : OuraTheme.Colors.textSecondary)
         }
-        .padding(.horizontal, OuraTheme.Spacing.listItemH)
-        .padding(.vertical, OuraTheme.Spacing.listItemV)
+        .padding(12)
+        .frame(width: 165)
+        .background(OuraTheme.Colors.surfaceCard)
+        .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.card))
+        .overlay(
+            RoundedRectangle(cornerRadius: OuraTheme.Radius.card)
+                .stroke(OuraTheme.Colors.border, lineWidth: 0.75)
+        )
     }
 
-    // MARK: - Quick actions
+    // MARK: - Quick actions (Simetris 2x2 Grid)
 
     private var quickActionsSection: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -239,13 +228,6 @@ struct BerandaView: View {
                     color: OuraTheme.Colors.blueAccent,
                     bg: OuraTheme.Colors.blueBg
                 ) { showTambahPembelian = true }
-
-                quickActionTile(
-                    icon: "bag.badge.plus",
-                    title: "Catat Penjualan",
-                    color: OuraTheme.Colors.greenAccent,
-                    bg: OuraTheme.Colors.greenBg
-                ) { showTambahPenjualan = true }
 
                 quickActionTile(
                     icon: "hammer.fill",
@@ -268,11 +250,13 @@ struct BerandaView: View {
                 }
 
                 quickActionTile(
-                    icon: "qrcode.viewfinder",
-                    title: "Scan & Jual",
-                    color: OuraTheme.Colors.accent,
-                    bg: OuraTheme.Colors.accentLight
-                ) { showQRScanner = true }
+                    icon: "chart.bar.xaxis",
+                    title: "Laporan Laba",
+                    color: OuraTheme.Colors.purple,
+                    bg: OuraTheme.Colors.purpleBg
+                ) {
+                    appState.selectedTab = 4 // tab Lainnya (Reports)
+                }
             }
         }
     }
@@ -307,6 +291,94 @@ struct BerandaView: View {
             )
         }
         .buttonStyle(.plain)
+    }
+
+    // MARK: - Sales Capsule Bottom Section
+
+    private var salesCapsuleSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("KASIR PENJUALAN KILAT")
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(OuraTheme.Colors.textTertiary)
+                .kerning(1.2)
+                .padding(.horizontal, OuraTheme.Spacing.horizontal)
+            
+            HStack(spacing: 12) {
+                // Catat Penjualan (Manual)
+                Button {
+                    showTambahPenjualan = true
+                } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: "bag.badge.plus")
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundStyle(OuraTheme.Colors.greenAccent)
+                            .frame(width: 38, height: 38)
+                            .background(OuraTheme.Colors.greenBg)
+                            .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.medium))
+                        
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Catat Penjualan")
+                                .font(.system(size: 13, weight: .bold))
+                                .foregroundStyle(OuraTheme.Colors.textPrimary)
+                            Text("Input Manual")
+                                .font(.system(size: 10))
+                                .foregroundStyle(OuraTheme.Colors.textSecondary)
+                        }
+                        Spacer()
+                    }
+                    .padding(10)
+                    .background(OuraTheme.Colors.surfaceCard)
+                    .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.card))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: OuraTheme.Radius.card)
+                            .stroke(OuraTheme.Colors.border, lineWidth: 0.75)
+                    )
+                }
+                .buttonStyle(.plain)
+                
+                // Scan & Jual (QR Scanner)
+                Button {
+                    showQRScanner = true
+                } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: "qrcode.viewfinder")
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundStyle(OuraTheme.Colors.accent)
+                            .frame(width: 38, height: 38)
+                            .background(OuraTheme.Colors.accentLight)
+                            .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.medium))
+                        
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Scan & Jual")
+                                .font(.system(size: 13, weight: .bold))
+                                .foregroundStyle(OuraTheme.Colors.textPrimary)
+                            Text("Pindai QR")
+                                .font(.system(size: 10))
+                                .foregroundStyle(OuraTheme.Colors.textSecondary)
+                        }
+                        Spacer()
+                    }
+                    .padding(10)
+                    .background(OuraTheme.Colors.surfaceCard)
+                    .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.card))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: OuraTheme.Radius.card)
+                            .stroke(OuraTheme.Colors.border, lineWidth: 0.75)
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, OuraTheme.Spacing.horizontal)
+        }
+        .padding(.vertical, 14)
+        .background(OuraTheme.Colors.surfaceSheet)
+        .overlay(
+            VStack {
+                Divider().overlay(OuraTheme.Colors.separator)
+                Spacer()
+            }
+        )
+        .shadow(color: Color.black.opacity(0.04), radius: 8, x: 0, y: -4)
     }
 
     // MARK: - Data
