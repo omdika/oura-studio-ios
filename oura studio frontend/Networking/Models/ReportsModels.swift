@@ -5,6 +5,7 @@ struct SalesReportPoint: Codable, Identifiable {
     let totalRevenue: Double
     let totalProfit: Double
     let orderCount: Int
+    let unitsSold: Int?
 
     var id: String { period }
 
@@ -13,6 +14,7 @@ struct SalesReportPoint: Codable, Identifiable {
         case totalRevenue
         case totalProfit
         case orderCount
+        case unitsSold = "units_sold"
     }
 }
 

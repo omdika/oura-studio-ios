@@ -184,6 +184,8 @@ struct SalesReportDetailView: View {
                             summaryCell("Total Profit", value: r.totalProfit.rupiahFormatted)
                             Spacer()
                             summaryCell("Transaksi", value: "\(r.points.reduce(0) { $0 + $1.orderCount })")
+                            Spacer()
+                            summaryCell("Pcs Terjual", value: "\(byProduct.reduce(0) { $0 + $1.qtySold }) pcs")
                         }
                         .padding(OuraTheme.Spacing.cardPad)
                         .ouraCard()
@@ -202,7 +204,9 @@ struct SalesReportDetailView: View {
                                         Text(point.totalRevenue.rupiahFormatted)
                                             .font(.system(size: 13, weight: .semibold))
                                             .foregroundStyle(OuraTheme.Colors.textPrimary)
-                                        Text("\(point.orderCount) transaksi")
+                                        
+                                        let transactionText = "\(point.orderCount) transaksi" + (point.unitsSold.map { " · \($0) pcs" } ?? "")
+                                        Text(transactionText)
                                             .font(.system(size: 11))
                                             .foregroundStyle(OuraTheme.Colors.textTertiary)
                                     }

@@ -1399,12 +1399,15 @@ class MockAPIService {
         var revenueByDay: [Date: Double] = [:]
         var profitByDay:  [Date: Double] = [:]
         var countByDay:   [Date: Int]    = [:]
+        var unitsByDay:   [Date: Int]    = [:]
         for order in _salesOrders where order.status != "cancelled" {
             let day = cal.startOfDay(for: order.soldAt)
             guard day >= startDay && day <= endDay else { continue }
             revenueByDay[day, default: 0] += order.displayRevenue
             profitByDay[day,  default: 0] += order.displayProfit
             countByDay[day,   default: 0] += 1
+            let totalQty = order.items.reduce(0) { $0 + $1.qty }
+            unitsByDay[day, default: 0] += totalQty
         }
 
         var points: [SalesReportPoint] = []
@@ -1413,9 +1416,10 @@ class MockAPIService {
             let rev   = revenueByDay[d] ?? 0
             let prf   = profitByDay[d]  ?? 0
             let count = countByDay[d]   ?? 0
+            let units = unitsByDay[d]   ?? 0
             guard rev > 0 || count > 0 else { continue }
             points.append(SalesReportPoint(period: fmt.string(from: d),
-                                           totalRevenue: rev, totalProfit: prf, orderCount: count))
+                                           totalRevenue: rev, totalProfit: prf, orderCount: count, unitsSold: units))
         }
 
         let total  = points.reduce(0.0) { $0 + $1.totalRevenue }
