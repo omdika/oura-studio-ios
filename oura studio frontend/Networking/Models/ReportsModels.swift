@@ -124,7 +124,7 @@ struct WasteByMaterial: Codable, Identifiable {
     let materialId: UUID
     let materialName: String
     let avgWastePct: Double
-    let totalWasteAreaCm2: Double
+    let totalWasteAreaCm2: Double?
 
     var id: UUID { materialId }
 

@@ -425,7 +425,7 @@ struct WasteReportView: View {
                                         .foregroundStyle(
                                             item.avgWastePct > 0.2 ? OuraTheme.Colors.dangerText : OuraTheme.Colors.greenAccent
                                         )
-                                    Text("\(item.totalWasteAreaCm2, specifier: "%.0f") cm²")
+                                    Text("\(item.totalWasteAreaCm2 ?? 0, specifier: "%.0f") cm²")
                                         .font(.system(size: 11))
                                         .foregroundStyle(OuraTheme.Colors.textTertiary)
                                 }
