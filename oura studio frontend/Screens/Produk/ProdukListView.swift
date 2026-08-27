@@ -14,6 +14,9 @@ struct ProdukListView: View {
     // an auto-navigation into ProdukDetailView so the user can pick which size(s) to fill in.
     @State private var newlyCreatedProduct: Product?
 
+    @State private var pageSize = 20
+    @State private var visibleCount = 20
+
     private var filtered: [Product] {
         let active = products.filter { !$0.isArchived }
         guard !searchText.isEmpty else { return active }
@@ -28,6 +31,10 @@ struct ProdukListView: View {
                     ($0.fabricVariantName?.localizedCaseInsensitiveContains(q) ?? false)
                 }
         }
+    }
+
+    private var filteredProductsToDisplay: [Product] {
+        Array(filtered.prefix(visibleCount))
     }
 
     private var totalProductsCount: Int {
@@ -47,7 +54,7 @@ struct ProdukListView: View {
             Group {
                 if isLoading {
                     ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if filtered.isEmpty {
+                } else if filteredProductsToDisplay.isEmpty {
                     emptyView
                 } else {
                     productList
@@ -62,6 +69,9 @@ struct ProdukListView: View {
         .navigationTitle("Produk")
         .navigationBarTitleDisplayMode(.large)
         .searchable(text: $searchText, prompt: "Cari produk atau bahan...")
+        .onChange(of: searchText) { _ in
+            visibleCount = pageSize
+        }
         .task { await load() }
         .refreshable { await load() }
         .toolbar {
@@ -167,13 +177,18 @@ struct ProdukListView: View {
                 summaryHeaderView
                     .padding(.bottom, 4)
 
-                ForEach(filtered) { product in
+                ForEach(filteredProductsToDisplay) { product in
                     let sizes = allSizes.filter { $0.productId == product.id && !$0.isArchived }
                     ProductGroupRow(
                         product: product,
                         sizes: sizes,
                         onProductChanged: { Task { await load() } }
                     )
+                    .onAppear {
+                        if product.id == filteredProductsToDisplay.last?.id && visibleCount < filtered.count {
+                            visibleCount = min(visibleCount + pageSize, filtered.count)
+                        }
+                    }
                 }
             }
             .padding(.horizontal, OuraTheme.Spacing.horizontal)
