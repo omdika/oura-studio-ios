@@ -464,10 +464,9 @@ struct QRGeneratorView: View {
         let prods = (try? await api.getProducts()) ?? []
         products = prods.filter { !$0.isArchived }
 
-        for product in products {
-            let sizes = (try? await api.getProductSizes(sku: product.sku)) ?? []
-            sizesByProduct[product.id] = sizes.filter { !$0.isArchived }
-        }
+        let allSizes = (try? await api.getAllProductSizes()) ?? []
+        let activeSizes = allSizes.filter { !$0.isArchived }
+        sizesByProduct = Dictionary(grouping: activeSizes, by: { $0.productId })
     }
 }
 
