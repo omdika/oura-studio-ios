@@ -68,25 +68,33 @@ struct ResepListView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            sectionHeader
-            searchField
-                .padding(.horizontal, OuraTheme.Spacing.horizontal)
-                .padding(.bottom, 6)
+        ZStack(alignment: .bottomTrailing) {
+            VStack(spacing: 0) {
+                searchField
+                    .padding(.top, 10)
+                    .padding(.horizontal, OuraTheme.Spacing.horizontal)
+                    .padding(.bottom, 6)
 
-            Group {
-                if isLoading {
-                    ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if let err = errorMsg {
-                    errorView(err)
-                } else if grouped.isEmpty {
-                    emptyView
-                } else {
-                    specList
+                Group {
+                    if isLoading {
+                        ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else if let err = errorMsg {
+                        errorView(err)
+                    } else if grouped.isEmpty {
+                        emptyView
+                    } else {
+                        specList
+                    }
                 }
             }
+            .background(OuraTheme.Colors.background)
+
+            OuraFAB {
+                showTambah = true
+            }
+            .padding(.trailing, OuraTheme.Spacing.horizontal)
+            .padding(.bottom, 20)
         }
-        .background(OuraTheme.Colors.background)
         .toolbar(.hidden, for: .navigationBar)
         .task { await load() }
         .sheet(isPresented: $showTambah, onDismiss: { Task { await load() } }) {
@@ -95,28 +103,6 @@ struct ResepListView: View {
         .sheet(item: $editSheetItem, onDismiss: { Task { await load() } }) { item in
             EditResepSheet(specGroups: item.specGroups, onUpdate: {})
         }
-    }
-
-    private var sectionHeader: some View {
-        HStack(alignment: .center) {
-            Text("Resep")
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(OuraTheme.Colors.textPrimary)
-            Spacer()
-            Button { showTambah = true } label: {
-                Image(systemName: "plus")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(OuraTheme.Colors.accent)
-                    .frame(width: 32, height: 32)
-                    .background(OuraTheme.Colors.accentLight)
-                    .clipShape(Circle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Tambah Resep")
-        }
-        .padding(.horizontal, OuraTheme.Spacing.horizontal)
-        .padding(.top, 10)
-        .padding(.bottom, 8)
     }
 
     private var searchField: some View {

@@ -48,33 +48,41 @@ struct BahanListView: View {
     private var displayed: [Material] { Array(filtered.prefix(displayCount)) }
 
     var body: some View {
-        VStack(spacing: 0) {
-            sectionHeader
-            searchField
-                .padding(.horizontal, OuraTheme.Spacing.horizontal)
-                .padding(.bottom, 4)
-
-            categoryFilterRow
-                .padding(.bottom, selectedCategory == .fabric && !fabricFamilies.isEmpty ? 6 : 4)
-
-            if selectedCategory == .fabric && !fabricFamilies.isEmpty {
-                familyFilterRow
+        ZStack(alignment: .bottomTrailing) {
+            VStack(spacing: 0) {
+                searchField
+                    .padding(.top, 10)
+                    .padding(.horizontal, OuraTheme.Spacing.horizontal)
                     .padding(.bottom, 4)
-            }
 
-            Group {
-                if isLoading {
-                    ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if let err = errorMsg {
-                    errorView(err)
-                } else if filtered.isEmpty {
-                    emptyView
-                } else {
-                    materialList
+                categoryFilterRow
+                    .padding(.bottom, selectedCategory == .fabric && !fabricFamilies.isEmpty ? 6 : 4)
+
+                if selectedCategory == .fabric && !fabricFamilies.isEmpty {
+                    familyFilterRow
+                        .padding(.bottom, 4)
+                }
+
+                Group {
+                    if isLoading {
+                        ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else if let err = errorMsg {
+                        errorView(err)
+                    } else if filtered.isEmpty {
+                        emptyView
+                    } else {
+                        materialList
+                    }
                 }
             }
+            .background(OuraTheme.Colors.background)
+
+            OuraFAB {
+                showTambah = true
+            }
+            .padding(.trailing, OuraTheme.Spacing.horizontal)
+            .padding(.bottom, 20)
         }
-        .background(OuraTheme.Colors.background)
         .toolbar(.hidden, for: .navigationBar)
         .task {
             await load()
@@ -161,31 +169,6 @@ struct BahanListView: View {
             errorMsg = "Gagal memproses kondisi arsip: \(error.localizedDescription)"
         }
         isLoadingConditions = false
-    }
-
-    // MARK: - Header
-
-    private var sectionHeader: some View {
-        HStack(alignment: .center) {
-            Text("Bahan")
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(OuraTheme.Colors.textPrimary)
-            Spacer()
-            Button {
-                showTambah = true
-            } label: {
-                Image(systemName: "plus")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(OuraTheme.Colors.accent)
-                    .frame(width: 32, height: 32)
-                    .background(OuraTheme.Colors.accentLight)
-                    .clipShape(Circle())
-            }
-            .buttonStyle(.plain)
-        }
-        .padding(.horizontal, OuraTheme.Spacing.horizontal)
-        .padding(.top, 10)
-        .padding(.bottom, 8)
     }
 
     // MARK: - Search

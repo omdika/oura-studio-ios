@@ -1,6 +1,6 @@
 ---
 name: dev-fullstack
-description: Coordinate and build both backend (FastAPI/SQLAlchemy) and frontend (SwiftUI) features for Oura Studios. Use this skill whenever a feature or change spans both frontend and backend layers (e.g., adding reports, modifying schemas, integrating new endpoints, sync operations, performance bottlenecks, or bug fixes across the stack). CRITICAL MANDATE: You MUST always update the handoff specifications first (handoff.md and versions/v3.xx.md) in both repositories before writing any functional code, README files, or other files.
+description: Coordinate and build backend (FastAPI) and frontend (SwiftUI) features for Oura Studios. CRITICAL MANDATE: You MUST update specifications FIRST before code. Update ONLY top 30-50 lines of handoff.md (Revision History) and create lightweight doc/versions/v3.xx.md in both repos. NEVER read full handoff.md.
 ---
 
 # Oura Studios — Fullstack Dev Skill
@@ -9,24 +9,27 @@ This skill governs the end-to-end development of Oura Studios, ensuring tight sy
 
 ---
 
-## 🛑 CORE MANDATE: Specification-First Development (No Code/README First!)
+## 🛑 CORE MANDATE: Specification-First Development (Token-Efficient & Strict)
 
-> **⚠️ ZERO TOLERANCE FOR CODE-FIRST DEVELOPMENT:**
-> Under no circumstances should functional code, configuration files, README files, or other documentation be written **BEFORE** the `handoff.md` and version spec `doc/versions/v3.xx.md` are edited and updated in **BOTH** frontend and backend repositories. 
+> **⚠️ ZERO TOLERANCE FOR CODE-FIRST DEVELOPMENT & FULL FILE READS:**
+> Under no circumstances should functional code or configuration files be written BEFORE the revision history and version specs are updated.
+> NEVER use full `read_file` on `handoff.md`. Always operate with targeted line limits to conserve API tokens.
 
-You must always execute this strict 3-step checklist **BEFORE** any implementation:
+You must always execute this strict 3-step checklist BEFORE any implementation:
 
-- [ ] **Step 1: Update Handoff Revision History.**
-      Add the new version row (e.g. `v3.26`) with status **`PLANNED`** directly at the top of the *Revision History* table inside:
-      *   `doc/handoff.md` (Frontend repo)
-      *   `../backend/doc/handoff.md` (Backend repo)
+- [ ] **Step 1: Update Handoff Revision History (TOKEN EFFICIENT).**
+      ⚠️ DO NOT read the entire `handoff.md` file! 
+      Use `head` or read ONLY the first 30-50 lines of `doc/handoff.md` to locate the Revision History table.
+      Add the new version row (e.g. `v3.22`) with status **`PLANNED`** directly at the top of the table in BOTH repos:
+      * `doc/handoff.md` (Frontend repo)
+      * `../backend/doc/handoff.md` (Backend repo)
+
 - [ ] **Step 2: Create Version Specification File.**
-      Create a dedicated detailed markdown file describing exactly what is going to change:
-      *   `doc/versions/v3.xx.md` (Frontend repo)
-      *   `../backend/doc/versions/v3.xx.md` (Backend repo)
-- [ ] **Step 3: Commit and Push Specifications (Optional but Recommended).**
-      Stage and commit the handoff changes before writing any code to maintain a clean git history of design-first thinking.
+      Create a dedicated lightweight markdown file `doc/versions/v3.xx.md` in BOTH repos.
+      * Base the context ONLY on `context.md` and targeted code search (`grep`). DO NOT load full historical handoffs.
 
+- [ ] **Step 3: Commit Specifications.**
+      Stage and commit the specifications before writing functional code.
 ---
 
 ## 🛠 Step-by-Step Development Workflow
@@ -38,8 +41,10 @@ For every fullstack feature or modification, you must execute this lifecycle:
 *   Analyze model structures, relations, and current API callers.
 *   Identify bottlenecks: check for N+1 queries, unindexed foreign keys, or synchronous multi-request loops on the client side.
 
-### Phase 2: Design & Specification (Handoff Updates FIRST)
-*   Update the `doc/handoff.md` and create `doc/versions/v3.xx.md` in **both repositories** as detailed in the Core Mandate. **Do not write READMEs, scripts, or application code in this phase.**
+### Phase 2: Design & Specification (Token-Efficient Handoff Updates FIRST)
+*   **Targeted Handoff Update:** Update ONLY the first 30–50 lines of `doc/handoff.md` (Revision History table) in both repositories using line-limited insertion. **DO NOT** use `read_file` to load the full `handoff.md` file.
+*   **Create Version Spec:** Create a lightweight `doc/versions/v3.xx.md` file in both repositories. Base the context solely on `context.md` and targeted code searches (`grep`).
+*   **Strict Boundary:** Do not write READMEs, scripts, or functional application code in this phase.
 
 ### Phase 3: Backend Implementation (FastAPI)
 *   **Database & Schemas:** Update Pydantic schemas in `app/schemas/` or entity schemas.
@@ -55,10 +60,12 @@ For every fullstack feature or modification, you must execute this lifecycle:
 *   **Compile Check:** Run `XcodeRefreshCodeIssuesInFile` and `BuildProject` to confirm successful build compilation.
 
 ### Phase 5: Verification & Push to Git
-*   Perform empirical validation to confirm the fix or feature works completely.
-*   Stage and commit modified/new files with clean, semantic messages (e.g. `feat(backend): ...`, `perf(frontend): ...`).
-*   Push to their respective remote GitHub repositories (`origin main`).
-
+*   Perform static compile checks ONLY to confirm the fix works.
+*   **NO AUTOMATED TESTS / NO PARALLEL SIMULATORS:** 
+    * DO NOT execute `Run All Tests`, `Get Test List`, `xcodebuild test`, or automated UI tests.
+    * DO NOT spawn or clone multiple iOS Simulators.
+    * Use only `BuildProject` for Swift and `python3 -m py_compile` for Python.
+*   **MANDATORY GIT PUSH:** Stage, commit with clean semantic messages, and **PUSH** changes to remote repository (`git push origin main` or active branch) in BOTH frontend and backend repositories before finishing the task.
 ---
 
 ## 💎 Technical & Performance Rules

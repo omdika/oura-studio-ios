@@ -369,10 +369,10 @@ struct QRGeneratorView: View {
         // (it had slack from being sized for the 3-line worst case) while the 3-line case, which
         // used up the whole box exactly, kept dropping "ukuran" until this buffer was added too.
         let skuFontSize: CGFloat = 4.5
-        let skuLineH: CGFloat = 6.0
-        let captionFontSize: CGFloat = 5.5
-        let captionLineH: CGFloat = 7.0
-        let maxCaptionLines = 3
+        let skuLineH: CGFloat = 0.0
+        let captionFontSize: CGFloat = 4.5
+        let captionLineH: CGFloat = 5.5
+        let maxCaptionLines = 5
         let captionBoxH: CGFloat = CGFloat(maxCaptionLines) * captionLineH + 6
         let labelH: CGFloat = skuLineH + captionBoxH
         let cellH = qrSize + labelH + 6
@@ -409,27 +409,17 @@ struct QRGeneratorView: View {
                     }
                 }
 
-                // SKU — directly under the QR code, above the product-name caption, smaller font.
-                let skuAttrs: [NSAttributedString.Key: Any] = [
-                    .font: UIFont.systemFont(ofSize: skuFontSize),
-                    .foregroundColor: UIColor.black
-                ]
+                // SKU separate drawing is removed to prevent duplication. SKU is now included directly in the caption label.
                 let skuY = currentY + qrSize + 2
-                size.productSku.draw(
-                    with: CGRect(x: x, y: skuY, width: qrSize, height: skuLineH),
-                    options: .usesLineFragmentOrigin,
-                    attributes: skuAttrs,
-                    context: nil
-                )
 
-                // Caption: product name / fabric variant (jenis kain, if any) / size label. Always
-                // drawn into the same fixed-size captionBoxH regardless of this item's actual line
-                // count -- see the comment above captionBoxH for why a per-item-sized box clipped
-                // the last line (ukuran) for both 2-line and 3-line captions.
-                var captionParts = [size.productName]
-                if let fabric = size.fabricVariantName { captionParts.append(fabric) }
-                captionParts.append(size.sizeLabel)
-                let label = captionParts.joined(separator: "\n")
+                // Caption: SKU - Product Name - Size - Fabric Variant (if any) / SKU - Product Name - Size (if none).
+                // Always drawn into the same fixed-size captionBoxH.
+                let label: String
+                if let fabric = size.fabricVariantName {
+                    label = "\(size.productSku) - \(size.productName) - \(size.sizeLabel) - \(fabric)"
+                } else {
+                    label = "\(size.productSku) - \(size.productName) - \(size.sizeLabel)"
+                }
 
                 let ps = NSMutableParagraphStyle()
                 ps.minimumLineHeight = captionLineH

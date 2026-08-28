@@ -118,7 +118,7 @@ struct ProdukListView: View {
     }
 
     private var summaryHeaderView: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 8) {
             statCard(
                 icon: "tag.fill",
                 title: "Total Produk",
@@ -146,12 +146,12 @@ struct ProdukListView: View {
     }
 
     private func statCard(icon: String, title: String, value: String, color: Color, bg: Color) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 6) {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 4) {
                 Image(systemName: icon)
-                    .font(.system(size: 11, weight: .bold))
+                    .font(.system(size: 10, weight: .bold))
                     .foregroundStyle(color)
-                    .frame(width: 22, height: 22)
+                    .frame(width: 20, height: 20)
                     .background(bg)
                     .clipShape(RoundedRectangle(cornerRadius: 6))
 
@@ -159,14 +159,17 @@ struct ProdukListView: View {
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(OuraTheme.Colors.textSecondary)
                     .lineLimit(1)
+                    .minimumScaleFactor(0.7)
             }
 
             Text(value)
-                .font(.system(size: 16, weight: .bold))
+                .font(.system(size: 15, weight: .bold))
                 .foregroundStyle(OuraTheme.Colors.textPrimary)
                 .lineLimit(1)
+                    .minimumScaleFactor(0.7)
         }
-        .padding(12)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 10)
         .frame(maxWidth: .infinity, alignment: .leading)
         .ouraCard()
     }
