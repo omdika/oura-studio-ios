@@ -65,13 +65,22 @@ struct ProdukListView: View {
 
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
-            Group {
-                if isLoading {
-                    ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if products.filter({ !$0.isArchived }).isEmpty {
-                    emptyView
-                } else {
-                    productList
+            VStack(spacing: 0) {
+                searchHeaderField
+                    .padding(.horizontal, OuraTheme.Spacing.horizontal)
+                    .padding(.top, 10)
+                    .padding(.bottom, 6)
+                
+                Divider().overlay(OuraTheme.Colors.separator)
+
+                Group {
+                    if isLoading {
+                        ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else if products.filter({ !$0.isArchived }).isEmpty {
+                        emptyView
+                    } else {
+                        productList
+                    }
                 }
             }
             .background(OuraTheme.Colors.background)
@@ -82,10 +91,6 @@ struct ProdukListView: View {
         }
         .navigationTitle("Produk")
         .navigationBarTitleDisplayMode(.large)
-        .searchable(text: $searchText, prompt: "Cari produk atau bahan...")
-        .onChange(of: searchText) { _ in
-            visibleCount = pageSize
-        }
         .onChange(of: isFilterActive) { _ in
             Task { await load() }
         }
@@ -129,8 +134,74 @@ struct ProdukListView: View {
                 .environmentObject(api)
         }
         .sheet(isPresented: $showQRGenerator) {
-            QRGeneratorView()
+            QRGeneratorView(initialIsFilterActive: isFilterActive,
+                            initialFilterFrom: filterFrom,
+                            initialFilterTo: filterTo,
+                            initialSearchText: searchText)
                 .environmentObject(api)
+        }
+    }
+
+    private var searchHeaderField: some View {
+        HStack(spacing: 8) {
+            // Textfield
+            HStack(spacing: 8) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundStyle(OuraTheme.Colors.textTertiary)
+                    .font(.system(size: 14))
+                TextField("Cari produk atau bahan...", text: $searchText)
+                    .font(.system(size: 14))
+                    .foregroundStyle(OuraTheme.Colors.textPrimary)
+                    .autocorrectionDisabled()
+                    .textInputAutocapitalization(.never)
+                if !searchText.isEmpty {
+                    Button { searchText = "" } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(OuraTheme.Colors.textTertiary)
+                            .font(.system(size: 14))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 9)
+            .background(OuraTheme.Colors.surfaceCard)
+            .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.medium))
+            .overlay(
+                RoundedRectangle(cornerRadius: OuraTheme.Radius.medium)
+                    .stroke(OuraTheme.Colors.border, lineWidth: 0.75)
+            )
+            
+            // X button (Cancel/Clear search)
+            if !searchText.isEmpty {
+                Button {
+                    searchText = ""
+                    // Dismiss keyboard
+                    UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(OuraTheme.Colors.textPrimary)
+                        .frame(width: 32, height: 32)
+                        .background(OuraTheme.Colors.border)
+                        .clipShape(Circle())
+                }
+                .buttonStyle(.plain)
+            }
+            
+            // Shortcut QR Generator button
+            Button {
+                showQRGenerator = true
+            } label: {
+                Image(systemName: "qrcode")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(OuraTheme.Colors.accent)
+                    .frame(width: 32, height: 32)
+                    .background(OuraTheme.Colors.accentLight)
+                    .clipShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Shortcut QR")
         }
     }
 

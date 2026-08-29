@@ -18,6 +18,16 @@ struct QRGeneratorView: View {
     @State private var filterTo = Date()
     @State private var additionsByVariant: [UUID: Int] = [:]
 
+    init(initialIsFilterActive: Bool = false,
+         initialFilterFrom: Date = Date(),
+         initialFilterTo: Date = Date(),
+         initialSearchText: String = "") {
+        _isFilterActive = State(initialValue: initialIsFilterActive)
+        _filterFrom = State(initialValue: initialFilterFrom)
+        _filterTo = State(initialValue: initialFilterTo)
+        _searchText = State(initialValue: initialSearchText)
+    }
+
     private var filteredProducts: [Product] {
         let base: [Product]
         let active = products
