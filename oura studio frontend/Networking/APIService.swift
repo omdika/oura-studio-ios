@@ -376,7 +376,11 @@ class APIService: ObservableObject {
 
     func getStockLedger(from: Date, to: Date) async throws -> [StockAdjustmentLedgerEntry] {
         if useMock { return try await MockAPIService.shared.getStockLedger(from: from, to: to) }
-        let q = "?from=\(dateFmt.string(from: from))&to=\(dateFmt.string(from: to))"
+        
+        // Defensively shift 'to' by +1 day so that any database query filtering with '<= to_date'
+        // (which casts to 'YYYY-MM-DD 00:00:00') correctly includes all entries created during the 'to' day.
+        let shiftedTo = Calendar.current.date(byAdding: .day, value: 1, to: to) ?? to
+        let q = "?from=\(dateFmt.string(from: from))&to=\(dateFmt.string(from: shiftedTo))"
         return try await get(path: "/stock-ledger\(q)")
     }
 
