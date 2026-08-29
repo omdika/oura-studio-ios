@@ -376,8 +376,11 @@ struct ProdukListView: View {
         if isFilterActive {
             do {
                 let entries = try await api.getStockLedger(from: filterFrom, to: filterTo)
-                ledgerAdditions = Dictionary(grouping: entries.filter { $0.changeQty > 0 }, by: { $0.productSizeId })
+                // Group all entries by size, sum all changes (positive and negative) to get the net addition,
+                // and keep only those sizes that had a net positive stock increase in this period.
+                ledgerAdditions = Dictionary(grouping: entries, by: { $0.productSizeId })
                     .mapValues { entries in entries.reduce(0) { $0 + $1.changeQty } }
+                    .filter { $0.value > 0 }
             } catch {
                 print("⚠️ [v3.44] Gagal memuat stock ledger dari backend: \(error)")
             }
