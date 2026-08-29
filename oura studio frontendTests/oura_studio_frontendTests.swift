@@ -65,4 +65,29 @@ struct oura_studio_frontendTests {
         #expect(xlEntry?.changeQty == 15)
         #expect(xlEntry?.reason == "initial")
     }
+
+    @Test func testStockLedgerNegativeAdjustment() async throws {
+        let api = MockAPIService.shared
+        let sizeScrunXL = UUID(uuidString: "55555555-0000-0000-0000-000000000007")! // L · Silk Putih
+        
+        let initialSize = try await api.getProductSizeById(id: sizeScrunXL)
+        let initialStock = initialSize.currentStockQty
+        
+        // 1. Perform negative adjustment (e.g. reduction of 3 pcs)
+        let updatedSize = try await api.adjustStock(sku: "SCRUNCHIE", sizeId: sizeScrunXL, qty: -3, reason: "adjustment", note: nil)
+        #expect(updatedSize.currentStockQty == initialStock - 3)
+        
+        // 2. Fetch today's ledger entries and find our negative entry
+        let today = Date()
+        let todayEntries = try await api.getStockLedger(from: today, to: today)
+        let negEntry = todayEntries.first { $0.productSizeId == sizeScrunXL && $0.changeQty == -3 }
+        #expect(negEntry != nil)
+        #expect(negEntry?.reason == "adjustment")
+        
+        // 3. Verify that v3.44 positive addition logic ignores this negative entry
+        let additionsMap = Dictionary(grouping: todayEntries.filter { $0.changeQty > 0 }, by: { $0.productSizeId })
+            .mapValues { entries in entries.reduce(0) { $0 + $1.changeQty } }
+        
+        #expect(additionsMap[sizeScrunXL] == nil)
+    }
 }

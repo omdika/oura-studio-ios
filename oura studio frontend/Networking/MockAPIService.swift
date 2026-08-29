@@ -1088,17 +1088,22 @@ class MockAPIService {
               let idx = list.firstIndex(where: { $0.id == sizeId }) else {
             throw APIError.serverError(404, "Ukuran tidak ditemukan")
         }
-        guard qty > 0 else {
-            throw APIError.serverError(400, "Jumlah harus lebih dari 0")
+        guard qty != 0 else {
+            return list[idx]
         }
         let old = list[idx]
+        let newCurrentStock = old.currentStockQty + qty
+        guard newCurrentStock >= 0 else {
+            throw APIError.serverError(400, "Stok tidak boleh kurang dari 0")
+        }
+        let newManualStock = max(0, old.manualStockQty + qty)
         let updated = ProductSizeDetail(id: old.id, productId: old.productId, productSku: old.productSku,
                                         productName: old.productName, sizeLabel: old.sizeLabel,
                                         fabricVariantName: old.fabricVariantName,
                                         reorderMinQty: old.reorderMinQty, isArchived: old.isArchived,
-                                        currentStockQty: old.currentStockQty + qty,
+                                        currentStockQty: newCurrentStock,
                                         productionStockQty: old.productionStockQty,
-                                        manualStockQty: old.manualStockQty + qty,
+                                        manualStockQty: newManualStock,
                                         latestHppBreakdown: old.latestHppBreakdown,
                                         sellingPrice: old.sellingPrice, marginPct: old.marginPct)
         list[idx] = updated

@@ -924,10 +924,10 @@ struct ProdukSizeDetailView: View {
     @State private var isEditing = false
     @State private var editSellingPrice: Double?
     @State private var editReorderMin: Double?
-    // Quick add-stock field shown inline in Edit mode -- always starts at nil/empty (it's a delta
-    // to add on save, not the current stock qty). The "+" button / TambahStokSheet flow (with
-    // bahan-deduction toggle) stays as the other, more capable way to add stock.
-    @State private var editAddStockQty: Double?
+    // Stock field shown inline in Edit mode -- initialized with the current stock qty.
+    // The "+" button / TambahStokSheet flow (with bahan-deduction toggle) stays as
+    // the other, more capable way to add stock.
+    @State private var editStockQty: Double?
     @State private var editHppFabric: Double?
     @State private var editHppPooled: Double?
     @State private var editHppHardware: Double?
@@ -1082,7 +1082,7 @@ struct ProdukSizeDetailView: View {
             stockRow
             if isEditing {
                 Divider().overlay(OuraTheme.Colors.separator)
-                NumericInputField(label: "Tambah Stok (pcs)", value: $editAddStockQty, unit: "pcs")
+                NumericInputField(label: "Stok (pcs)", value: $editStockQty, unit: "pcs")
                 CurrencyInputField(label: "Harga Jual", value: $editSellingPrice)
                 NumericInputField(label: "Reorder Min (pcs)", value: $editReorderMin, unit: "pcs")
             } else {
@@ -1338,7 +1338,7 @@ struct ProdukSizeDetailView: View {
     private func startEdit() {
         editSellingPrice = size.sellingPrice
         editReorderMin = size.reorderMinQty
-        editAddStockQty = nil
+        editStockQty = Double(size.currentStockQty)
         hppFromSpec = false
         if let manualHpp = size.manualHppBreakdown {
             editHppFabric   = manualHpp.fabric        > 0 ? manualHpp.fabric        : nil
@@ -1370,14 +1370,16 @@ struct ProdukSizeDetailView: View {
                     manualHppHardware: includeManualHpp ? (editHppHardware ?? 0) : nil,
                     manualHppLabor:    includeManualHpp ? (editHppLabor    ?? 0) : nil,
                     manualHppOverhead: includeManualHpp ? (editHppOverhead ?? 0) : nil))
-            // Quick add-stock field in Edit mode — plain adjustment, no bahan deduction (that stays
-            // the job of the "+" button / TambahStokSheet). Applied after the price/HPP patch so the
-            // returned detail (fetched fresh via GET, unlike the patch response) reflects both.
-            if let qty = editAddStockQty, qty > 0 {
-                updated = try await api.adjustStock(sku: size.productSku, sizeId: size.id, qty: Int(qty), reason: "adjustment")
+            // Stock adjustment in Edit mode — plain adjustment, no bahan deduction.
+            // Calculates difference between new and old stock, then calls adjustStock.
+            if let newStock = editStockQty {
+                let diff = Int(newStock) - size.currentStockQty
+                if diff != 0 {
+                    updated = try await api.adjustStock(sku: size.productSku, sizeId: size.id, qty: diff, reason: "adjustment")
+                }
             }
             size = updated
-            editAddStockQty = nil
+            editStockQty = nil
             withAnimation { isEditing = false }
         } catch let e as APIError { errorMsg = e.errorDescription }
         catch { errorMsg = error.localizedDescription }
