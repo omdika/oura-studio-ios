@@ -78,8 +78,6 @@ struct QRGeneratorView: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if products.isEmpty {
                     emptyView
-                } else if filteredProducts.isEmpty {
-                    noResultsView
                 } else {
                     productList
                 }
@@ -139,156 +137,177 @@ struct QRGeneratorView: View {
                 .listRowBackground(OuraTheme.Colors.surfaceCard)
             }
 
-            Section {
-                Button {
-                    if allSelectableSelected {
-                        allSelectableSizes.forEach {
-                            selectedSizeIds.remove($0.id)
-                            qtyPerSize.removeValue(forKey: $0.id)
-                        }
-                    } else {
-                        allSelectableSizes.forEach {
-                            selectedSizeIds.insert($0.id)
-                            if qtyPerSize[$0.id] == nil {
-                                if isFilterActive {
-                                    qtyPerSize[$0.id] = additionsByVariant[$0.id] ?? 1
-                                } else {
-                                    qtyPerSize[$0.id] = max(1, $0.currentStockQty)
-                                }
-                            }
-                        }
-                    }
-                } label: {
-                    HStack {
-                        Text(allSelectableSelected ? "Batal Semua" : "Pilih Semua")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(OuraTheme.Colors.accent)
-                        Spacer()
-                        Image(systemName: allSelectableSelected ? "checkmark.circle.fill" : "circle")
-                            .font(.system(size: 18))
-                            .foregroundStyle(allSelectableSelected ? OuraTheme.Colors.accent : OuraTheme.Colors.border)
-                    }
-                }
-                .buttonStyle(.plain)
-                .listRowBackground(OuraTheme.Colors.surfaceCard)
-                .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
-            }
-
-            ForEach(filteredProducts) { product in
-                let sizes = filteredSizes(for: product)
-                if !sizes.isEmpty {
-                    Section {
-                        ForEach(sizes) { size in
-                            let isSelected = selectedSizeIds.contains(size.id)
-                            let qty = qtyPerSize[size.id] ?? 1
-                            HStack(spacing: 12) {
-                                if let img = makeQRImage(for: size.id) {
-                                    Image(uiImage: img)
-                                        .interpolation(.none)
-                                        .resizable()
-                                        .frame(width: 44, height: 44)
-                                        .clipShape(RoundedRectangle(cornerRadius: 6))
-                                }
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(size.displayLabel)
-                                        .font(.system(size: 14, weight: .medium))
-                                        .foregroundStyle(OuraTheme.Colors.textPrimary)
-                                    Text("Stok: \(size.currentStockQty) pcs")
-                                        .font(.system(size: 12))
-                                        .foregroundStyle(OuraTheme.Colors.textTertiary)
-                                }
-                                Spacer()
-                                if isSelected {
-                                    HStack(spacing: 2) {
-                                        Button {
-                                            let newQty = max(1, qty - 1)
-                                            qtyPerSize[size.id] = newQty
-                                        } label: {
-                                            Image(systemName: "minus")
-                                                .font(.system(size: 12, weight: .semibold))
-                                                .frame(width: 28, height: 28)
-                                                .background(OuraTheme.Colors.surfaceSheet)
-                                                .clipShape(Circle())
-                                                .foregroundStyle(qty > 1 ? OuraTheme.Colors.textPrimary : OuraTheme.Colors.textDisabled)
-                                        }
-                                        .buttonStyle(.plain)
-                                        .disabled(qty <= 1)
-
-                                        Text("\(qty)")
-                                            .font(.system(size: 14, weight: .semibold))
-                                            .foregroundStyle(OuraTheme.Colors.accent)
-                                            .frame(minWidth: 26, alignment: .center)
-
-                                        Button {
-                                            qtyPerSize[size.id] = qty + 1
-                                        } label: {
-                                            Image(systemName: "plus")
-                                                .font(.system(size: 12, weight: .semibold))
-                                                .frame(width: 28, height: 28)
-                                                .background(OuraTheme.Colors.surfaceSheet)
-                                                .clipShape(Circle())
-                                                .foregroundStyle(OuraTheme.Colors.textPrimary)
-                                        }
-                                        .buttonStyle(.plain)
-                                    }
-                                    .padding(.trailing, 4)
-                                }
-                                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                                    .font(.system(size: 22))
-                                    .foregroundStyle(isSelected ? OuraTheme.Colors.accent : OuraTheme.Colors.border)
-                            }
-                            .contentShape(Rectangle())
-                            .onTapGesture {
-                                if isSelected {
-                                    selectedSizeIds.remove(size.id)
-                                    qtyPerSize.removeValue(forKey: size.id)
-                                } else {
-                                    selectedSizeIds.insert(size.id)
-                                    if isFilterActive {
-                                        qtyPerSize[size.id] = additionsByVariant[size.id] ?? 1
-                                    } else {
-                                        qtyPerSize[size.id] = max(1, size.currentStockQty)
-                                    }
-                                }
-                            }
-                            .listRowBackground(OuraTheme.Colors.surfaceCard)
-                            .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
-                        }
-
-                        let allSelected = sizes.allSatisfy { selectedSizeIds.contains($0.id) }
-                        Button {
-                            if allSelected {
-                                sizes.forEach {
-                                    selectedSizeIds.remove($0.id)
-                                    qtyPerSize.removeValue(forKey: $0.id)
-                                }
-                            } else {
-                                sizes.forEach {
-                                    selectedSizeIds.insert($0.id)
-                                    if qtyPerSize[$0.id] == nil {
-                                        if isFilterActive {
-                                            qtyPerSize[$0.id] = additionsByVariant[$0.id] ?? 1
-                                        } else {
-                                            qtyPerSize[$0.id] = max(1, $0.currentStockQty)
-                                        }
-                                    }
-                                }
-                            }
-                        } label: {
-                            Text(allSelected ? "Batal pilih semua" : "Pilih semua ukuran")
-                                .font(.system(size: 13, weight: .medium))
-                                .foregroundStyle(OuraTheme.Colors.accent)
-                        }
-                        .buttonStyle(.plain)
-                        .listRowBackground(OuraTheme.Colors.surfaceCard)
-                        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
-                    } header: {
-                        Text(product.name)
-                            .font(.system(size: 13, weight: .semibold))
+            if filteredProducts.isEmpty {
+                Section {
+                    VStack(spacing: 12) {
+                        Image(systemName: "magnifyingglass")
+                            .font(.system(size: 40))
+                            .foregroundStyle(OuraTheme.Colors.textTertiary)
+                            .padding(.top, 24)
+                        Text("Tidak ada hasil")
+                            .font(.system(size: 15, weight: .medium))
                             .foregroundStyle(OuraTheme.Colors.textSecondary)
-                            .textCase(.none)
+                        Text("Coba ganti kata kunci pencarian atau matikan/ubah rentang tanggal filter.")
+                            .font(.system(size: 13))
+                            .foregroundStyle(OuraTheme.Colors.textTertiary)
+                            .multilineTextAlignment(.center)
+                            .padding(.bottom, 24)
                     }
-                    .listSectionSeparatorTint(OuraTheme.Colors.separator)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .listRowBackground(OuraTheme.Colors.surfaceCard)
+                }
+            } else {
+                Section {
+                    Button {
+                        if allSelectableSelected {
+                            allSelectableSizes.forEach {
+                                selectedSizeIds.remove($0.id)
+                                qtyPerSize.removeValue(forKey: $0.id)
+                            }
+                        } else {
+                            allSelectableSizes.forEach {
+                                selectedSizeIds.insert($0.id)
+                                if qtyPerSize[$0.id] == nil {
+                                    if isFilterActive {
+                                        qtyPerSize[$0.id] = additionsByVariant[$0.id] ?? 1
+                                    } else {
+                                        qtyPerSize[$0.id] = max(1, $0.currentStockQty)
+                                    }
+                                }
+                            }
+                        }
+                    } label: {
+                        HStack {
+                            Text(allSelectableSelected ? "Batal Semua" : "Pilih Semua")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(OuraTheme.Colors.accent)
+                            Spacer()
+                            Image(systemName: allSelectableSelected ? "checkmark.circle.fill" : "circle")
+                                .font(.system(size: 18))
+                                .foregroundStyle(allSelectableSelected ? OuraTheme.Colors.accent : OuraTheme.Colors.border)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .listRowBackground(OuraTheme.Colors.surfaceCard)
+                    .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
+                }
+
+                ForEach(filteredProducts) { product in
+                    let sizes = filteredSizes(for: product)
+                    if !sizes.isEmpty {
+                        Section {
+                            ForEach(sizes) { size in
+                                let isSelected = selectedSizeIds.contains(size.id)
+                                let qty = qtyPerSize[size.id] ?? 1
+                                HStack(spacing: 12) {
+                                    if let img = makeQRImage(for: size.id) {
+                                        Image(uiImage: img)
+                                            .interpolation(.none)
+                                            .resizable()
+                                            .frame(width: 44, height: 44)
+                                            .clipShape(RoundedRectangle(cornerRadius: 6))
+                                    }
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(size.displayLabel)
+                                            .font(.system(size: 14, weight: .medium))
+                                            .foregroundStyle(OuraTheme.Colors.textPrimary)
+                                        Text("Stok: \(size.currentStockQty) pcs")
+                                            .font(.system(size: 12))
+                                            .foregroundStyle(OuraTheme.Colors.textTertiary)
+                                    }
+                                    Spacer()
+                                    if isSelected {
+                                        HStack(spacing: 2) {
+                                            Button {
+                                                let newQty = max(1, qty - 1)
+                                                qtyPerSize[size.id] = newQty
+                                            } label: {
+                                                Image(systemName: "minus")
+                                                    .font(.system(size: 12, weight: .semibold))
+                                                    .frame(width: 28, height: 28)
+                                                    .background(OuraTheme.Colors.surfaceSheet)
+                                                    .clipShape(Circle())
+                                                    .foregroundStyle(qty > 1 ? OuraTheme.Colors.textPrimary : OuraTheme.Colors.textDisabled)
+                                            }
+                                            .buttonStyle(.plain)
+                                            .disabled(qty <= 1)
+
+                                            Text("\(qty)")
+                                                .font(.system(size: 14, weight: .semibold))
+                                                .foregroundStyle(OuraTheme.Colors.accent)
+                                                .frame(minWidth: 26, alignment: .center)
+
+                                            Button {
+                                                qtyPerSize[size.id] = qty + 1
+                                            } label: {
+                                                Image(systemName: "plus")
+                                                    .font(.system(size: 12, weight: .semibold))
+                                                    .frame(width: 28, height: 28)
+                                                    .background(OuraTheme.Colors.surfaceSheet)
+                                                    .clipShape(Circle())
+                                                    .foregroundStyle(OuraTheme.Colors.textPrimary)
+                                            }
+                                            .buttonStyle(.plain)
+                                        }
+                                        .padding(.trailing, 4)
+                                    }
+                                    Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                                        .font(.system(size: 22))
+                                        .foregroundStyle(isSelected ? OuraTheme.Colors.accent : OuraTheme.Colors.border)
+                                }
+                                .contentShape(Rectangle())
+                                .onTapGesture {
+                                    if isSelected {
+                                        selectedSizeIds.remove(size.id)
+                                        qtyPerSize.removeValue(forKey: size.id)
+                                    } else {
+                                        selectedSizeIds.insert(size.id)
+                                        if isFilterActive {
+                                            qtyPerSize[size.id] = additionsByVariant[size.id] ?? 1
+                                        } else {
+                                            qtyPerSize[size.id] = max(1, size.currentStockQty)
+                                        }
+                                    }
+                                }
+                                .listRowBackground(OuraTheme.Colors.surfaceCard)
+                                .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
+                            }
+
+                            let allSelected = sizes.allSatisfy { selectedSizeIds.contains($0.id) }
+                            Button {
+                                if allSelected {
+                                    sizes.forEach {
+                                        selectedSizeIds.remove($0.id)
+                                        qtyPerSize.removeValue(forKey: $0.id)
+                                    }
+                                } else {
+                                    sizes.forEach {
+                                        selectedSizeIds.insert($0.id)
+                                        if qtyPerSize[$0.id] == nil {
+                                            if isFilterActive {
+                                                qtyPerSize[$0.id] = additionsByVariant[$0.id] ?? 1
+                                            } else {
+                                                qtyPerSize[$0.id] = max(1, $0.currentStockQty)
+                                            }
+                                        }
+                                    }
+                                }
+                            } label: {
+                                Text(allSelected ? "Batal pilih semua" : "Pilih semua ukuran")
+                                    .font(.system(size: 13, weight: .medium))
+                                    .foregroundStyle(OuraTheme.Colors.accent)
+                            }
+                            .buttonStyle(.plain)
+                            .listRowBackground(OuraTheme.Colors.surfaceCard)
+                            .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                        } header: {
+                            Text(product.name)
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(OuraTheme.Colors.textSecondary)
+                                .textCase(.none)
+                        }
+                        .listSectionSeparatorTint(OuraTheme.Colors.separator)
+                    }
                 }
             }
         }

@@ -68,7 +68,7 @@ struct ProdukListView: View {
             Group {
                 if isLoading {
                     ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if filteredProductsToDisplay.isEmpty {
+                } else if products.filter({ !$0.isArchived }).isEmpty {
                     emptyView
                 } else {
                     productList
@@ -224,19 +224,37 @@ struct ProdukListView: View {
 
                 dateFilterSection
 
-                ForEach(filteredProductsToDisplay) { product in
-                    let sizes = allSizes.filter { s in
-                        s.productId == product.id && !s.isArchived && (!isFilterActive || additionsByVariant[s.id] != nil)
+                if filteredProductsToDisplay.isEmpty {
+                    VStack(spacing: 12) {
+                        Image(systemName: "magnifyingglass")
+                            .font(.system(size: 40))
+                            .foregroundStyle(OuraTheme.Colors.textTertiary)
+                            .padding(.top, 40)
+                        Text("Produk tidak ditemukan")
+                            .font(.system(size: 15, weight: .medium))
+                            .foregroundStyle(OuraTheme.Colors.textSecondary)
+                        Text("Coba ganti kata kunci pencarian atau matikan/ubah rentang tanggal filter.")
+                            .font(.system(size: 13))
+                            .foregroundStyle(OuraTheme.Colors.textTertiary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 32)
                     }
-                    ProductGroupRow(
-                        product: product,
-                        sizes: sizes,
-                        additionsByVariant: additionsByVariant,
-                        onProductChanged: { Task { await load() } }
-                    )
-                    .onAppear {
-                        if product.id == filteredProductsToDisplay.last?.id && visibleCount < filtered.count {
-                            visibleCount = min(visibleCount + pageSize, filtered.count)
+                    .frame(maxWidth: .infinity)
+                } else {
+                    ForEach(filteredProductsToDisplay) { product in
+                        let sizes = allSizes.filter { s in
+                            s.productId == product.id && !s.isArchived && (!isFilterActive || additionsByVariant[s.id] != nil)
+                        }
+                        ProductGroupRow(
+                            product: product,
+                            sizes: sizes,
+                            additionsByVariant: additionsByVariant,
+                            onProductChanged: { Task { await load() } }
+                        )
+                        .onAppear {
+                            if product.id == filteredProductsToDisplay.last?.id && visibleCount < filtered.count {
+                                visibleCount = min(visibleCount + pageSize, filtered.count)
+                            }
                         }
                     }
                 }
