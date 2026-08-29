@@ -13,30 +13,41 @@ struct QRGeneratorView: View {
     @State private var isLoading = true
     @State private var searchText = ""
 
+    @State private var isFilterActive = false
+    @State private var filterFrom = Date()
+    @State private var filterTo = Date()
+    @State private var additionsByVariant: [UUID: Int] = [:]
+
     private var filteredProducts: [Product] {
         let base: [Product]
-        if searchText.isEmpty {
-            base = products
-        } else {
-            base = products.filter { product in
-                if product.name.localizedCaseInsensitiveContains(searchText) { return true }
+        let active = products
+        
+        let dateFiltered = active.filter { product in
+            if isFilterActive {
                 let sizes = (sizesByProduct[product.id] ?? []).filter { !$0.isArchived }
-                return sizes.contains { $0.displayLabel.localizedCaseInsensitiveContains(searchText) }
+                return sizes.contains { additionsByVariant[$0.id] != nil }
+            }
+            return true
+        }
+
+        if searchText.isEmpty {
+            base = dateFiltered
+        } else {
+            base = dateFiltered.filter { product in
+                if product.name.localizedCaseInsensitiveContains(searchText) { return true }
+                let sizes = filteredSizes(for: product)
+                return !sizes.isEmpty
             }
         }
         return base.sorted { $0.name.localizedCompare($1.name) == .orderedAscending }
     }
 
     private func filteredSizes(for product: Product) -> [ProductSizeDetail] {
-        // Reuses the same grouping/fallback ProdukSizeGroupView uses (makeSizeGroups +
-        // ProdukSizeGroup.displayVariants, in ProdukDetailView.swift) instead of this view's own
-        // separate "hide the parent row when variants exist" heuristic -- that heuristic only
-        // ever hid the fabric-less parent row and should have kept every real fabric variant, but
-        // in practice a size with multiple fabric variants (e.g. XS with Satin Pink AND Satin
-        // Hijau) was only showing one of them here while the Produk tab correctly showed both.
-        // Sharing the exact same grouping logic guarantees this list can't drift from what the
-        // Produk tab shows again, regardless of what the discrepancy actually was.
-        let groups = makeSizeGroups(from: sizesByProduct[product.id] ?? [])
+        let baseSizes = sizesByProduct[product.id] ?? []
+        let dateFiltered = baseSizes.filter { size in
+            !isFilterActive || additionsByVariant[size.id] != nil
+        }
+        let groups = makeSizeGroups(from: dateFiltered)
         let all = groups.flatMap { $0.displayVariants }
         guard !searchText.isEmpty, !product.name.localizedCaseInsensitiveContains(searchText) else { return all }
         return all.filter { $0.displayLabel.localizedCaseInsensitiveContains(searchText) }
@@ -93,6 +104,9 @@ struct QRGeneratorView: View {
                 PrintPreviewSheet(pdfData: data, count: totalLabelCount)
             }
         }
+        .onChange(of: isFilterActive) { _ in
+            Task { await loadData() }
+        }
         .task { await loadData() }
     }
 
@@ -100,6 +114,31 @@ struct QRGeneratorView: View {
 
     private var productList: some View {
         List {
+            Section {
+                VStack(spacing: 10) {
+                    Toggle(isOn: $isFilterActive.animation()) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "calendar.badge.clock")
+                                .font(.system(size: 14))
+                                .foregroundStyle(isFilterActive ? OuraTheme.Colors.greenAccent : OuraTheme.Colors.textSecondary)
+                            Text("Filter berdasarkan Tanggal Masuk Stok")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(OuraTheme.Colors.textPrimary)
+                        }
+                    }
+                    .tint(OuraTheme.Colors.greenAccent)
+                    
+                    if isFilterActive {
+                        DateRangeField(from: $filterFrom, to: $filterTo) {
+                            Task { await loadData() }
+                        }
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+                    }
+                }
+                .padding(.vertical, 4)
+                .listRowBackground(OuraTheme.Colors.surfaceCard)
+            }
+
             Section {
                 Button {
                     if allSelectableSelected {
@@ -110,7 +149,13 @@ struct QRGeneratorView: View {
                     } else {
                         allSelectableSizes.forEach {
                             selectedSizeIds.insert($0.id)
-                            if qtyPerSize[$0.id] == nil { qtyPerSize[$0.id] = max(1, $0.currentStockQty) }
+                            if qtyPerSize[$0.id] == nil {
+                                if isFilterActive {
+                                    qtyPerSize[$0.id] = additionsByVariant[$0.id] ?? 1
+                                } else {
+                                    qtyPerSize[$0.id] = max(1, $0.currentStockQty)
+                                }
+                            }
                         }
                     }
                 } label: {
@@ -199,7 +244,11 @@ struct QRGeneratorView: View {
                                     qtyPerSize.removeValue(forKey: size.id)
                                 } else {
                                     selectedSizeIds.insert(size.id)
-                                    qtyPerSize[size.id] = max(1, size.currentStockQty)
+                                    if isFilterActive {
+                                        qtyPerSize[size.id] = additionsByVariant[size.id] ?? 1
+                                    } else {
+                                        qtyPerSize[size.id] = max(1, size.currentStockQty)
+                                    }
                                 }
                             }
                             .listRowBackground(OuraTheme.Colors.surfaceCard)
@@ -216,7 +265,13 @@ struct QRGeneratorView: View {
                             } else {
                                 sizes.forEach {
                                     selectedSizeIds.insert($0.id)
-                                    if qtyPerSize[$0.id] == nil { qtyPerSize[$0.id] = max(1, $0.currentStockQty) }
+                                    if qtyPerSize[$0.id] == nil {
+                                        if isFilterActive {
+                                            qtyPerSize[$0.id] = additionsByVariant[$0.id] ?? 1
+                                        } else {
+                                            qtyPerSize[$0.id] = max(1, $0.currentStockQty)
+                                        }
+                                    }
                                 }
                             }
                         } label: {
@@ -457,6 +512,15 @@ struct QRGeneratorView: View {
         let allSizes = (try? await api.getAllProductSizes()) ?? []
         let activeSizes = allSizes.filter { !$0.isArchived }
         sizesByProduct = Dictionary(grouping: activeSizes, by: { $0.productId })
+        
+        var ledgerAdditions: [UUID: Int] = [:]
+        if isFilterActive {
+            if let entries = try? await api.getStockLedger(from: filterFrom, to: filterTo) {
+                ledgerAdditions = Dictionary(grouping: entries.filter { $0.changeQty > 0 }, by: { $0.productSizeId })
+                    .mapValues { entries in entries.reduce(0) { $0 + $1.changeQty } }
+            }
+        }
+        additionsByVariant = ledgerAdditions
     }
 }
 

@@ -92,6 +92,7 @@ class MockAPIService {
     private var _productionBatches: [ProductionBatch] = []
     private var _salesOrders: [SalesOrder] = []
     private var _settings: [SettingItem] = []
+    private var _ledgerEntries: [StockAdjustmentLedgerEntry] = []
 
     init() { seedData() }
 
@@ -157,26 +158,26 @@ class MockAPIService {
             "SCRUNCHIE": [
                 ProductSizeDetail(id: sizeScrunM, productId: prodScrunchieId, productSku: "SCRUNCHIE",
                                   productName: "Scrunchie", sizeLabel: "M", fabricVariantName: "Satin Pelangi",
-                                  reorderMinQty: 20, isArchived: false, currentStockQty: 0,
-                                  productionStockQty: 0, manualStockQty: 0,
+                                  reorderMinQty: 20, isArchived: false, currentStockQty: 10,
+                                  productionStockQty: 0, manualStockQty: 10,
                                   latestHppBreakdown: HPPBreakdown(fabric: 3_400, pooledMaterial: 350, hardware: 120, labor: 2_800, overhead: 600, total: 7_270),
                                   sellingPrice: 22_000, marginPct: 0.67),
                 ProductSizeDetail(id: sizeScrunXS, productId: prodScrunchieId, productSku: "SCRUNCHIE",
                                   productName: "Scrunchie", sizeLabel: "M", fabricVariantName: "Waffle Merah",
-                                  reorderMinQty: 20, isArchived: false, currentStockQty: 0,
-                                  productionStockQty: 0, manualStockQty: 0,
+                                  reorderMinQty: 20, isArchived: false, currentStockQty: 5,
+                                  productionStockQty: 0, manualStockQty: 5,
                                   latestHppBreakdown: HPPBreakdown(fabric: 2_900, pooledMaterial: 300, hardware: 100, labor: 2_800, overhead: 550, total: 6_650),
                                   sellingPrice: 20_000, marginPct: 0.67),
                 ProductSizeDetail(id: sizeScrunL, productId: prodScrunchieId, productSku: "SCRUNCHIE",
                                   productName: "Scrunchie", sizeLabel: "L", fabricVariantName: "Satin Pelangi",
-                                  reorderMinQty: 15, isArchived: false, currentStockQty: 0,
-                                  productionStockQty: 0, manualStockQty: 0,
+                                  reorderMinQty: 15, isArchived: false, currentStockQty: 12,
+                                  productionStockQty: 0, manualStockQty: 12,
                                   latestHppBreakdown: HPPBreakdown(fabric: 4_200, pooledMaterial: 400, hardware: 150, labor: 3_360, overhead: 700, total: 8_810),
                                   sellingPrice: 25_000, marginPct: 0.65),
                 ProductSizeDetail(id: sizeScrunS, productId: prodScrunchieId, productSku: "SCRUNCHIE",
                                   productName: "Scrunchie", sizeLabel: "L", fabricVariantName: "Waffle Merah",
-                                  reorderMinQty: 10, isArchived: false, currentStockQty: 0,
-                                  productionStockQty: 0, manualStockQty: 0,
+                                  reorderMinQty: 10, isArchived: false, currentStockQty: 8,
+                                  productionStockQty: 8, manualStockQty: 0,
                                   latestHppBreakdown: HPPBreakdown(fabric: 3_600, pooledMaterial: 350, hardware: 130, labor: 3_360, overhead: 650, total: 8_090),
                                   sellingPrice: 24_000, marginPct: 0.66),
                 ProductSizeDetail(id: sizeScrunXL, productId: prodScrunchieId, productSku: "SCRUNCHIE",
@@ -239,6 +240,13 @@ class MockAPIService {
             SettingItem(key: "default_overhead_per_unit", value: 300, updatedAt: ago(days: 30)),
             SettingItem(key: "pooled_material_rate:thread", value: 500, updatedAt: ago(days: 30)),
             SettingItem(key: "pooled_material_rate:packaging", value: 200, updatedAt: ago(days: 30)),
+        ]
+
+        _ledgerEntries = [
+            StockAdjustmentLedgerEntry(id: UUID(), productSizeId: sizeScrunM, changeQty: 10, reason: "initial", createdAt: ago(days: 3)),
+            StockAdjustmentLedgerEntry(id: UUID(), productSizeId: sizeScrunXS, changeQty: 5, reason: "initial", createdAt: ago(days: 2)),
+            StockAdjustmentLedgerEntry(id: UUID(), productSizeId: sizeScrunL, changeQty: 12, reason: "initial", createdAt: ago(days: 1)),
+            StockAdjustmentLedgerEntry(id: UUID(), productSizeId: sizeScrunS, changeQty: 8, reason: "production", createdAt: Date()),
         ]
     }
 
@@ -509,6 +517,17 @@ class MockAPIService {
             throw APIError.serverError(404, "Product size tidak ditemukan")
         }
         return found
+    }
+
+    func getStockLedger(from: Date, to: Date) async throws -> [StockAdjustmentLedgerEntry] {
+        await delay()
+        let cal = Calendar.current
+        let startOfDay = cal.startOfDay(for: from)
+        let endOfDay = cal.startOfDay(for: cal.date(byAdding: .day, value: 1, to: to) ?? to)
+        
+        return _ledgerEntries.filter { entry in
+            entry.createdAt >= startOfDay && entry.createdAt < endOfDay
+        }
     }
 
     func patchProduct(sku: String, name: String) async throws -> Product {
@@ -1000,6 +1019,14 @@ class MockAPIService {
                                                     overhead: item.hppOverhead, total: item.hppTotal),
                                                 sellingPrice: s.sellingPrice, marginPct: s.marginPct)
                 _productSizes[sku] = sizes
+                
+                _ledgerEntries.append(StockAdjustmentLedgerEntry(
+                    id: UUID(),
+                    productSizeId: s.id,
+                    changeQty: item.qtyActual,
+                    reason: "production",
+                    createdAt: Date()
+                ))
                 break
             }
         }
@@ -1076,6 +1103,15 @@ class MockAPIService {
                                         sellingPrice: old.sellingPrice, marginPct: old.marginPct)
         list[idx] = updated
         _productSizes[sku] = list
+        
+        _ledgerEntries.append(StockAdjustmentLedgerEntry(
+            id: UUID(),
+            productSizeId: sizeId,
+            changeQty: qty,
+            reason: reason,
+            createdAt: Date()
+        ))
+        
         return updated
     }
 
@@ -1157,6 +1193,15 @@ class MockAPIService {
                                         sellingPrice: old.sellingPrice, marginPct: old.marginPct)
         sizeList[sIdx] = updated
         _productSizes[sku] = sizeList
+        
+        _ledgerEntries.append(StockAdjustmentLedgerEntry(
+            id: UUID(),
+            productSizeId: sizeId,
+            changeQty: qty,
+            reason: "initial",
+            createdAt: Date()
+        ))
+        
         return updated
     }
 
@@ -1216,6 +1261,15 @@ class MockAPIService {
                                         sellingPrice: old.sellingPrice, marginPct: old.marginPct)
         sizeList[sIdx] = updated
         _productSizes[sku] = sizeList
+        
+        _ledgerEntries.append(StockAdjustmentLedgerEntry(
+            id: UUID(),
+            productSizeId: sizeId,
+            changeQty: qty,
+            reason: "initial",
+            createdAt: Date()
+        ))
+        
         return updated
     }
 

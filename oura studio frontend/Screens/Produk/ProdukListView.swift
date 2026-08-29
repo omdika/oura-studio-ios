@@ -17,11 +17,25 @@ struct ProdukListView: View {
     @State private var pageSize = 20
     @State private var visibleCount = 20
 
+    @State private var isFilterActive: Bool = false
+    @State private var filterFrom: Date = Date()
+    @State private var filterTo: Date = Date()
+    @State private var additionsByVariant: [UUID: Int] = [:]
+
     private var filtered: [Product] {
         let active = products.filter { !$0.isArchived }
-        guard !searchText.isEmpty else { return active }
+        
+        let dateFiltered = active.filter { product in
+            if isFilterActive {
+                let sizes = allSizes.filter { $0.productId == product.id && !$0.isArchived }
+                return sizes.contains { additionsByVariant[$0.id] != nil }
+            }
+            return true
+        }
+        
+        guard !searchText.isEmpty else { return dateFiltered }
         let q = searchText.lowercased()
-        return active.filter { product in
+        return dateFiltered.filter { product in
             product.name.localizedCaseInsensitiveContains(q) ||
             product.sku.localizedCaseInsensitiveContains(q) ||
             allSizes
@@ -71,6 +85,9 @@ struct ProdukListView: View {
         .searchable(text: $searchText, prompt: "Cari produk atau bahan...")
         .onChange(of: searchText) { _ in
             visibleCount = pageSize
+        }
+        .onChange(of: isFilterActive) { _ in
+            Task { await load() }
         }
         .task { await load() }
         .refreshable { await load() }
@@ -174,17 +191,47 @@ struct ProdukListView: View {
         .ouraCard()
     }
 
+    private var dateFilterSection: some View {
+        VStack(spacing: 10) {
+            Toggle(isOn: $isFilterActive.animation()) {
+                HStack(spacing: 8) {
+                    Image(systemName: "calendar.badge.clock")
+                        .font(.system(size: 14))
+                        .foregroundStyle(isFilterActive ? OuraTheme.Colors.greenAccent : OuraTheme.Colors.textSecondary)
+                    Text("Filter berdasarkan Tanggal Masuk Stok")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(OuraTheme.Colors.textPrimary)
+                }
+            }
+            .tint(OuraTheme.Colors.greenAccent)
+            
+            if isFilterActive {
+                DateRangeField(from: $filterFrom, to: $filterTo) {
+                    Task { await load() }
+                }
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+        .padding(OuraTheme.Spacing.cardPad)
+        .ouraCard()
+    }
+
     private var productList: some View {
         ScrollView {
             VStack(spacing: 12) {
                 summaryHeaderView
                     .padding(.bottom, 4)
 
+                dateFilterSection
+
                 ForEach(filteredProductsToDisplay) { product in
-                    let sizes = allSizes.filter { $0.productId == product.id && !$0.isArchived }
+                    let sizes = allSizes.filter { s in
+                        s.productId == product.id && !s.isArchived && (!isFilterActive || additionsByVariant[s.id] != nil)
+                    }
                     ProductGroupRow(
                         product: product,
                         sizes: sizes,
+                        additionsByVariant: additionsByVariant,
                         onProductChanged: { Task { await load() } }
                     )
                     .onAppear {
@@ -224,8 +271,21 @@ struct ProdukListView: View {
         isLoading = true
         async let p = api.getProducts()
         async let s = api.getAllProductSizes()
-        products = (try? await p) ?? []
-        allSizes = (try? await s) ?? []
+        
+        let fetchedProducts = (try? await p) ?? []
+        let fetchedSizes = (try? await s) ?? []
+        
+        var ledgerAdditions: [UUID: Int] = [:]
+        if isFilterActive {
+            if let entries = try? await api.getStockLedger(from: filterFrom, to: filterTo) {
+                ledgerAdditions = Dictionary(grouping: entries.filter { $0.changeQty > 0 }, by: { $0.productSizeId })
+                    .mapValues { entries in entries.reduce(0) { $0 + $1.changeQty } }
+            }
+        }
+        
+        products = fetchedProducts
+        allSizes = fetchedSizes
+        additionsByVariant = ledgerAdditions
         isLoading = false
     }
 }
@@ -235,6 +295,7 @@ struct ProdukListView: View {
 private struct ProductGroupRow: View {
     let product: Product
     let sizes: [ProductSizeDetail]
+    var additionsByVariant: [UUID: Int] = [:]
     let onProductChanged: () -> Void
 
     private struct SizeGroup: Identifiable {
@@ -300,6 +361,8 @@ private struct ProductGroupRow: View {
 
                 VStack(spacing: 0) {
                     ForEach(groups) { group in
+                        let groupAdditions = group.variants.reduce(0) { $0 + (additionsByVariant[$1.id] ?? 0) }
+                        
                         // Each size label row → ProdukSizeGroupView (fabric variants)
                         NavigationLink(destination: ProdukSizeGroupView(product: product, sizeLabel: group.sizeLabel)) {
                             HStack(spacing: 10) {
@@ -316,7 +379,11 @@ private struct ProductGroupRow: View {
                                             .font(.system(size: 8))
                                             .foregroundStyle(OuraTheme.Colors.warningText)
                                     }
-                                    if group.isAnyHabis {
+                                    if groupAdditions > 0 {
+                                        OuraTag(text: "+\(groupAdditions) masuk",
+                                                color: OuraTheme.Colors.greenAccent,
+                                                bg: OuraTheme.Colors.greenBg)
+                                    } else if group.isAnyHabis {
                                         OuraTag(text: "Habis",
                                                 color: OuraTheme.Colors.dangerText,
                                                 bg: OuraTheme.Colors.dangerBg)

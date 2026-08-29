@@ -345,6 +345,12 @@ class APIService: ObservableObject {
         return try await get(path: "/product-sizes/\(id.uuidString)")
     }
 
+    func getStockLedger(from: Date, to: Date) async throws -> [StockAdjustmentLedgerEntry] {
+        if useMock { return try await MockAPIService.shared.getStockLedger(from: from, to: to) }
+        let q = "?from=\(dateFmt.string(from: from))&to=\(dateFmt.string(from: to))"
+        return try await get(path: "/stock-ledger\(q)")
+    }
+
     // Converts a flat ProductSizeBasic (list endpoint format) to the enriched ProductSizeDetail
     // the UI expects. stock breakdown fields (production/manual) are not available in list responses.
     private func sizeDetailFromBasic(_ basic: ProductSizeBasic, sku: String, productName: String) -> ProductSizeDetail {
