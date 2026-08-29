@@ -17,6 +17,8 @@ struct ProdukListView: View {
     @State private var pageSize = 20
     @State private var visibleCount = 20
 
+    @FocusState private var isSearchFocused: Bool
+
     @State private var isFilterActive: Bool = false
     @State private var filterFrom: Date = Date()
     @State private var filterTo: Date = Date()
@@ -70,6 +72,7 @@ struct ProdukListView: View {
                     .padding(.horizontal, OuraTheme.Spacing.horizontal)
                     .padding(.top, 10)
                     .padding(.bottom, 6)
+                    .animation(.easeInOut(duration: 0.2), value: isSearchFocused)
                 
                 Divider().overlay(OuraTheme.Colors.separator)
 
@@ -91,6 +94,7 @@ struct ProdukListView: View {
         }
         .navigationTitle("Produk")
         .navigationBarTitleDisplayMode(.large)
+        .toolbar(isSearchFocused ? .hidden : .visible, for: .navigationBar)
         .onChange(of: isFilterActive) { _ in
             Task { await load() }
         }
@@ -154,6 +158,7 @@ struct ProdukListView: View {
                     .foregroundStyle(OuraTheme.Colors.textPrimary)
                     .autocorrectionDisabled()
                     .textInputAutocapitalization(.never)
+                    .focused($isSearchFocused)
                 if !searchText.isEmpty {
                     Button { searchText = "" } label: {
                         Image(systemName: "xmark.circle.fill")
@@ -173,11 +178,10 @@ struct ProdukListView: View {
             )
             
             // X button (Cancel/Clear search)
-            if !searchText.isEmpty {
+            if isSearchFocused {
                 Button {
                     searchText = ""
-                    // Dismiss keyboard
-                    UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                    isSearchFocused = false
                 } label: {
                     Image(systemName: "xmark")
                         .font(.system(size: 12, weight: .bold))
@@ -187,21 +191,25 @@ struct ProdukListView: View {
                         .clipShape(Circle())
                 }
                 .buttonStyle(.plain)
+                .transition(.scale.combined(with: .opacity))
             }
             
-            // Shortcut QR Generator button
-            Button {
-                showQRGenerator = true
-            } label: {
-                Image(systemName: "qrcode")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(OuraTheme.Colors.accent)
-                    .frame(width: 32, height: 32)
-                    .background(OuraTheme.Colors.accentLight)
-                    .clipShape(Circle())
+            // Shortcut QR Generator button (only visible when search is active/focused)
+            if isSearchFocused {
+                Button {
+                    showQRGenerator = true
+                } label: {
+                    Image(systemName: "qrcode")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(OuraTheme.Colors.accent)
+                        .frame(width: 32, height: 32)
+                        .background(OuraTheme.Colors.accentLight)
+                        .clipShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Shortcut QR")
+                .transition(.scale.combined(with: .opacity))
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Shortcut QR")
         }
     }
 
