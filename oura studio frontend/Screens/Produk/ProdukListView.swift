@@ -295,9 +295,12 @@ struct ProdukListView: View {
         
         var ledgerAdditions: [UUID: Int] = [:]
         if isFilterActive {
-            if let entries = try? await api.getStockLedger(from: filterFrom, to: filterTo) {
+            do {
+                let entries = try await api.getStockLedger(from: filterFrom, to: filterTo)
                 ledgerAdditions = Dictionary(grouping: entries.filter { $0.changeQty > 0 }, by: { $0.productSizeId })
                     .mapValues { entries in entries.reduce(0) { $0 + $1.changeQty } }
+            } catch {
+                print("⚠️ [v3.44] Gagal memuat stock ledger dari backend: \(error)")
             }
         }
         

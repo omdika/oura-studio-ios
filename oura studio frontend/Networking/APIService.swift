@@ -43,15 +43,44 @@ class APIService: ObservableObject {
         d.dateDecodingStrategy = .custom { decoder in
             let container = try decoder.singleValueContainer()
             let str = try container.decode(String.self)
-            let fmts: [DateFormatter] = [
-                { let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd'T'HH:mm:ssZ"; return f }(),
-                { let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSZ"; return f }(),
-                { let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"; return f }(),
-            ]
-            for fmt in fmts {
-                if let d = fmt.date(from: str) { return d }
+            
+            // Try standard ISO8601 with/without timezone and fractional seconds
+            let isoFormatter = ISO8601DateFormatter()
+            isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            if let date = isoFormatter.date(from: str) {
+                return date
             }
-            if let d = ISO8601DateFormatter().date(from: str) { return d }
+            
+            let isoFormatterNoMillis = ISO8601DateFormatter()
+            isoFormatterNoMillis.formatOptions = [.withInternetDateTime]
+            if let date = isoFormatterNoMillis.date(from: str) {
+                return date
+            }
+
+            // Fallback to custom DateFormatter patterns for various backend datetime string outputs
+            let fmts: [String] = [
+                "yyyy-MM-dd'T'HH:mm:ss.SSSSSSZ",
+                "yyyy-MM-dd'T'HH:mm:ss.SSSSSS",
+                "yyyy-MM-dd'T'HH:mm:ss.SSSZ",
+                "yyyy-MM-dd'T'HH:mm:ss.SSS",
+                "yyyy-MM-dd'T'HH:mm:ssZ",
+                "yyyy-MM-dd'T'HH:mm:ss",
+                "yyyy-MM-dd HH:mm:ss.SSSSSS",
+                "yyyy-MM-dd HH:mm:ss.SSS",
+                "yyyy-MM-dd HH:mm:ss",
+                "yyyy-MM-dd"
+            ]
+            
+            for format in fmts {
+                let formatter = DateFormatter()
+                formatter.locale = Locale(identifier: "en_US_POSIX")
+                formatter.dateFormat = format
+                formatter.timeZone = TimeZone(secondsFromGMT: 0)
+                if let date = formatter.date(from: str) {
+                    return date
+                }
+            }
+            
             throw DecodingError.dataCorruptedError(in: container,
                 debugDescription: "Cannot parse date: \(str)")
         }
