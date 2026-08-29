@@ -44,7 +44,10 @@ struct QRGeneratorView: View {
             base = dateFiltered
         } else {
             base = dateFiltered.filter { product in
-                if product.name.localizedCaseInsensitiveContains(searchText) { return true }
+                if product.name.localizedCaseInsensitiveContains(searchText) ||
+                    product.sku.localizedCaseInsensitiveContains(searchText) {
+                    return true
+                }
                 let sizes = filteredSizes(for: product)
                 return !sizes.isEmpty
             }
@@ -59,8 +62,17 @@ struct QRGeneratorView: View {
         }
         let groups = makeSizeGroups(from: dateFiltered)
         let all = groups.flatMap { $0.displayVariants }
-        guard !searchText.isEmpty, !product.name.localizedCaseInsensitiveContains(searchText) else { return all }
-        return all.filter { $0.displayLabel.localizedCaseInsensitiveContains(searchText) }
+        guard !searchText.isEmpty else { return all }
+        
+        if product.name.localizedCaseInsensitiveContains(searchText) ||
+            product.sku.localizedCaseInsensitiveContains(searchText) {
+            return all
+        }
+        
+        return all.filter { size in
+            size.displayLabel.localizedCaseInsensitiveContains(searchText) ||
+            size.productSku.localizedCaseInsensitiveContains(searchText)
+        }
     }
 
     private var allSelectableSizes: [ProductSizeDetail] {
