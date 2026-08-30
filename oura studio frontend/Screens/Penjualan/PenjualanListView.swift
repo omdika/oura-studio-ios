@@ -164,6 +164,13 @@ struct PenjualanListView: View {
 private struct OrderRow: View {
     let order: SalesOrder
 
+    private var formattedTime: String {
+        let fmt = DateFormatter()
+        fmt.locale = Locale(identifier: "id_ID")
+        fmt.dateFormat = "HH:mm"
+        return fmt.string(from: order.soldAt)
+    }
+
     var body: some View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 6) {
@@ -185,7 +192,7 @@ private struct OrderRow: View {
                             .font(.system(size: 12))
                             .foregroundStyle(OuraTheme.Colors.textSecondary)
                     }
-                    Text("· \(order.items.count) item")
+                    Text("· \(order.items.count) item · \(formattedTime)")
                         .font(.system(size: 12))
                         .foregroundStyle(OuraTheme.Colors.textTertiary)
                 }
@@ -243,7 +250,10 @@ private struct EditPenjualanSheet: View {
                     LabeledContent("Invoice", value: order.invoiceNo)
                         .listRowBackground(OuraTheme.Colors.surfaceCard)
                     LabeledContent("Tanggal") {
-                        Text(order.soldAt, style: .date)
+                        HStack(spacing: 6) {
+                            Text(order.soldAt, style: .date)
+                            Text(order.soldAt, style: .time)
+                        }
                     }
                     .listRowBackground(OuraTheme.Colors.surfaceCard)
                 } header: { OuraSectionHeader(title: "Detail") }
