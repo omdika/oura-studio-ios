@@ -12,6 +12,7 @@ struct PenjualanListView: View {
     @State private var showQRScanner = false
     @State private var fromDate: Date = Calendar.current.date(byAdding: .day, value: -30, to: Date()) ?? Date()
     @State private var toDate: Date = Date()
+    @State private var expandedOrderIds: Set<UUID> = []
 
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
@@ -48,10 +49,20 @@ struct PenjualanListView: View {
                             ForEach(groupedOrders, id: \.date) { group in
                                 Section {
                                     ForEach(group.orders) { order in
-                                        Button { editingOrder = order } label: {
-                                            OrderRow(order: order)
-                                        }
-                                        .buttonStyle(.plain)
+                                        OrderRow(
+                                            order: order,
+                                            isExpanded: expandedOrderIds.contains(order.id),
+                                            onToggleExpand: {
+                                                if expandedOrderIds.contains(order.id) {
+                                                    expandedOrderIds.remove(order.id)
+                                                } else {
+                                                    expandedOrderIds.insert(order.id)
+                                                }
+                                            },
+                                            onTapRow: {
+                                                editingOrder = order
+                                            }
+                                        )
                                         .listRowBackground(OuraTheme.Colors.surfaceCard)
                                         .listRowInsets(EdgeInsets(top: 12, leading: 16, bottom: 12, trailing: 16))
                                         .listRowSeparatorTint(OuraTheme.Colors.separator)
@@ -163,6 +174,9 @@ struct PenjualanListView: View {
 
 private struct OrderRow: View {
     let order: SalesOrder
+    let isExpanded: Bool
+    let onToggleExpand: () -> Void
+    let onTapRow: () -> Void
 
     private var formattedTime: String {
         let fmt = DateFormatter()
@@ -172,39 +186,96 @@ private struct OrderRow: View {
     }
 
     var body: some View {
-        HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 6) {
-                HStack(spacing: 8) {
-                    Text(order.invoiceNo)
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(OuraTheme.Colors.textPrimary)
-                    statusTag
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 0) {
+                // Expand toggle button on the left
+                Button(action: onToggleExpand) {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(OuraTheme.Colors.accent)
+                        .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                        .frame(width: 32, height: 32)
+                        .contentShape(Rectangle())
                 }
-                HStack(spacing: 4) {
-                    if let customer = order.customerName {
-                        Text(customer)
-                            .font(.system(size: 12))
-                            .foregroundStyle(OuraTheme.Colors.textSecondary)
-                        Text("·").foregroundStyle(OuraTheme.Colors.textTertiary)
+                .buttonStyle(.borderless)
+                .padding(.leading, -8) // pull slightly to left for perfect alignment
+                
+                // Main row content (tappable for navigation)
+                Button(action: onTapRow) {
+                    HStack(spacing: 8) {
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack(spacing: 8) {
+                                Text(order.invoiceNo)
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundStyle(OuraTheme.Colors.textPrimary)
+                                statusTag
+                            }
+                            HStack(spacing: 4) {
+                                if let customer = order.customerName {
+                                    Text(customer)
+                                        .font(.system(size: 12))
+                                        .foregroundStyle(OuraTheme.Colors.textSecondary)
+                                    Text("·").foregroundStyle(OuraTheme.Colors.textTertiary)
+                                }
+                                if let method = order.paymentMethod {
+                                    Text(method.capitalized)
+                                        .font(.system(size: 12))
+                                        .foregroundStyle(OuraTheme.Colors.textSecondary)
+                                }
+                                Text("· \(order.items.count) item · \(formattedTime)")
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(OuraTheme.Colors.textTertiary)
+                            }
+                        }
+                        
+                        Spacer()
+                        
+                        VStack(alignment: .trailing, spacing: 4) {
+                            Text(order.displayRevenue.rupiahFormatted)
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundStyle(OuraTheme.Colors.textPrimary)
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundStyle(OuraTheme.Colors.textTertiary)
+                        }
                     }
-                    if let method = order.paymentMethod {
-                        Text(method.capitalized)
-                            .font(.system(size: 12))
-                            .foregroundStyle(OuraTheme.Colors.textSecondary)
-                    }
-                    Text("· \(order.items.count) item · \(formattedTime)")
-                        .font(.system(size: 12))
-                        .foregroundStyle(OuraTheme.Colors.textTertiary)
+                    .contentShape(Rectangle())
                 }
+                .buttonStyle(.borderless)
             }
-            Spacer()
-            VStack(alignment: .trailing, spacing: 4) {
-                Text(order.displayRevenue.rupiahFormatted)
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundStyle(OuraTheme.Colors.textPrimary)
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(OuraTheme.Colors.textTertiary)
+            
+            if isExpanded {
+                VStack(alignment: .leading, spacing: 8) {
+                    Divider()
+                        .background(OuraTheme.Colors.separator)
+                        .padding(.vertical, 4)
+                    
+                    ForEach(order.items) { item in
+                        HStack(spacing: 12) {
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("\(item.productName ?? "Produk") · \(item.sizeLabel ?? "-")")
+                                    .font(.system(size: 13, weight: .medium))
+                                    .foregroundStyle(OuraTheme.Colors.textPrimary)
+                                HStack(spacing: 4) {
+                                    Text("\(item.qty) pcs × \(item.unitPrice.rupiahFormatted)")
+                                        .font(.system(size: 11))
+                                        .foregroundStyle(OuraTheme.Colors.textSecondary)
+                                    if item.discount > 0 {
+                                        Text("- \(item.discount.rupiahFormatted)")
+                                            .font(.system(size: 11))
+                                            .foregroundStyle(OuraTheme.Colors.dangerText)
+                                    }
+                                }
+                            }
+                            Spacer()
+                            Text(item.lineRevenue.rupiahFormatted)
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(OuraTheme.Colors.textPrimary)
+                        }
+                        .padding(.vertical, 2)
+                    }
+                }
+                .padding(.leading, 24) // perfect indentation matching content start
             }
         }
     }
