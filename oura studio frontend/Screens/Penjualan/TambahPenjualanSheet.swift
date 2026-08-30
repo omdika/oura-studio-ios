@@ -207,9 +207,7 @@ struct TambahPenjualanSheet: View {
                             }
                         }
                     }
-                    .onTapGesture { // MARK: - Dismiss keyboard on tap outside
-                        self.hideKeyboard()
-                    }
+                    .scrollDismissesKeyboard(.interactively)
 
                 // MARK: - Scan Toast Overlay
                 VStack {
