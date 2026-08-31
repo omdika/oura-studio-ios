@@ -1,6 +1,6 @@
 ---
 name: dev-fullstack
-description: Coordinate and build backend (FastAPI) and frontend (SwiftUI) features for Oura Studios. CRITICAL MANDATE: You MUST update specifications FIRST before code. Update ONLY top 30-50 lines of handoff.md (Revision History) and create lightweight doc/versions/v3.xx.md in both repos. NEVER read full handoff.md.
+description: Coordinate and build backend (FastAPI) and frontend (SwiftUI) features for Oura Studios. CRITICAL MANDATE: You MUST update specifications FIRST before code. Update ONLY top 30-50 lines of handoff.md (Revision History) and create lightweight doc/versions/v3.xx.md in both repos. NEVER read full handoff.md. For DB schemas/API endpoints use api_contract.md; for screens use ui_spec.md.
 ---
 
 # Oura Studios — Fullstack Dev Skill
@@ -13,7 +13,10 @@ This skill governs the end-to-end development of Oura Studios, ensuring tight sy
 
 > **⚠️ ZERO TOLERANCE FOR CODE-FIRST DEVELOPMENT & FULL FILE READS:**
 > Under no circumstances should functional code or configuration files be written BEFORE the revision history and version specs are updated.
-> NEVER use full `read_file` on `handoff.md`. Always operate with targeted line limits to conserve API tokens.
+> NEVER use full `read_file` on `handoff.md`. Always operate with targeted line limits to conserve API tokens. For domain-specific schemas, UI rules, or status, load only the modular spec files:
+> - `doc/api_contract.md` for DB tables, Pydantic schemas, API endpoints, and CRUD audit rules.
+> - `doc/ui_spec.md` for SwiftUI screen list, bottom navigation, and layout interactivities.
+> - `doc/implementation_status.md` for open decisions, frontend milestone checklists, and seed data.
 
 You must always execute this strict 3-step checklist BEFORE any implementation:
 
@@ -26,7 +29,7 @@ You must always execute this strict 3-step checklist BEFORE any implementation:
 
 - [ ] **Step 2: Create Version Specification File.**
       Create a dedicated lightweight markdown file `doc/versions/v3.xx.md` in BOTH repos.
-      * Base the context ONLY on `context.md` and targeted code search (`grep`). DO NOT load full historical handoffs.
+      * Base the context ONLY on `context.md`, `doc/api_contract.md` (for backend/API), `doc/ui_spec.md` (for frontend UI), and targeted code search (`grep`). DO NOT load full historical handoffs.
 
 - [ ] **Step 3: Commit Specifications.**
       Stage and commit the specifications before writing functional code.
