@@ -142,7 +142,13 @@ struct OuraSectionHeader: View {
 // MARK: - OuraFAB (floating action button)
 
 struct OuraFAB: View {
+    let id: String
     let action: () -> Void
+
+    init(id: String = "fab-tambah", action: @escaping () -> Void) {
+        self.id = id
+        self.action = action
+    }
 
     var body: some View {
         Button(action: action) {
@@ -154,6 +160,7 @@ struct OuraFAB: View {
                 .clipShape(RoundedRectangle(cornerRadius: 16))
                 .shadow(color: OuraTheme.Colors.accent.opacity(0.35), radius: 8, x: 0, y: 4)
         }
+        .accessibilityIdentifier(id)
     }
 }
 
@@ -162,6 +169,7 @@ struct OuraFAB: View {
 struct OuraPrimaryButton: View {
     let title: String
     var isLoading: Bool = false
+    var testId: String? = nil
     let action: () -> Void
 
     var body: some View {
@@ -182,6 +190,7 @@ struct OuraPrimaryButton: View {
             .background(OuraTheme.Colors.accentGradient)
             .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.medium))
         }
+        .accessibilityIdentifier(testId ?? "btn-primary-\(title.replacingOccurrences(of: " ", with: "-").lowercased())")
         .disabled(isLoading)
     }
 }

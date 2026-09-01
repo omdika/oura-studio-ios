@@ -121,8 +121,13 @@ class APIService: ObservableObject {
                     throw APIError.conflict(msg)
                 }
                 if http.statusCode >= 400 {
-                    let msg = (try? decoder.decode([String: String].self, from: data))?["detail"] ?? "Server error"
-                    throw APIError.serverError(http.statusCode, msg)
+                    var errorMsg = "Server error"
+                    if let dict = try? decoder.decode([String: String].self, from: data), let msg = dict["detail"] {
+                        errorMsg = msg
+                    } else if let rawString = String(data: data, encoding: .utf8) {
+                        errorMsg = rawString
+                    }
+                    throw APIError.serverError(http.statusCode, errorMsg)
                 }
             }
             return data

@@ -5,6 +5,7 @@ struct NumericInputField: View {
     @Binding var value: Double?
     var placeholder: String = "0"
     var unit: String? = nil
+    var testId: String? = nil
 
     @State private var text: String = ""
     @FocusState private var isFocused: Bool
@@ -22,6 +23,7 @@ struct NumericInputField: View {
                     .foregroundStyle(OuraTheme.Colors.textPrimary)
                     .focused($isFocused)
                     .accessibilityLabel(label)
+                    .accessibilityIdentifier(testId ?? "input-\(label.replacingOccurrences(of: " (cm)", with: "").replacingOccurrences(of: " (gulung)", with: "").replacingOccurrences(of: " (meter)", with: "").replacingOccurrences(of: " (pcs)", with: "").replacingOccurrences(of: " (gram)", with: ""))")
                     .onChange(of: text) { new in
                         let normalized = new.replacingOccurrences(of: ",", with: ".")
                         let filtered = normalized.filter { $0.isNumber || $0 == "." }

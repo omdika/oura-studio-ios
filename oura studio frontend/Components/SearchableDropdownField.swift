@@ -83,6 +83,7 @@ private struct SearchPickerContent: View {
                         .font(.system(size: 15))
                         .autocorrectionDisabled()
                         .textInputAutocapitalization(.never)
+                        .accessibilityIdentifier("search-picker-\(label)")
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 10)

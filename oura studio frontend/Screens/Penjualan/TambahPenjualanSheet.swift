@@ -204,6 +204,7 @@ struct TambahPenjualanSheet: View {
                                 Button("Simpan") { Task { await save() } }
                                     .foregroundStyle(canSave ? OuraTheme.Colors.accent : OuraTheme.Colors.textDisabled)
                                     .disabled(!canSave)
+                                    .accessibilityIdentifier("btn-simpan-penjualan")
                             }
                         }
                     }

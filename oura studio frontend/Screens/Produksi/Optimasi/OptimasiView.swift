@@ -301,6 +301,7 @@ struct OptimasiView: View {
             .padding(.vertical, 13)
         }
         .buttonStyle(.plain)
+        .accessibilityIdentifier("spec-row-\(spec.productName)-\(spec.sizeLabel)")
     }
 
     // MARK: - Step 2: Pilih Gulungan Kain
@@ -458,6 +459,7 @@ struct OptimasiView: View {
             .background(isSelected ? OuraTheme.Colors.accentLight : Color.clear)
         }
         .buttonStyle(.plain)
+        .accessibilityIdentifier("roll-row-\(purchase.id)")
     }
 
     // MARK: - Step 3: Hasil
@@ -650,6 +652,7 @@ struct OptimasiView: View {
             }
             .buttonStyle(.plain)
             .disabled(isSaving)
+            .accessibilityIdentifier("btn-gunakan-layout")
         }
         .padding(OuraTheme.Spacing.cardPad)
         .ouraCard()

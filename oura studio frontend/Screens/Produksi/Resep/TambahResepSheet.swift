@@ -309,6 +309,7 @@ struct TambahResepSheet: View {
                         Button("Simpan") { Task { await save() } }
                             .foregroundStyle(canSave ? OuraTheme.Colors.accent : OuraTheme.Colors.textDisabled)
                             .disabled(!canSave || isSaving)
+                            .accessibilityIdentifier("btn-simpan-resep")
                     }
                 }
             }

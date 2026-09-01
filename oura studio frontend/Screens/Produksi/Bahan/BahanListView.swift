@@ -77,7 +77,7 @@ struct BahanListView: View {
             }
             .background(OuraTheme.Colors.background)
 
-            OuraFAB {
+            OuraFAB(id: "Tambah Pembelian") {
                 showTambah = true
             }
             .padding(.trailing, OuraTheme.Spacing.horizontal)

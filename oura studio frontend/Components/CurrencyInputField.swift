@@ -3,6 +3,7 @@ import SwiftUI
 struct CurrencyInputField: View {
     let label: String
     @Binding var value: Double?
+    var testId: String? = nil
 
     @State private var digits: String = ""
     @FocusState private var isFocused: Bool
@@ -39,6 +40,7 @@ struct CurrencyInputField: View {
                 .font(.system(size: 15))
                 .foregroundStyle(OuraTheme.Colors.textPrimary)
                 .focused($isFocused)
+                .accessibilityIdentifier(testId ?? "input-\(label.replacingOccurrences(of: " (cm)", with: "").replacingOccurrences(of: " (gulung)", with: "").replacingOccurrences(of: " (meter)", with: "").replacingOccurrences(of: " (pcs)", with: "").replacingOccurrences(of: " (gram)", with: "").replacingOccurrences(of: "Total ", with: "").replacingOccurrences(of: "Harga ", with: ""))")
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 11)

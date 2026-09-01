@@ -270,6 +270,7 @@ private struct BatchCard: View {
                 .padding(OuraTheme.Spacing.cardPad)
             }
             .buttonStyle(.plain)
+            .accessibilityIdentifier("batch-card-toggle")
 
             if isExpanded {
                 Divider().overlay(OuraTheme.Colors.separator)
@@ -320,6 +321,7 @@ private struct BatchCard: View {
                             .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.medium))
                     }
                     .buttonStyle(.plain)
+                    .accessibilityIdentifier("btn-konfirmasi-batch")
                 }
                 .padding(.horizontal, OuraTheme.Spacing.cardPad)
                 .padding(.bottom, OuraTheme.Spacing.cardPad)
@@ -676,6 +678,7 @@ private struct BatchItemRow: View {
                     .foregroundStyle(OuraTheme.Colors.textPrimary)
                     .multilineTextAlignment(.center)
                     .frame(width: 44)
+                    .accessibilityIdentifier("input-item-qty")
                     .onChange(of: qtyText) { new in
                         guard let q = Int(new), q != item.qtyActual else { return }
                         onUpdate(q)
