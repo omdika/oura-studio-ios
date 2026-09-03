@@ -34,8 +34,10 @@ All 11 frontend milestones are **complete**. The iOS app is now connected to the
 | 7 | Produksi → Optimasi + Batch confirm | ✅ Done | `OptimasiView`, `ProduksiBatchView` |
 | 8 | Produk (list + price advisor) | ✅ Done | `ProdukListView`, `ProdukDetailView` |
 | 9 | Penjualan | ✅ Done | `PenjualanListView`, `TambahPenjualanSheet` |
-| 10 | Lainnya (Reports + Settings + Keluar) | ✅ Done | `LainnyaView`, `ReportsView`, `SettingsView` |
-| 11 | Beranda / Dashboard | ✅ Done | `BerandaView` |
+| 10 | Lainnya (Reports + Settings + Keluar) | ✅ Done | `LainnyaView.swift`, `ReportsView.swift`, `SettingsView.swift` |
+| 11 | Beranda / Dashboard | ✅ Done | `BerandaView.swift` |
+| 12 | API Integration & Contract Tests | ✅ Done (v3.47) | `APIIntegrationTests.swift` |
+| 13 | BOLA Security API Tests | ✅ Done (v3.48) | `Security/TC_BOLA_A1_Materials.swift`, `TC_BOLA_B1_Products.swift`, `TC_BOLA_C1_Production.swift`, `TC_BOLA_D1_Sales.swift` |
 
 ### Bug fixes applied (v1.3)
 

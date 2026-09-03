@@ -34,6 +34,7 @@
 		262AB429301A072C0064A438 /* oura studio frontendUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "oura studio frontendUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		262AB44E301A07A10064A438 /* .claude */ = {isa = PBXFileReference; lastKnownFileType = folder; path = .claude; sourceTree = "<group>"; };
 		262AB450301A07A90064A438 /* doc */ = {isa = PBXFileReference; lastKnownFileType = folder; path = doc; sourceTree = "<group>"; };
+		2688F7433047B97E006E3C20 /* oura studio frontend.xctestplan */ = {isa = PBXFileReference; lastKnownFileType = text; path = "oura studio frontend.xctestplan"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -82,6 +83,7 @@
 		262AB409301A072A0064A438 = {
 			isa = PBXGroup;
 			children = (
+				2688F7433047B97E006E3C20 /* oura studio frontend.xctestplan */,
 				262AB450301A07A90064A438 /* doc */,
 				262AB44E301A07A10064A438 /* .claude */,
 				262AB414301A072A0064A438 /* oura studio frontend */,

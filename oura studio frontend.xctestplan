@@ -1,0 +1,48 @@
+{
+  "configurations" : [
+    {
+      "id" : "5427D075-66B6-46BC-AA25-333298B35133",
+      "name" : "Test Scheme Action",
+      "options" : {
+
+      }
+    }
+  ],
+  "defaultOptions" : {
+    "environmentVariableEntries" : [
+      {
+        "key" : "JWT_ATTACKER",
+        "value" : "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJmYzNmZDk1Ni05MzM4LTQ1ZTctYWU4YS04NDkyNjE2ZWI4YWYiLCJpYXQiOjE3ODc2Mjg5MTAsImV4cCI6MTgxMzU0ODkxMH0.hBQcAx"
+      },
+      {
+        "key" : "JWT_OWNER",
+        "value" : "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJmYzNmZDk1Ni05MzM4LTQ1ZTctYWU4YS04NDkyNjE2ZWI4YWYiLCJpYXQiOjE3ODc2Mjg5MTAsImV4cCI6MTgxMzU0ODkxMH0.hBQcAizccZhQk816S4y8GQfuIKtCVWQ0CVBtY02iOk8"
+      }
+    ],
+    "performanceAntipatternCheckerEnabled" : true,
+    "targetForVariableExpansion" : {
+      "containerPath" : "container:oura studio frontend.xcodeproj",
+      "identifier" : "262AB411301A072A0064A438",
+      "name" : "oura studio frontend"
+    }
+  },
+  "testTargets" : [
+    {
+      "parallelizable" : true,
+      "target" : {
+        "containerPath" : "container:oura studio frontend.xcodeproj",
+        "identifier" : "262AB41E301A072C0064A438",
+        "name" : "oura studio frontendTests"
+      }
+    },
+    {
+      "parallelizable" : true,
+      "target" : {
+        "containerPath" : "container:oura studio frontend.xcodeproj",
+        "identifier" : "262AB428301A072C0064A438",
+        "name" : "oura studio frontendUITests"
+      }
+    }
+  ],
+  "version" : 1
+}

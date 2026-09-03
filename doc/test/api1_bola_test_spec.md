@@ -51,19 +51,19 @@ Modul ini mengelola data bahan mentah kain, benang, dan hardware, serta rekaman 
     *   **Metode & Path:** `GET /materials/a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d`
     *   **Header:** `Authorization: Bearer {{JWT_OWNER}}`
     *   **Ekspektasi Hasil:** `200 OK`, mengembalikan data detail material Satin Pelangi.
-    *   **Status Skrip Uji:** ⭕ Belum Diimplementasikan (Planned)
+    *   **Status Skrip Uji:** ✅ Diimplementasikan (Implemented)
     *   **Link ke Skrip:** `test/scripts/TC_BOLA_A1_Materials.swift` -> `testMaterialsGet_AsOwner_ReturnsSuccess`
 *   **Kasus Uji A.1.2 (Negative Case - Attacker Akses BOLA):**
     *   **Metode & Path:** `GET /materials/a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d`
     *   **Header:** `Authorization: Bearer {{JWT_ATTACKER}}`
     *   **Ekspektasi Hasil:** `403 Forbidden` atau `404 Not Found` (mencegah enumerasi ID).
-    *   **Status Skrip Uji:** ⭕ Belum Diimplementasikan (Planned)
+    *   **Status Skrip Uji:** ✅ Diimplementasikan (Implemented)
     *   **Link ke Skrip:** `test/scripts/TC_BOLA_A1_Materials.swift` -> `testMaterialsGet_AsAttacker_ReturnsForbidden`
 *   **Kasus Uji A.1.3 (Negative Case - Tanpa Autentikasi):**
     *   **Metode & Path:** `GET /materials/a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d`
     *   **Header:** Kosong
     *   **Ekspektasi Hasil:** `401 Unauthorized`
-    *   **Status Skrip Uji:** ⭕ Belum Diimplementasikan (Planned)
+    *   **Status Skrip Uji:** ✅ Diimplementasikan (Implemented)
     *   **Link ke Skrip:** `test/scripts/TC_BOLA_A1_Materials.swift` -> `testMaterialsGet_NoToken_ReturnsUnauthorized`
 
 #### 2. Endpoint: `PATCH /materials/{id}`
@@ -74,14 +74,14 @@ Modul ini mengelola data bahan mentah kain, benang, dan hardware, serta rekaman 
     *   **Header:** `Authorization: Bearer {{JWT_OWNER}}`
     *   **Payload:** `{ "name": "Satin Pelangi Premium" }`
     *   **Ekspektasi Hasil:** `200 OK` atau `204 No Content`, nama berubah di database.
-    *   **Status Skrip Uji:** ⭕ Belum Diimplementasikan (Planned)
+    *   **Status Skrip Uji:** ✅ Diimplementasikan (Implemented)
     *   **Link ke Skrip:** `test/scripts/TC_BOLA_A1_Materials.swift` -> `testMaterialsPatch_AsOwner_ReturnsSuccess`
 *   **Kasus Uji A.2.2 (Negative Case - Attacker Edit BOLA):**
     *   **Metode & Path:** `PATCH /materials/a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d`
     *   **Header:** `Authorization: Bearer {{JWT_ATTACKER}}`
     *   **Payload:** `{ "name": "Satin Di-hack" }`
     *   **Ekspektasi Hasil:** `403 Forbidden` (nama Satin Pelangi tidak boleh berubah).
-    *   **Status Skrip Uji:** ⭕ Belum Diimplementasikan (Planned)
+    *   **Status Skrip Uji:** ✅ Diimplementasikan (Implemented)
     *   **Link ke Skrip:** `test/scripts/TC_BOLA_A1_Materials.swift` -> `testMaterialsPatch_AsAttacker_ReturnsForbidden`
 
 #### 3. Endpoint: `PATCH /materials/{id}/purchases/{purchase_id}`
@@ -92,14 +92,14 @@ Modul ini mengelola data bahan mentah kain, benang, dan hardware, serta rekaman 
     *   **Header:** `Authorization: Bearer {{JWT_OWNER}}`
     *   **Payload:** `{ "total_cost": 50000 }`
     *   **Ekspektasi Hasil:** `200 OK`, biaya pembelian terperbarui, `current_avg_cost` material dihitung ulang secara otomatis.
-    *   **Status Skrip Uji:** ⭕ Belum Diimplementasikan (Planned)
+    *   **Status Skrip Uji:** ✅ Diimplementasikan (Implemented)
     *   **Link ke Skrip:** `test/scripts/TC_BOLA_A1_Materials.swift` -> `testPurchasePatch_AsOwner_ReturnsSuccess`
 *   **Kasus Uji A.3.2 (Negative Case - Attacker Mencoba Meretas Biaya Pembelian):**
     *   **Metode & Path:** `PATCH /materials/a1b2.../purchases/p9999-uuid-pembelian`
     *   **Header:** `Authorization: Bearer {{JWT_ATTACKER}}`
     *   **Payload:** `{ "total_cost": 100 }`
     *   **Ekspektasi Hasil:** `403 Forbidden`, nilai pembelian di database aman tidak berubah.
-    *   **Status Skrip Uji:** ⭕ Belum Diimplementasikan (Planned)
+    *   **Status Skrip Uji:** ✅ Diimplementasikan (Implemented)
     *   **Link ke Skrip:** `test/scripts/TC_BOLA_A1_Materials.swift` -> `testPurchasePatch_AsAttacker_ReturnsForbidden`
 
 ---
@@ -115,13 +115,13 @@ Modul ini mengelola data produk jadi, ukuran (ProductSize) beserta varian kainny
     *   **Metode & Path:** `GET /products/SCRUNCHIE/sizes/s1111-uuid-ukuran-m`
     *   **Header:** `Authorization: Bearer {{JWT_OWNER}}`
     *   **Ekspektasi Hasil:** `200 OK`, mengembalikan detail ukuran "M" beserta HPP breakdown dan ketersediaan stok fisik.
-    *   **Status Skrip Uji:** ⭕ Belum Diimplementasikan (Planned)
+    *   **Status Skrip Uji:** ✅ Diimplementasikan (Implemented)
     *   **Link ke Skrip:** `test/scripts/TC_BOLA_B1_Products.swift` -> `testProductSizeGet_AsOwner_ReturnsSuccess`
 *   **Kasus Uji B.1.2 (Negative Case - BOLA):**
     *   **Metode & Path:** `GET /products/SCRUNCHIE/sizes/s1111-uuid-ukuran-m`
     *   **Header:** `Authorization: Bearer {{JWT_ATTACKER}}`
     *   **Ekspektasi Hasil:** `403 Forbidden`
-    *   **Status Skrip Uji:** ⭕ Belum Diimplementasikan (Planned)
+    *   **Status Skrip Uji:** ✅ Diimplementasikan (Implemented)
     *   **Link ke Skrip:** `test/scripts/TC_BOLA_B1_Products.swift` -> `testProductSizeGet_AsAttacker_ReturnsForbidden`
 
 #### 2. Endpoint: `PATCH /products/{sku}/sizes/{sizeId}`
@@ -132,14 +132,14 @@ Modul ini mengelola data produk jadi, ukuran (ProductSize) beserta varian kainny
     *   **Header:** `Authorization: Bearer {{JWT_OWNER}}`
     *   **Payload:** `{ "selling_price": 15000 }`
     *   **Ekspektasi Hasil:** `200 OK` atau `204 No Content`, harga jual diperbarui.
-    *   **Status Skrip Uji:** ⭕ Belum Diimplementasikan (Planned)
+    *   **Status Skrip Uji:** ✅ Diimplementasikan (Implemented)
     *   **Link ke Skrip:** `test/scripts/TC_BOLA_B1_Products.swift` -> `testProductSizePatch_AsOwner_ReturnsSuccess`
 *   **Kasus Uji B.2.2 (Negative Case - BOLA):**
     *   **Metode & Path:** `PATCH /products/SCRUNCHIE/sizes/s1111-uuid-ukuran-m`
     *   **Header:** `Authorization: Bearer {{JWT_ATTACKER}}`
     *   **Payload:** `{ "selling_price": 500 }`
     *   **Ekspektasi Hasil:** `403 Forbidden`
-    *   **Status Skrip Uji:** ⭕ Belum Diimplementasikan (Planned)
+    *   **Status Skrip Uji:** ✅ Diimplementasikan (Implemented)
     *   **Link ke Skrip:** `test/scripts/TC_BOLA_B1_Products.swift` -> `testProductSizePatch_AsAttacker_ReturnsForbidden`
 
 ---
@@ -156,13 +156,13 @@ Modul ini mengelola batch pemotongan fisik dan perakitan produk jadi yang memeng
     *   **Metode & Path:** `POST /production-batches/b5555-uuid-batch-draft/confirm`
     *   **Header:** `Authorization: Bearer {{JWT_OWNER}}`
     *   **Ekspektasi Hasil:** `200 OK`, status berubah menjadi `confirmed`, stock ledger terisi secara otomatis, kain berkurang, stock produk bertambah.
-    *   **Status Skrip Uji:** ⭕ Belum Diimplementasikan (Planned)
+    *   **Status Skrip Uji:** ✅ Diimplementasikan (Implemented)
     *   **Link ke Skrip:** `test/scripts/TC_BOLA_C1_Production.swift` -> `testProductionConfirm_AsOwner_ReturnsSuccess`
 *   **Kasus Uji C.1.2 (Negative Case - BOLA):**
     *   **Metode & Path:** `POST /production-batches/b5555-uuid-batch-draft/confirm`
     *   **Header:** `Authorization: Bearer {{JWT_ATTACKER}}`
     *   **Ekspektasi Hasil:** `403 Forbidden`, status batch tetap `draft`, stok fisik aman tidak bergerak.
-    *   **Status Skrip Uji:** ⭕ Belum Diimplementasikan (Planned)
+    *   **Status Skrip Uji:** ✅ Diimplementasikan (Implemented)
     *   **Link ke Skrip:** `test/scripts/TC_BOLA_C1_Production.swift` -> `testProductionConfirm_AsAttacker_ReturnsForbidden`
 
 ---
@@ -180,14 +180,14 @@ Modul ini mencatat nota transaksi penjualan produk ke konsumen dan memotong sald
     *   **Header:** `Authorization: Bearer {{JWT_OWNER}}`
     *   **Payload:** `{ "reason": "Saran pembatalan dari owner" }`
     *   **Ekspektasi Hasil:** `200 OK`, status penjualan menjadi `cancelled`, stok produk dikembalikan utuh ke stock ledger.
-    *   **Status Skrip Uji:** ⭕ Belum Diimplementasikan (Planned)
+    *   **Status Skrip Uji:** ✅ Diimplementasikan (Implemented)
     *   **Link ke Skrip:** `test/scripts/TC_BOLA_D1_Sales.swift` -> `testSalesCancel_AsOwner_ReturnsSuccess`
 *   **Kasus Uji D.1.2 (Negative Case - BOLA):**
     *   **Metode & Path:** `POST /sales-orders/o7777-uuid-sales-paid/cancel`
     *   **Header:** `Authorization: Bearer {{JWT_ATTACKER}}`
     *   **Payload:** `{ "reason": "Dibatalkan oleh hacker" }`
     *   **Ekspektasi Hasil:** `403 Forbidden`, status nota tetap `paid` dan stok produk tidak berubah.
-    *   **Status Skrip Uji:** ⭕ Belum Diimplementasikan (Planned)
+    *   **Status Skrip Uji:** ✅ Diimplementasikan (Implemented)
     *   **Link ke Skrip:** `test/scripts/TC_BOLA_D1_Sales.swift` -> `testSalesCancel_AsAttacker_ReturnsForbidden`
 
 ---

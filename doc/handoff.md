@@ -25,9 +25,9 @@ To keep context windows lean and token-efficient for developers and AI agents, t
 
 | Version | Date | Changed by | Summary |
 |---|---|---|---|
+| v3.48 | 2026-09-02 | SDET | **IMPLEMENTED: Otomatisasi Security Test BOLA (API1:2023).** Mengimplementasikan rangkaian pengujian keamanan BOLA otomatis di bawah target `oura studio frontendTests/Security` berbasis `XCTest`. Pengujian mencakup 15 kasus uji pada 4 modul data utama dengan prinsip "Fail Loudly" jika env disabotase. Rincian spesifikasi: `doc/versions/v3.48.md`. |
 | v3.47 | 2026-08-31 | SDET | **IMPLEMENTED: Otomatisasi API Integration & Network Contract Test.** Mengimplementasikan skrip pengujian integrasi live (`APIIntegrationTests.swift`) yang memvalidasi kontrak API live backend (`https://ourastudiobackendseoul-763614853578.asia-northeast3.run.app/api/v1`) untuk model data `Material` dan `ProductSize`. Rincian spesifikasi: `doc/versions/v3.47.md`. |
 | v3.46 | 2026-08-30 | Frontend | **IMPLEMENTED: Expand List Item Penjualan di Daftar Penjualan.** Menambahkan opsi expand down (akordeon) di baris daftar penjualan untuk menampilkan rincian item produk yang dibeli secara kompak (nama produk, ukuran, qty, harga, diskon, subtotal) dengan indentasi estetik, sementara seluruh area baris tetap dapat diklik untuk membuka detail transaksi lengkap. Rincian spesifikasi: `doc/versions/v3.46.md`. |
-| v3.45 | 2026-08-30 | Frontend | **IMPLEMENTED: Jam Transaksi Penjualan.** Menambahkan waktu jam transaksi (jam & menit) di seksi detail penjualan dan baris daftar penjualan untuk visibilitas waktu transaksi yang lebih presisi. Rincian spesifikasi: `doc/versions/v3.45.md`. |
 
 > **Note:** Untuk melihat daftar histori revisi v1.0 s.d v3.44 secara lengkap, silakan merujuk ke folder `doc/versions/`.
 
