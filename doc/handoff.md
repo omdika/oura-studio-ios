@@ -21,10 +21,11 @@ To keep context windows lean and token-efficient for developers and AI agents, t
 
 ---
 
-## Revision History (Latest 3)
+## Revision History (Latest 4)
 
 | Version | Date | Changed by | Summary |
 |---|---|---|---|
+| v3.48 | 2026-09-03 | Fullstack | **IMPLEMENTED: Integrasi Login Google SSO.** Mengintegrasikan login Google Single Sign-In (SSO) secara native dengan memuat Google Client ID dari Info.plist secara dinamis, mengonfigurasi Reversed Client ID sebagai skema URL kustom, mengarahkan callback Google langsung kembali ke aplikasi tanpa static web intermediary, dan menambahkan unit pengujian verifikasi konfigurasi. Rincian spesifikasi: `doc/versions/v3.48.md`. |
 | v3.47 | 2026-08-31 | SDET | **IMPLEMENTED: Otomatisasi API Integration & Network Contract Test.** Mengimplementasikan skrip pengujian integrasi live (`APIIntegrationTests.swift`) yang memvalidasi kontrak API live backend (`https://ourastudiobackendseoul-763614853578.asia-northeast3.run.app/api/v1`) untuk model data `Material` dan `ProductSize`. Rincian spesifikasi: `doc/versions/v3.47.md`. |
 | v3.46 | 2026-08-30 | Frontend | **IMPLEMENTED: Expand List Item Penjualan di Daftar Penjualan.** Menambahkan opsi expand down (akordeon) di baris daftar penjualan untuk menampilkan rincian item produk yang dibeli secara kompak (nama produk, ukuran, qty, harga, diskon, subtotal) dengan indentasi estetik, sementara seluruh area baris tetap dapat diklik untuk membuka detail transaksi lengkap. Rincian spesifikasi: `doc/versions/v3.46.md`. |
 | v3.45 | 2026-08-30 | Frontend | **IMPLEMENTED: Jam Transaksi Penjualan.** Menambahkan waktu jam transaksi (jam & menit) di seksi detail penjualan dan baris daftar penjualan untuk visibilitas waktu transaksi yang lebih presisi. Rincian spesifikasi: `doc/versions/v3.45.md`. |
