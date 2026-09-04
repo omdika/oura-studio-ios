@@ -75,6 +75,15 @@ struct BerandaView: View {
         }
     }
 
+    private var userName: String? {
+        guard let email = appState.currentUserEmail else { return nil }
+        let parts = email.components(separatedBy: "@")
+        if let first = parts.first {
+            return first.capitalized
+        }
+        return nil
+    }
+
     // MARK: - Header
 
     private var headerSection: some View {
@@ -84,10 +93,12 @@ struct BerandaView: View {
                     .font(.system(size: 12, weight: .bold))
                     .foregroundStyle(OuraTheme.Colors.accent)
                     .kerning(1.6)
-                Text(greeting)
+                Text(userName != nil ? "\(greeting), \(userName!)" : greeting)
                     .font(.system(size: 27, weight: .heavy))
                     .foregroundStyle(OuraTheme.Colors.textPrimary)
                     .tracking(-0.3)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
             }
             Spacer()
             Text(todayFormatted)
