@@ -46,8 +46,8 @@ class AppState: ObservableObject {
         isCheckingAuth = false
     }
 
-    func loginWithGoogle(idToken: String?) async throws {
-        let response = try await api.loginWithGoogle(idToken: idToken)
+    func loginWithGoogle(idToken: String?, invitationToken: String? = nil) async throws {
+        let response = try await api.loginWithGoogle(idToken: idToken, invitationToken: invitationToken)
         KeychainManager.saveToken(response.accessToken)
         api.authToken = response.accessToken
         isAuthenticated = true

@@ -199,10 +199,15 @@ class APIService: ObservableObject {
 
     // MARK: - Auth
 
-    func loginWithGoogle(idToken: String?) async throws -> LoginResponse {
+    func loginWithGoogle(idToken: String?, invitationToken: String? = nil) async throws -> LoginResponse {
         if useMock { return try await MockAPIService.shared.loginWithGoogle(idToken: idToken) }
         guard let token = idToken else { throw APIError.serverError(0, "Google ID token kosong") }
-        return try await post(path: "/auth/google", body: GoogleLoginRequest(idToken: token))
+        return try await post(path: "/auth/google", body: GoogleLoginRequest(idToken: token, invitationToken: invitationToken))
+    }
+
+    func verifyInvite(email: String, code: String) async throws -> VerifyInviteResponse {
+        if useMock { return VerifyInviteResponse(invitationToken: "mock-invitation-token-\(UUID())") }
+        return try await post(path: "/auth/verify-invite", body: VerifyInviteRequest(email: email, code: code))
     }
 
     // MARK: - Materials

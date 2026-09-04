@@ -6,6 +6,9 @@ struct LoginView: View {
 
     @State private var isLoading = false
     @State private var errorMessage: String?
+    @State private var successMessage: String? = nil
+    @State private var verifiedInvitationToken: String? = nil
+    @State private var showingInviteSheet = false
     @State private var oauthCoordinator = GoogleOAuthCoordinator()
     #if DEBUG
     @State private var devToken = ""
@@ -58,6 +61,25 @@ struct LoginView: View {
                         .transition(.opacity.combined(with: .move(edge: .top)))
                     }
 
+                    if let success = successMessage {
+                        HStack(spacing: 8) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundStyle(OuraTheme.Colors.accent)
+                            Text(success)
+                                .font(.system(size: 13))
+                                .foregroundStyle(OuraTheme.Colors.textSecondary)
+                        }
+                        .padding(12)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(OuraTheme.Colors.surfaceSheet)
+                        .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.medium))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: OuraTheme.Radius.medium)
+                                .stroke(OuraTheme.Colors.accent.opacity(0.3), lineWidth: 1)
+                        )
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+                    }
+
                     Button {
                         Task { await performGoogleLogin() }
                     } label: {
@@ -84,6 +106,15 @@ struct LoginView: View {
                         )
                     }
                     .disabled(isLoading)
+
+                    Button {
+                        showingInviteSheet = true
+                    } label: {
+                        Text("Punya Kode Undangan?")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(OuraTheme.Colors.accent)
+                    }
+                    .padding(.top, 8)
                 }
                 .padding(.horizontal, OuraTheme.Spacing.horizontal)
                 .animation(.easeInOut(duration: 0.2), value: errorMessage)
@@ -144,6 +175,14 @@ struct LoginView: View {
                     .padding(.bottom, 16)
             }
         }
+        .sheet(isPresented: $showingInviteSheet) {
+            InviteVerificationSheet(
+                isPresented: $showingInviteSheet,
+                verifiedToken: $verifiedInvitationToken,
+                successMessage: $successMessage,
+                errorMessage: $errorMessage
+            )
+        }
     }
 
     private func performGoogleLogin() async {
@@ -153,11 +192,11 @@ struct LoginView: View {
 
         do {
             if APIService.shared.useMock {
-                try await appState.loginWithGoogle(idToken: nil)
+                try await appState.loginWithGoogle(idToken: nil, invitationToken: verifiedInvitationToken)
                 return
             }
             let idToken = try await oauthCoordinator.requestIDToken()
-            try await appState.loginWithGoogle(idToken: idToken)
+            try await appState.loginWithGoogle(idToken: idToken, invitationToken: verifiedInvitationToken)
         } catch ASWebAuthenticationSessionError.canceledLogin {
             // user cancelled — no error shown
         } catch let e as APIError {
@@ -277,4 +316,143 @@ final class GoogleOAuthCoordinator: NSObject, ASWebAuthenticationPresentationCon
     LoginView()
         .environmentObject(AppState())
         .environmentObject(APIService.shared)
+}
+
+// MARK: - Invite Verification Sheet
+
+struct InviteVerificationSheet: View {
+    @Binding var isPresented: Bool
+    @Binding var verifiedToken: String?
+    @Binding var successMessage: String?
+    @Binding var errorMessage: String?
+    
+    @State private var email = ""
+    @State private var code = ""
+    @State private var isLoading = false
+    @State private var sheetError: String? = nil
+    
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                OuraTheme.Colors.background.ignoresSafeArea()
+                
+                VStack(spacing: 20) {
+                    Text("Verifikasi Kode Undangan")
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundStyle(OuraTheme.Colors.textPrimary)
+                        .padding(.top, 10)
+                    
+                    Text("Masukkan email Anda dan 6-digit kode undangan yang Anda terima dari Admin.")
+                        .font(.system(size: 14))
+                        .foregroundStyle(OuraTheme.Colors.textSecondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 20)
+                    
+                    if let err = sheetError {
+                        Text(err)
+                            .font(.system(size: 13))
+                            .foregroundStyle(OuraTheme.Colors.dangerText)
+                            .padding(10)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(OuraTheme.Colors.dangerBg)
+                            .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.small))
+                            .padding(.horizontal, 20)
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Email Penerima")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(OuraTheme.Colors.textSecondary)
+                        
+                        TextField("Email Anda", text: $email)
+                            .keyboardType(.emailAddress)
+                            .autocorrectionDisabled()
+                            .textInputAutocapitalization(.never)
+                            .padding()
+                            .background(OuraTheme.Colors.surfaceCard)
+                            .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.small))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: OuraTheme.Radius.small)
+                                    .stroke(OuraTheme.Colors.border, lineWidth: 1)
+                            )
+                    }
+                    .padding(.horizontal, 20)
+                    
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Kode Undangan (6 Karakter)")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(OuraTheme.Colors.textSecondary)
+                        
+                        TextField("Contoh: 8X2K9F", text: $code)
+                            .autocorrectionDisabled()
+                            .textInputAutocapitalization(.characters)
+                            .padding()
+                            .background(OuraTheme.Colors.surfaceCard)
+                            .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.small))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: OuraTheme.Radius.small)
+                                    .stroke(OuraTheme.Colors.border, lineWidth: 1)
+                            )
+                    }
+                    .padding(.horizontal, 20)
+                    
+                    Spacer()
+                    
+                    Button {
+                        Task { await performVerification() }
+                    } label: {
+                        HStack {
+                            if isLoading {
+                                ProgressView()
+                                    .progressViewStyle(.circular)
+                                    .tint(.white)
+                            } else {
+                                Text("Verifikasi Kode")
+                                    .font(.system(size: 16, weight: .bold))
+                                    .foregroundStyle(.white)
+                            }
+                        }
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 50)
+                        .background(email.isEmpty || code.isEmpty ? OuraTheme.Colors.textTertiary : OuraTheme.Colors.accent)
+                        .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.medium))
+                    }
+                    .disabled(isLoading || email.isEmpty || code.isEmpty)
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 20)
+                }
+            }
+            .navigationTitle("Pendaftaran Anggota")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Tutup") {
+                        isPresented = false
+                    }
+                    .foregroundStyle(OuraTheme.Colors.textSecondary)
+                }
+            }
+        }
+    }
+    
+    private func performVerification() async {
+        sheetError = nil
+        isLoading = true
+        defer { isLoading = false }
+        
+        do {
+            let res = try await APIService.shared.verifyInvite(
+                email: email.trimmingCharacters(in: .whitespacesAndNewlines),
+                code: code.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+            )
+            verifiedToken = res.invitationToken
+            successMessage = "Kode undangan untuk \(email) terverifikasi! Silakan klik 'Masuk dengan Google' dengan akun Google Anda."
+            errorMessage = nil
+            isPresented = false
+        } catch let e as APIError {
+            sheetError = e.errorDescription
+        } catch {
+            sheetError = error.localizedDescription
+        }
+    }
 }
