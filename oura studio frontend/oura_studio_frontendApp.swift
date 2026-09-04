@@ -1,4 +1,5 @@
 import SwiftUI
+import GoogleSignIn
 
 @main
 struct OuraStudioApp: App {
@@ -22,6 +23,9 @@ struct OuraStudioApp: App {
                 }
             }
             .animation(.easeInOut(duration: 0.3), value: appState.isAuthenticated)
+            .onOpenURL { url in
+                GIDSignIn.sharedInstance.handle(url)
+            }
         }
     }
 }

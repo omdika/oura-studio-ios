@@ -1,5 +1,5 @@
 import SwiftUI
-import AuthenticationServices
+import GoogleSignIn
 
 struct LoginView: View {
     @EnvironmentObject private var appState: AppState
@@ -9,7 +9,6 @@ struct LoginView: View {
     @State private var successMessage: String? = nil
     @State private var verifiedInvitationToken: String? = nil
     @State private var showingInviteSheet = false
-    @State private var oauthCoordinator = GoogleOAuthCoordinator()
     #if DEBUG
     @State private var devToken = ""
     #endif
@@ -169,7 +168,7 @@ struct LoginView: View {
                 Spacer()
                 Spacer()
 
-                Text("v3.48")
+                Text("v3.49")
                     .font(.system(size: 11))
                     .foregroundStyle(OuraTheme.Colors.textTertiary)
                     .padding(.bottom, 16)
@@ -195,14 +194,30 @@ struct LoginView: View {
                 try await appState.loginWithGoogle(idToken: nil, invitationToken: verifiedInvitationToken)
                 return
             }
-            let idToken = try await oauthCoordinator.requestIDToken()
+            
+            guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                  let rootVC = windowScene.windows.first(where: { $0.isKeyWindow })?.rootViewController else {
+                throw APIError.serverError(0, "Gagal mendapatkan window scene aktif")
+            }
+            
+            let result = try await GIDSignIn.sharedInstance.signIn(withPresenting: rootVC)
+            guard let idToken = result.user.idToken?.tokenString else {
+                throw APIError.serverError(0, "Gagal mengekstrak ID Token dari Google")
+            }
+            
             try await appState.loginWithGoogle(idToken: idToken, invitationToken: verifiedInvitationToken)
-        } catch ASWebAuthenticationSessionError.canceledLogin {
-            // user cancelled — no error shown
-        } catch let e as APIError {
-            errorMessage = e.errorDescription
         } catch {
-            errorMessage = error.localizedDescription
+            let nsError = error as NSError
+            if nsError.domain == "com.google.GIDSignIn" && nsError.code == -5 {
+                // GIDSignInErrorCodeCanceled = -5 (User cancelled flow)
+                return
+            }
+            
+            if let apiError = error as? APIError {
+                errorMessage = apiError.errorDescription
+            } else {
+                errorMessage = error.localizedDescription
+            }
         }
     }
 }
@@ -250,70 +265,7 @@ private struct GoogleGIcon: View {
     }
 }
 
-// MARK: - Google OAuth coordinator
 
-final class GoogleOAuthCoordinator: NSObject, ASWebAuthenticationPresentationContextProviding {
-    private var activeSession: ASWebAuthenticationSession?
-
-    nonisolated func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
-        MainActor.assumeIsolated {
-            UIApplication.shared.connectedScenes
-                .compactMap { $0 as? UIWindowScene }
-                .flatMap { $0.windows }
-                .first { $0.isKeyWindow } ?? UIWindow()
-        }
-    }
-
-    func requestIDToken() async throws -> String {
-        // 1. Ambil Google Client ID secara dinamis dari Info.plist, dengan fallback
-        let clientID = (Bundle.main.object(forInfoDictionaryKey: "GoogleClientID") as? String)
-            ?? "763614853578-khhhap8llgs7a4obnuj2riebn5ci4t9v.apps.googleusercontent.com"
-        
-        guard !clientID.isEmpty else {
-            throw APIError.serverError(0, "GoogleClientID tidak terkonfigurasi")
-        }
-        
-        // 2. Tentukan Reversed Client ID sebagai Skema URL Callback
-        let components = clientID.components(separatedBy: ".")
-        let reversedClientID = components.reversed().joined(separator: ".")
-        let redirectURI = "\(reversedClientID):/oauth2callback"
-
-        var comps = URLComponents(string: "https://accounts.google.com/o/oauth2/v2/auth")!
-        comps.queryItems = [
-            URLQueryItem(name: "client_id",     value: clientID),
-            URLQueryItem(name: "redirect_uri",  value: redirectURI),
-            URLQueryItem(name: "response_type", value: "id_token"),
-            URLQueryItem(name: "scope",         value: "openid email profile"),
-            URLQueryItem(name: "nonce",         value: UUID().uuidString),
-        ]
-        guard let authURL = comps.url else { throw APIError.invalidURL }
-
-        return try await withCheckedThrowingContinuation { continuation in
-            // Menggunakan reversedClientID sebagai skema callback yang diintersep oleh iOS
-            let session = ASWebAuthenticationSession(
-                url: authURL,
-                callbackURLScheme: reversedClientID
-            ) { callbackURL, error in
-                if let error { 
-                    continuation.resume(throwing: error)
-                    return 
-                }
-                guard let fragment = callbackURL?.fragment,
-                      let idToken = URLComponents(string: "?\(fragment)")?
-                          .queryItems?.first(where: { $0.name == "id_token" })?.value
-                else {
-                    continuation.resume(throwing: APIError.serverError(0, "Token Google tidak ditemukan di URL fragment"))
-                    return
-                }
-                continuation.resume(returning: idToken)
-            }
-            session.presentationContextProvider = self
-            session.prefersEphemeralWebBrowserSession = true
-            session.start()
-            self.activeSession = session
-        }
-    }
-}
 
 #Preview {
     LoginView()
