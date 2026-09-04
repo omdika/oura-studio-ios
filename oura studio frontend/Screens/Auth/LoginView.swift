@@ -138,7 +138,7 @@ struct LoginView: View {
                 Spacer()
                 Spacer()
 
-                Text("v1.1")
+                Text("v3.48")
                     .font(.system(size: 11))
                     .foregroundStyle(OuraTheme.Colors.textTertiary)
                     .padding(.bottom, 16)
@@ -226,9 +226,15 @@ final class GoogleOAuthCoordinator: NSObject, ASWebAuthenticationPresentationCon
     }
 
     func requestIDToken() async throws -> String {
-        let clientID = "YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com"
-        let bundleID = Bundle.main.bundleIdentifier ?? "handika.oura-studio-frontend"
-        let redirectURI = "\(bundleID):/oauth2callback"
+        // 1. Ambil Google Client ID secara dinamis dari Info.plist
+        guard let clientID = Bundle.main.object(forInfoDictionaryKey: "GoogleClientID") as? String, !clientID.isEmpty else {
+            throw APIError.serverError(0, "GoogleClientID tidak terkonfigurasi di Info.plist")
+        }
+        
+        // 2. Tentukan Reversed Client ID sebagai Skema URL Callback
+        let components = clientID.components(separatedBy: ".")
+        let reversedClientID = components.reversed().joined(separator: ".")
+        let redirectURI = "\(reversedClientID):/oauth2callback"
 
         var comps = URLComponents(string: "https://accounts.google.com/o/oauth2/v2/auth")!
         comps.queryItems = [
@@ -241,16 +247,20 @@ final class GoogleOAuthCoordinator: NSObject, ASWebAuthenticationPresentationCon
         guard let authURL = comps.url else { throw APIError.invalidURL }
 
         return try await withCheckedThrowingContinuation { continuation in
+            // Menggunakan reversedClientID sebagai skema callback yang diintersep oleh iOS
             let session = ASWebAuthenticationSession(
                 url: authURL,
-                callbackURLScheme: bundleID
+                callbackURLScheme: reversedClientID
             ) { callbackURL, error in
-                if let error { continuation.resume(throwing: error); return }
+                if let error { 
+                    continuation.resume(throwing: error)
+                    return 
+                }
                 guard let fragment = callbackURL?.fragment,
                       let idToken = URLComponents(string: "?\(fragment)")?
                           .queryItems?.first(where: { $0.name == "id_token" })?.value
                 else {
-                    continuation.resume(throwing: APIError.serverError(0, "Token Google tidak ditemukan"))
+                    continuation.resume(throwing: APIError.serverError(0, "Token Google tidak ditemukan di URL fragment"))
                     return
                 }
                 continuation.resume(returning: idToken)
