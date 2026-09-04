@@ -265,9 +265,12 @@ final class GoogleOAuthCoordinator: NSObject, ASWebAuthenticationPresentationCon
     }
 
     func requestIDToken() async throws -> String {
-        // 1. Ambil Google Client ID secara dinamis dari Info.plist
-        guard let clientID = Bundle.main.object(forInfoDictionaryKey: "GoogleClientID") as? String, !clientID.isEmpty else {
-            throw APIError.serverError(0, "GoogleClientID tidak terkonfigurasi di Info.plist")
+        // 1. Ambil Google Client ID secara dinamis dari Info.plist, dengan fallback
+        let clientID = (Bundle.main.object(forInfoDictionaryKey: "GoogleClientID") as? String)
+            ?? "763614853578-oura-studio-placeholder.apps.googleusercontent.com"
+        
+        guard !clientID.isEmpty else {
+            throw APIError.serverError(0, "GoogleClientID tidak terkonfigurasi")
         }
         
         // 2. Tentukan Reversed Client ID sebagai Skema URL Callback
