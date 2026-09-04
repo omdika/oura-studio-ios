@@ -95,17 +95,17 @@ struct oura_studio_frontendTests {
         // 1. Verify GoogleClientID is in Info.plist
         let clientID = Bundle.main.object(forInfoDictionaryKey: "GoogleClientID") as? String
         #expect(clientID != nil)
-        #expect(clientID == "763614853578-oura-studio-placeholder.apps.googleusercontent.com")
+        #expect(clientID == "763614853578-khhhap8llgs7a4obnuj2riebn5ci4t9v.apps.googleusercontent.com")
         
         // 2. Verify Reversed Client ID computation logic
         guard let unwrappedClientID = clientID else { return }
         let components = unwrappedClientID.components(separatedBy: ".")
         let reversedClientID = components.reversed().joined(separator: ".")
         
-        #expect(reversedClientID == "com.googleusercontent.apps.763614853578-oura-studio-placeholder")
+        #expect(reversedClientID == "com.googleusercontent.apps.763614853578-khhhap8llgs7a4obnuj2riebn5ci4t9v")
         
         // 3. Verify URL Scheme matches
         let redirectURI = "\(reversedClientID):/oauth2callback"
-        #expect(redirectURI == "com.googleusercontent.apps.763614853578-oura-studio-placeholder:/oauth2callback")
+        #expect(redirectURI == "com.googleusercontent.apps.763614853578-khhhap8llgs7a4obnuj2riebn5ci4t9v:/oauth2callback")
     }
 }

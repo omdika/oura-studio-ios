@@ -411,15 +411,8 @@
 				DEVELOPMENT_TEAM = YWVRM7H59J;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleURLTypes = (
-					{
-						CFBundleTypeRole = Editor;
-						CFBundleURLSchemes = (
-							"com.googleusercontent.apps.763614853578-oura-studio-placeholder",
-						);
-					},
-				);
-				INFOPLIST_KEY_GoogleClientID = "763614853578-oura-studio-placeholder.apps.googleusercontent.com";
+				INFOPLIST_KEY_CFBundleURLTypes = "{\n    CFBundleTypeRole = Editor;\n    CFBundleURLSchemes =     (\n        \"com.googleusercontent.apps.763614853578-khhhap8llgs7a4obnuj2riebn5ci4t9v\"\n    );\n}";
+				INFOPLIST_KEY_GoogleClientID = "763614853578-khhhap8llgs7a4obnuj2riebn5ci4t9v.apps.googleusercontent.com\n";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Kamera digunakan untuk scan QR code produk Oura Studio.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -454,15 +447,8 @@
 				DEVELOPMENT_TEAM = YWVRM7H59J;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleURLTypes = (
-					{
-						CFBundleTypeRole = Editor;
-						CFBundleURLSchemes = (
-							"com.googleusercontent.apps.763614853578-oura-studio-placeholder",
-						);
-					},
-				);
-				INFOPLIST_KEY_GoogleClientID = "763614853578-oura-studio-placeholder.apps.googleusercontent.com";
+				INFOPLIST_KEY_CFBundleURLTypes = "{\n    CFBundleTypeRole = Editor;\n    CFBundleURLSchemes =     (\n        \"com.googleusercontent.apps.763614853578-khhhap8llgs7a4obnuj2riebn5ci4t9v\"\n    );\n}";
+				INFOPLIST_KEY_GoogleClientID = "763614853578-khhhap8llgs7a4obnuj2riebn5ci4t9v.apps.googleusercontent.com\n";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Kamera digunakan untuk scan QR code produk Oura Studio.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
