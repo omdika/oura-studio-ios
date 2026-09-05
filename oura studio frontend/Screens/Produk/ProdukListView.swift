@@ -1,4 +1,5 @@
 import SwiftUI
+import PhotosUI
 
 struct ProdukListView: View {
     @EnvironmentObject private var api: APIService
@@ -396,10 +397,19 @@ struct ProdukListView: View {
 // MARK: - Product group row
 
 private struct ProductGroupRow: View {
+    @EnvironmentObject private var api: APIService
+
     let product: Product
     let sizes: [ProductSizeDetail]
     var additionsByVariant: [UUID: Int] = [:]
     let onProductChanged: () -> Void
+
+    @State private var selectedGroupForUpload: SizeGroup? = nil
+    @State private var targetSizeDetail: ProductSizeDetail? = nil
+    @State private var showVariantSelection = false
+    @State private var selectedPhotos: [PhotosPickerItem] = []
+    @State private var isPhotoPickerPresented = false
+    @State private var isUploading = false
 
     private struct SizeGroup: Identifiable {
         let sizeLabel: String
@@ -535,6 +545,14 @@ private struct ProductGroupRow: View {
                             .padding(.vertical, 9)
                         }
                         .buttonStyle(.plain)
+                        .contextMenu {
+                            Button {
+                                selectedGroupForUpload = group
+                                triggerUpload(for: group)
+                            } label: {
+                                Label("Unggah Foto Varian", systemImage: "photo.badge.plus")
+                            }
+                        }
 
                         if group.id != groups.last?.id {
                             Divider()
@@ -546,6 +564,60 @@ private struct ProductGroupRow: View {
             }
         }
         .ouraCard()
+        .confirmationDialog("Pilih Varian Kain", isPresented: $showVariantSelection, titleVisibility: .visible) {
+            if let group = selectedGroupForUpload {
+                ForEach(group.variants) { variant in
+                    Button(variant.fabricVariantName ?? "Default") {
+                        targetSizeDetail = variant
+                        isPhotoPickerPresented = true
+                    }
+                }
+                Button("Batal", role: .cancel) {}
+            }
+        } message: {
+            Text("Pilih varian kain untuk ukuran \(selectedGroupForUpload?.sizeLabel ?? "")")
+        }
+        .photosPicker(isPresented: $isPhotoPickerPresented, selection: $selectedPhotos, maxSelectionCount: 5, matching: .images)
+        .onChange(of: selectedPhotos) { newItems in
+            Task {
+                await handlePhotoSelection(newItems)
+            }
+        }
+    }
+
+    private func triggerUpload(for group: SizeGroup) {
+        if group.variants.count == 1 {
+            targetSizeDetail = group.variants[0]
+            isPhotoPickerPresented = true
+        } else if group.variants.count > 1 {
+            showVariantSelection = true
+        }
+    }
+
+    private func handlePhotoSelection(_ newItems: [PhotosPickerItem]) async {
+        guard let variant = targetSizeDetail, !newItems.isEmpty else { return }
+        
+        isUploading = true
+        defer {
+            isUploading = false
+            selectedPhotos = []
+            targetSizeDetail = nil
+        }
+        
+        for item in newItems {
+            guard let data = try? await item.loadTransferable(type: Data.self),
+                  let uiImage = UIImage(data: data) else { continue }
+            
+            guard let compressedData = ImageCompressor.compressToJPEG(image: uiImage) else { continue }
+            
+            do {
+                _ = try await api.uploadProductSizeImage(sku: variant.productSku, sizeId: variant.id, imageData: compressedData)
+            } catch {
+                print("⚠️ Gagal mengunggah foto: \(error)")
+            }
+        }
+        
+        onProductChanged()
     }
 }
 
