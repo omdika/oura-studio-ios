@@ -1,4 +1,5 @@
 import SwiftUI
+import PhotosUI
 
 // MARK: - Size label ordering (shared with ProdukListView's own size-group sort)
 
@@ -937,6 +938,11 @@ struct ProdukSizeDetailView: View {
     @State private var showAddStock = false
     @State private var errorMsg: String?
 
+    @State private var selectedItems: [PhotosPickerItem] = []
+    @State private var isUploading = false
+    @State private var imageToDelete: ProductSizeImage? = nil
+    @State private var showDeleteConfirmation = false
+
     // Spec-based HPP estimate (loaded on appear; used when no batch/manual HPP exists)
     @State private var relatedSpec: PatternSpec? = nil
     @State private var isLoadingSpec: Bool = false
@@ -957,6 +963,7 @@ struct ProdukSizeDetailView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: OuraTheme.Spacing.sectionGap) {
                 infoCard
+                photosSection
                 hppSection
                 priceAdvisorSection
                 if let err = errorMsg {
@@ -987,6 +994,144 @@ struct ProdukSizeDetailView: View {
         }
         .sheet(isPresented: $showAddStock, onDismiss: { Task { await refreshSize() } }) {
             TambahStokSheet(size: size)
+        }
+        .alert("Hapus Foto", isPresented: $showDeleteConfirmation, presenting: imageToDelete) { img in
+            Button("Hapus", role: .destructive) {
+                Task {
+                    await deletePhoto(img)
+                }
+            }
+            Button("Batal", role: .cancel) {}
+        } message: { img in
+            Text("Hapus foto ini dari produk?")
+        }
+    }
+
+    private var photosSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Foto Produk Varian")
+                .font(.system(size: 14, weight: .bold))
+                .foregroundStyle(OuraTheme.Colors.textPrimary)
+            
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 12) {
+                    // 1. Existing images
+                    if let images = size.images, !images.isEmpty {
+                        ForEach(images) { img in
+                            ZStack(alignment: .topTrailing) {
+                                AsyncImage(url: URL(string: img.imageUrl)) { image in
+                                    image.resizable()
+                                        .aspectRatio(contentMode: .fill)
+                                } placeholder: {
+                                    ZStack {
+                                        Color.gray.opacity(0.1)
+                                        ProgressView()
+                                    }
+                                }
+                                .frame(width: 80, height: 80)
+                                .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.small))
+                                
+                                // Delete Overlay (Button)
+                                Button {
+                                    imageToDelete = img
+                                    showDeleteConfirmation = true
+                                } label: {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .foregroundStyle(.red)
+                                        .background(Color.white.clipShape(Circle()))
+                                }
+                                .disabled(isUploading)
+                                .offset(x: 5, y: -5)
+                            }
+                        }
+                    }
+                    
+                    // 2. Upload Progress Overlay
+                    if isUploading {
+                        ZStack {
+                            Color.gray.opacity(0.2)
+                            ProgressView()
+                        }
+                        .frame(width: 80, height: 80)
+                        .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.small))
+                    }
+                    
+                    // 3. PhotosPicker Trigger Button
+                    PhotosPicker(selection: $selectedItems, maxSelectionCount: 5, matching: .images) {
+                        VStack(spacing: 4) {
+                            Image(systemName: "camera.fill")
+                                .font(.system(size: 18))
+                            Image(systemName: "plus")
+                                .font(.system(size: 12, weight: .bold))
+                        }
+                        .foregroundStyle(isUploading ? OuraTheme.Colors.textDisabled : OuraTheme.Colors.accent)
+                        .frame(width: 80, height: 80)
+                        .background(OuraTheme.Colors.accentLight.opacity(0.3))
+                        .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.small))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: OuraTheme.Radius.small)
+                                .stroke(isUploading ? OuraTheme.Colors.textDisabled : OuraTheme.Colors.accent, style: StrokeStyle(lineWidth: 1, dash: [4]))
+                        )
+                    }
+                    .disabled(isUploading)
+                    .onChange(of: selectedItems) { newItems in
+                        Task {
+                            await handlePhotoSelection(newItems)
+                        }
+                    }
+                }
+                .padding(.top, 4)
+                .padding(.horizontal, 4)
+            }
+            
+            // Empty State
+            if (size.images == nil || size.images!.isEmpty) && !isUploading {
+                HStack(spacing: 8) {
+                    Image(systemName: "camera.badge.ellipsis")
+                        .foregroundStyle(OuraTheme.Colors.textTertiary)
+                    Text("Belum ada foto untuk ukuran ini")
+                        .font(.system(size: 13))
+                        .foregroundStyle(OuraTheme.Colors.textSecondary)
+                }
+                .padding(.vertical, 4)
+            }
+        }
+        .padding(OuraTheme.Spacing.cardPad)
+        .ouraCard()
+    }
+
+    private func handlePhotoSelection(_ newItems: [PhotosPickerItem]) async {
+        guard !newItems.isEmpty else { return }
+        
+        isUploading = true
+        defer { isUploading = false }
+        
+        for item in newItems {
+            guard let data = try? await item.loadTransferable(type: Data.self),
+                  let uiImage = UIImage(data: data) else { continue }
+            
+            guard let compressedData = ImageCompressor.compressToJPEG(image: uiImage) else {
+                errorMsg = "Gagal mengompresi gambar."
+                continue
+            }
+            
+            do {
+                _ = try await api.uploadProductSizeImage(sku: size.productSku, sizeId: size.id, imageData: compressedData)
+            } catch {
+                errorMsg = "Gagal mengunggah foto: \(error.localizedDescription)"
+            }
+        }
+        
+        selectedItems = []
+        await refreshSize()
+    }
+
+    private func deletePhoto(_ img: ProductSizeImage) async {
+        do {
+            try await api.deleteProductSizeImage(sku: size.productSku, sizeId: size.id, imageId: img.id)
+            await refreshSize()
+        } catch {
+            errorMsg = "Gagal menghapus foto: \(error.localizedDescription)"
         }
     }
 

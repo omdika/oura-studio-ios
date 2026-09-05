@@ -1210,6 +1210,65 @@ class MockAPIService {
         return updated
     }
 
+    func uploadProductSizeImage(sku: String, sizeId: UUID, imageData: Data) async throws -> ProductSizeImage {
+        await delay()
+        
+        let newImage = ProductSizeImage(
+            id: UUID(),
+            productSizeId: sizeId,
+            imageUrl: "https://storage.googleapis.com/oura-studio-prod-bucket/products/\(sku)/sizes/\(sizeId.uuidString)/\(UUID().uuidString).jpg",
+            createdAt: Date()
+        )
+        
+        if var list = _productSizes[sku],
+           let idx = list.firstIndex(where: { $0.id == sizeId }) {
+            let old = list[idx]
+            var imgs = old.images ?? []
+            imgs.append(newImage)
+            
+            list[idx] = ProductSizeDetail(
+                id: old.id, productId: old.productId, productSku: old.productSku,
+                productName: old.productName, sizeLabel: old.sizeLabel,
+                fabricVariantName: old.fabricVariantName, reorderMinQty: old.reorderMinQty,
+                isArchived: old.isArchived, currentStockQty: old.currentStockQty,
+                productionStockQty: old.productionStockQty, manualStockQty: old.manualStockQty,
+                latestHppBreakdown: old.latestHppBreakdown, sellingPrice: old.sellingPrice,
+                marginPct: old.marginPct, manualHppFabric: old.manualHppFabric,
+                manualHppPooled: old.manualHppPooled, manualHppHardware: old.manualHppHardware,
+                manualHppLabor: old.manualHppLabor, manualHppOverhead: old.manualHppOverhead,
+                images: imgs
+            )
+            _productSizes[sku] = list
+        }
+        
+        return newImage
+    }
+
+    func deleteProductSizeImage(sku: String, sizeId: UUID, imageId: UUID) async throws {
+        await delay()
+        
+        if var list = _productSizes[sku],
+           let idx = list.firstIndex(where: { $0.id == sizeId }) {
+            let old = list[idx]
+            var imgs = old.images ?? []
+            imgs.removeAll { $0.id == imageId }
+            
+            list[idx] = ProductSizeDetail(
+                id: old.id, productId: old.productId, productSku: old.productSku,
+                productName: old.productName, sizeLabel: old.sizeLabel,
+                fabricVariantName: old.fabricVariantName, reorderMinQty: old.reorderMinQty,
+                isArchived: old.isArchived, currentStockQty: old.currentStockQty,
+                productionStockQty: old.productionStockQty, manualStockQty: old.manualStockQty,
+                latestHppBreakdown: old.latestHppBreakdown, sellingPrice: old.sellingPrice,
+                marginPct: old.marginPct, manualHppFabric: old.manualHppFabric,
+                manualHppPooled: old.manualHppPooled, manualHppHardware: old.manualHppHardware,
+                manualHppLabor: old.manualHppLabor, manualHppOverhead: old.manualHppOverhead,
+                images: imgs
+            )
+            _productSizes[sku] = list
+        }
+    }
+
     // Adds product stock and deducts fabric using manually-specified cutting dimensions (no spec required)
     func addStockManual(sku: String, sizeId: UUID, qty: Int, materialId: UUID, cutWidthCm: Double, cutLengthCm: Double) async throws -> ProductSizeDetail {
         await delay()

@@ -352,6 +352,48 @@ class APIService: ObservableObject {
         return sizeDetailFromBasic(basic, sku: sku, productName: name)
     }
 
+    func uploadProductSizeImage(sku: String, sizeId: UUID, imageData: Data) async throws -> ProductSizeImage {
+        if useMock { return try await MockAPIService.shared.uploadProductSizeImage(sku: sku, sizeId: sizeId, imageData: imageData) }
+        
+        let boundary = "Boundary-\(UUID().uuidString)"
+        guard let url = URL(string: baseURL + "/products/\(sku)/sizes/\(sizeId.uuidString)/images") else { throw APIError.invalidURL }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        if let token = authToken {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        
+        var body = Data()
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"file\"; filename=\"image.jpg\"\r\n".data(using: .utf8)!)
+        body.append("Content-Type: image/jpeg\r\n\r\n".data(using: .utf8)!)
+        body.append(imageData)
+        body.append("\r\n".data(using: .utf8)!)
+        body.append("--\(boundary)--\r\n".data(using: .utf8)!)
+        
+        request.httpBody = body
+        
+        let (data, response) = try await session.data(for: request)
+        if let http = response as? HTTPURLResponse {
+            if http.statusCode == 401 {
+                DispatchQueue.main.async { self.onUnauthorized?() }
+                throw APIError.unauthorized
+            }
+            if http.statusCode >= 400 {
+                let msg = (try? decoder.decode([String: String].self, from: data))?["detail"] ?? "Server error"
+                throw APIError.serverError(http.statusCode, msg)
+            }
+        }
+        
+        return try loggedDecode(ProductSizeImage.self, from: data, path: "/products/\(sku)/sizes/\(sizeId.uuidString)/images")
+    }
+
+    func deleteProductSizeImage(sku: String, sizeId: UUID, imageId: UUID) async throws {
+        if useMock { return try await MockAPIService.shared.deleteProductSizeImage(sku: sku, sizeId: sizeId, imageId: imageId) }
+        try await delete(path: "/products/\(sku)/sizes/\(sizeId.uuidString)/images/\(imageId.uuidString)")
+    }
+
     func getMaterialUsage(materialId: UUID) async throws -> [MaterialUsageEntry] {
         if useMock { return try await MockAPIService.shared.getMaterialUsage(materialId: materialId) }
         return try await get(path: "/materials/\(materialId)/usage")
@@ -416,7 +458,8 @@ class APIService: ObservableObject {
             manualHppPooled: basic.manualHppPooled,
             manualHppHardware: basic.manualHppHardware,
             manualHppLabor: basic.manualHppLabor,
-            manualHppOverhead: basic.manualHppOverhead
+            manualHppOverhead: basic.manualHppOverhead,
+            images: basic.images
         )
     }
 

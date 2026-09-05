@@ -30,6 +30,20 @@ struct ProductSize: Codable, Identifiable, Hashable {
     }
 }
 
+struct ProductSizeImage: Codable, Identifiable, Hashable {
+    let id: UUID
+    let productSizeId: UUID
+    let imageUrl: String
+    let createdAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case productSizeId = "product_size_id"
+        case imageUrl      = "image_url"
+        case createdAt     = "created_at"
+    }
+}
+
 // Matches the flat list response from GET /products/{sku}/sizes
 struct ProductSizeBasic: Codable, Identifiable {
     let id: UUID
@@ -51,6 +65,7 @@ struct ProductSizeBasic: Codable, Identifiable {
     let manualHppHardware: Double?
     let manualHppLabor: Double?
     let manualHppOverhead: Double?
+    let images: [ProductSizeImage]?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -70,6 +85,7 @@ struct ProductSizeBasic: Codable, Identifiable {
         case manualHppHardware   = "manual_hpp_hardware"
         case manualHppLabor      = "manual_hpp_labor"
         case manualHppOverhead   = "manual_hpp_overhead"
+        case images
     }
 }
 
@@ -141,6 +157,7 @@ struct ProductSizeDetail: Codable, Identifiable {
     var manualHppHardware: Double?
     var manualHppLabor: Double?
     var manualHppOverhead: Double?
+    var images: [ProductSizeImage]?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -162,6 +179,7 @@ struct ProductSizeDetail: Codable, Identifiable {
         case manualHppHardware = "manual_hpp_hardware"
         case manualHppLabor    = "manual_hpp_labor"
         case manualHppOverhead = "manual_hpp_overhead"
+        case images
     }
 
     var displayLabel: String {

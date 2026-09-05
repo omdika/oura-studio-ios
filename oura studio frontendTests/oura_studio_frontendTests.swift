@@ -108,4 +108,26 @@ struct oura_studio_frontendTests {
         let redirectURI = "\(reversedClientID):/oauth2callback"
         #expect(redirectURI == "com.googleusercontent.apps.763614853578-khhhap8llgs7a4obnuj2riebn5ci4t9v:/oauth2callback")
     }
+
+    private func createMockImage(width: CGFloat, height: CGFloat) -> UIImage {
+        let renderer = UIGraphicsImageRenderer(size: CGSize(width: width, height: height))
+        return renderer.image { ctx in
+            UIColor.blue.setFill()
+            ctx.fill(CGRect(x: 0, y: 0, width: width, height: height))
+        }
+    }
+
+    @Test func testImageCompressorNoOpAndLimits() async throws {
+        // 1. Create a small mock image
+        let smallImage = createMockImage(width: 100, height: 100)
+        let smallData = ImageCompressor.compressToJPEG(image: smallImage, maxBytes: 50000)
+        #expect(smallData != nil)
+        #expect(smallData!.count <= 50000)
+        
+        // 2. Create a larger mock image and compress with a tight constraint
+        let largeImage = createMockImage(width: 1000, height: 1000)
+        let compressedData = ImageCompressor.compressToJPEG(image: largeImage, maxBytes: 15000)
+        #expect(compressedData != nil)
+        #expect(compressedData!.count <= 15000)
+    }
 }
