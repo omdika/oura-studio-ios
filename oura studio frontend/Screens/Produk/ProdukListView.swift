@@ -420,6 +420,7 @@ private struct ProductGroupRow: View {
         // Flags a size that's completely unconfigured — no stock and no price set on any variant —
         // e.g. right after "Simpan Tanpa Resep" before the user has filled anything in.
         var needsSetup: Bool { totalStock == 0 && lowestPrice == nil }
+        var imageCount: Int { variants.compactMap { $0.images }.flatMap { $0 }.count }
     }
 
     private var groups: [SizeGroup] {
@@ -481,6 +482,19 @@ private struct ProductGroupRow: View {
                                         Image(systemName: "star.fill")
                                             .font(.system(size: 8))
                                             .foregroundStyle(OuraTheme.Colors.warningText)
+                                    }
+                                    if group.imageCount > 0 {
+                                        HStack(spacing: 3) {
+                                            Image(systemName: "camera.fill")
+                                                .font(.system(size: 8))
+                                            Text("\(group.imageCount)")
+                                                .font(.system(size: 8, weight: .bold))
+                                        }
+                                        .foregroundStyle(OuraTheme.Colors.accent)
+                                        .padding(.horizontal, 5)
+                                        .padding(.vertical, 2)
+                                        .background(OuraTheme.Colors.accentLight.opacity(0.4))
+                                        .clipShape(RoundedRectangle(cornerRadius: 4))
                                     }
                                     if groupAdditions > 0 {
                                         OuraTag(text: "+\(groupAdditions) masuk",
