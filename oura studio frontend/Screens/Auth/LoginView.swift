@@ -3,6 +3,7 @@ import GoogleSignIn
 
 struct LoginView: View {
     @EnvironmentObject private var appState: AppState
+    @EnvironmentObject private var api: APIService
 
     @State private var isLoading = false
     @State private var errorMessage: String?
@@ -135,6 +136,26 @@ struct LoginView: View {
                             .foregroundStyle(OuraTheme.Colors.border)
                     }
                     .padding(.top, 24)
+
+                    Toggle(isOn: Binding(
+                        get: { api.useMock },
+                        set: { api.useMock = $0 }
+                    )) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "square.stack.3d.up.fill")
+                                .foregroundStyle(OuraTheme.Colors.accent)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Gunakan Mock Data")
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundStyle(OuraTheme.Colors.textPrimary)
+                                Text("Berjalan tanpa koneksi ke server real")
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(OuraTheme.Colors.textSecondary)
+                            }
+                        }
+                    }
+                    .tint(OuraTheme.Colors.accent)
+                    .padding(.vertical, 4)
 
                     TextField("Paste bearer token...", text: $devToken, axis: .vertical)
                         .lineLimit(3)

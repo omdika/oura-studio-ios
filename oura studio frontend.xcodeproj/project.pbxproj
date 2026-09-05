@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		262AB44F301A07A10064A438 /* .claude in Resources */ = {isa = PBXBuildFile; fileRef = 262AB44E301A07A10064A438 /* .claude */; };
 		262AB451301A07A90064A438 /* doc in Resources */ = {isa = PBXBuildFile; fileRef = 262AB450301A07A90064A438 /* doc */; };
+		26C73C01304BDA1300760516 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = 2619C631304A918D0022A8D8 /* GoogleSignIn */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -72,6 +73,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				26C73C01304BDA1300760516 /* GoogleSignIn in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -134,8 +136,7 @@
 			);
 			name = "oura studio frontend";
 			packageProductDependencies = (
-							2619C631304A918D0022A8D8 /* GoogleSignIn */,
-
+				2619C631304A918D0022A8D8 /* GoogleSignIn */,
 			);
 			productName = "oura studio frontend";
 			productReference = 262AB412301A072A0064A438 /* oura studio frontend.app */;
@@ -430,8 +431,6 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "oura-studio-frontend-Info.plist";
-				INFOPLIST_KEY_CFBundleURLTypes = "{\n    CFBundleTypeRole = Editor;\n    CFBundleURLSchemes =     (\n        \"com.googleusercontent.apps.763614853578-khhhap8llgs7a4obnuj2riebn5ci4t9v\"\n    );\n}";
-				INFOPLIST_KEY_GoogleClientID = "763614853578-khhhap8llgs7a4obnuj2riebn5ci4t9v.apps.googleusercontent.com\n";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Kamera digunakan untuk scan QR code produk Oura Studio.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -467,8 +466,6 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "oura-studio-frontend-Info.plist";
-				INFOPLIST_KEY_CFBundleURLTypes = "{\n    CFBundleTypeRole = Editor;\n    CFBundleURLSchemes =     (\n        \"com.googleusercontent.apps.763614853578-khhhap8llgs7a4obnuj2riebn5ci4t9v\"\n    );\n}";
-				INFOPLIST_KEY_GoogleClientID = "763614853578-khhhap8llgs7a4obnuj2riebn5ci4t9v.apps.googleusercontent.com\n";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Kamera digunakan untuk scan QR code produk Oura Studio.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -618,14 +615,6 @@
 		};
 /* End XCConfigurationList section */
 
-/* Begin XCSwiftPackageProductDependency section */
-		2619C631304A918D0022A8D8 /* GoogleSignIn */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 2619C630304A918D0022A8D8 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
-			productName = GoogleSignIn;
-		};
-/* End XCSwiftPackageProductDependency section */
-
 /* Begin XCRemoteSwiftPackageReference section */
 		2619C630304A918D0022A8D8 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */ = {
 			isa = XCRemoteSwiftPackageReference;
@@ -636,6 +625,14 @@
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		2619C631304A918D0022A8D8 /* GoogleSignIn */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 2619C630304A918D0022A8D8 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
+			productName = GoogleSignIn;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 262AB40A301A072A0064A438 /* Project object */;
 }

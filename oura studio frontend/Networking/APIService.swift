@@ -26,7 +26,7 @@ class APIService: ObservableObject {
 
     var baseURL: String = "https://ourastudiobackendseoul-763614853578.asia-northeast3.run.app/api/v1"
     var authToken: String? = nil
-    var useMock: Bool = false
+    @Published var useMock: Bool = false
     var onUnauthorized: (() -> Void)? = nil
 
     private var session: URLSession = .shared
@@ -113,8 +113,13 @@ class APIService: ObservableObject {
             let (data, response) = try await session.data(for: req)
             if let http = response as? HTTPURLResponse {
                 if http.statusCode == 401 {
-                    DispatchQueue.main.async { self.onUnauthorized?() }
-                    throw APIError.unauthorized
+                    if path.hasPrefix("/auth") {
+                        let msg = (try? decoder.decode([String: String].self, from: data))?["detail"] ?? "Gagal verifikasi kredensial"
+                        throw APIError.serverError(401, msg)
+                    } else {
+                        DispatchQueue.main.async { self.onUnauthorized?() }
+                        throw APIError.unauthorized
+                    }
                 }
                 if http.statusCode == 409 {
                     let msg = (try? decoder.decode([String: String].self, from: data))?["detail"] ?? "Konflik"
