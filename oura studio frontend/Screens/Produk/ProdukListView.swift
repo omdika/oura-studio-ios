@@ -466,12 +466,24 @@ private struct ProductGroupRow: View {
                         Text(product.name)
                             .font(.system(size: 15, weight: .semibold))
                             .foregroundStyle(OuraTheme.Colors.textPrimary)
-                        Text(product.sku)
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(OuraTheme.Colors.textTertiary)
-                            .padding(.horizontal, 7).padding(.vertical, 2)
-                            .background(OuraTheme.Colors.border)
-                            .clipShape(Capsule())
+                        HStack(spacing: 6) {
+                            Text(product.sku)
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundStyle(OuraTheme.Colors.textTertiary)
+                                .padding(.horizontal, 7).padding(.vertical, 2)
+                                .background(OuraTheme.Colors.border)
+                                .clipShape(Capsule())
+                            
+                            if let cat = product.category, !cat.isEmpty {
+                                let isPouch = cat.lowercased() == "pouch"
+                                Text(cat.capitalized)
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .foregroundStyle(isPouch ? OuraTheme.Colors.blueAccent : OuraTheme.Colors.accent)
+                                    .padding(.horizontal, 7).padding(.vertical, 2)
+                                    .background(isPouch ? OuraTheme.Colors.blueBg : OuraTheme.Colors.accentLight)
+                                    .clipShape(Capsule())
+                            }
+                        }
                     }
                     Spacer()
                     Image(systemName: "chevron.right")
