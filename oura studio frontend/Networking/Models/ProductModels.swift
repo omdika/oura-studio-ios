@@ -6,11 +6,13 @@ struct Product: Codable, Identifiable, Hashable {
     let name: String
     let isArchived: Bool
     let createdAt: Date
+    let category: String?
 
     enum CodingKeys: String, CodingKey {
         case id, sku, name
         case isArchived = "is_archived"
         case createdAt = "created_at"
+        case category
     }
 }
 
@@ -279,10 +281,12 @@ struct PatchProductSizeRequest: Codable {
 struct CreateProductRequest: Codable {
     let name: String
     let sku: String?
+    let category: String?
 }
 
 struct PatchProductRequest: Codable {
     let name: String
+    let category: String?
 }
 
 // Used for soft-archiving a product — backend requires name alongside is_archived

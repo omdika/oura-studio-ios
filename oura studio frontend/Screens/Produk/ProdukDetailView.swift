@@ -54,8 +54,10 @@ struct ProdukDetailView: View {
 
     @State private var sizes: [ProductSizeDetail] = []
     @State private var isLoading = true
-    @State private var isEditingName = false
+    @State private var isEditingProduct = false
     @State private var editName: String = ""
+    @State private var editCategory: String? = nil
+    @State private var currentProduct: Product? = nil
     @State private var showAddSize = false
     @State private var showArchiveAlert = false
     @State private var errorMsg: String?
@@ -81,16 +83,18 @@ struct ProdukDetailView: View {
             .padding(.bottom, 32)
         }
         .background(OuraTheme.Colors.background)
-        .navigationTitle(product.name)
+        .navigationTitle((currentProduct ?? product).name)
         .navigationBarTitleDisplayMode(.large)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Menu {
                     Button {
-                        editName = product.name
-                        isEditingName = true
+                        let activeProduct = currentProduct ?? product
+                        editName = activeProduct.name
+                        editCategory = activeProduct.category
+                        isEditingProduct = true
                     } label: {
-                        Label("Ubah Nama", systemImage: "pencil")
+                        Label("Ubah Detail Produk", systemImage: "pencil")
                     }
                     Divider()
                     Button(role: .destructive) {
@@ -104,16 +108,65 @@ struct ProdukDetailView: View {
                 }
             }
         }
-        .task { await loadSizes() }
+        .task {
+            currentProduct = product
+            await loadSizes()
+        }
         .sheet(isPresented: $showAddSize, onDismiss: { Task { await loadSizes() } }) {
             AddSizeSheet(productSku: product.sku, existingSizes: sizes)
         }
-        .alert("Ubah Nama Produk", isPresented: $isEditingName) {
-            TextField("Nama produk", text: $editName)
-            Button("Simpan") { Task { await renameProduct() } }
-            Button("Batal", role: .cancel) {}
+        .sheet(isPresented: $isEditingProduct) {
+            NavigationStack {
+                VStack(alignment: .leading, spacing: 20) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Nama Produk")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(OuraTheme.Colors.textTertiary)
+                            .textCase(.uppercase)
+                            .tracking(0.5)
+                        
+                        TextField("Nama produk", text: $editName)
+                            .font(.system(size: 15))
+                            .foregroundStyle(OuraTheme.Colors.textPrimary)
+                            .autocorrectionDisabled()
+                            .fieldStyle()
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 8) {
+                        ChipSingleSelect(
+                            label: "Kategori Produk (Shopee Mass Upload)",
+                            selected: $editCategory,
+                            options: [
+                                ("scrunchie", "Scrunchie (100146)"),
+                                ("pouch", "Pouch (101650)")
+                            ]
+                        )
+                    }
+                    
+                    Spacer()
+                }
+                .padding(24)
+                .background(OuraTheme.Colors.background)
+                .navigationTitle("Ubah Detail Produk")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Batal") { isEditingProduct = false }
+                            .foregroundStyle(OuraTheme.Colors.accent)
+                    }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Simpan") {
+                            isEditingProduct = false
+                            Task { await saveProductChanges() }
+                        }
+                        .disabled(editName.trimmingCharacters(in: .whitespaces).isEmpty)
+                        .foregroundStyle(OuraTheme.Colors.accent)
+                    }
+                }
+            }
+            .presentationDetents([.medium])
         }
-        .alert("Arsipkan \(product.name)?", isPresented: $showArchiveAlert) {
+        .alert("Arsipkan \((currentProduct ?? product).name)?", isPresented: $showArchiveAlert) {
             Button("Arsipkan", role: .destructive) { Task { await archiveProduct() } }
             Button("Batal", role: .cancel) {}
         } message: {
@@ -125,10 +178,11 @@ struct ProdukDetailView: View {
 
     private var headerCard: some View {
         let materialNames = Array(Set(sizes.compactMap { $0.fabricVariantName })).sorted()
+        let activeProduct = currentProduct ?? product
         return VStack(alignment: .leading, spacing: 12) {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(product.name)
+                    Text(activeProduct.name)
                         .font(.system(size: 17, weight: .semibold))
                         .foregroundStyle(OuraTheme.Colors.textPrimary)
                     if !materialNames.isEmpty {
@@ -136,13 +190,25 @@ struct ProdukDetailView: View {
                             .font(.system(size: 13))
                             .foregroundStyle(OuraTheme.Colors.textSecondary)
                     }
-                    Text(product.sku)
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(OuraTheme.Colors.textTertiary)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(OuraTheme.Colors.border)
-                        .clipShape(Capsule())
+                    HStack(spacing: 6) {
+                        Text(product.sku)
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(OuraTheme.Colors.textTertiary)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(OuraTheme.Colors.border)
+                            .clipShape(Capsule())
+                        
+                        if let cat = activeProduct.category, !cat.isEmpty {
+                            Text(cat.capitalized)
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(OuraTheme.Colors.accent)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 3)
+                                .background(OuraTheme.Colors.accentLight)
+                                .clipShape(Capsule())
+                        }
+                    }
                 }
                 Spacer()
             }
@@ -231,10 +297,15 @@ struct ProdukDetailView: View {
         isLoading = false
     }
 
-    private func renameProduct() async {
+    private func saveProductChanges() async {
         guard !editName.trimmingCharacters(in: .whitespaces).isEmpty else { return }
         do {
-            _ = try await api.patchProduct(sku: product.sku, name: editName.trimmingCharacters(in: .whitespaces))
+            let updated = try await api.patchProduct(
+                sku: product.sku,
+                name: editName.trimmingCharacters(in: .whitespaces),
+                category: editCategory
+            )
+            currentProduct = updated
             onProductChanged?()
         } catch let e as APIError { errorMsg = e.errorDescription }
         catch { errorMsg = error.localizedDescription }
@@ -242,7 +313,7 @@ struct ProdukDetailView: View {
 
     private func archiveProduct() async {
         do {
-            try await api.archiveProduct(sku: product.sku, currentName: product.name)
+            try await api.archiveProduct(sku: product.sku, currentName: (currentProduct ?? product).name)
             onProductChanged?()
             dismiss()
         } catch let e as APIError { errorMsg = e.errorDescription }
@@ -1682,5 +1753,18 @@ struct TambahStokSheet: View {
             dismiss()
         } catch let e as APIError { errorMsg = e.errorDescription }
         catch { errorMsg = error.localizedDescription }
+    }
+}
+
+// MARK: - TextField style helper
+
+private extension View {
+    func fieldStyle() -> some View {
+        self
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(OuraTheme.Colors.surfaceSheet)
+            .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.medium))
+            .overlay(RoundedRectangle(cornerRadius: OuraTheme.Radius.medium).stroke(OuraTheme.Colors.border, lineWidth: 1))
     }
 }

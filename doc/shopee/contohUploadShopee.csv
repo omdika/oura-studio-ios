@@ -1,0 +1,82 @@
+ps_category,ps_product_name,ps_product_description,ps_sku_parent_short,et_title_variation_integration_no,et_title_variation_1,et_title_option_for_variation_1,et_title_image_per_variation,et_title_variation_2,et_title_option_for_variation_2,ps_price,ps_stock,ps_sku_short,ps_hs_code,ps_tax_code,ps_item_cover_image,ps_item_image_1,ps_item_image_2,ps_item_image_3,ps_item_image_4,ps_item_image_5,ps_item_image_6,ps_item_image_7,ps_item_image_8,ps_weight,ps_length,ps_width,ps_height,channel_id_,channel_id_,channel_id_,ps_product_pre_order_dts_range,ps_product_pre_order_dts,ps_brand,,,,,,,,,,ps_tool_mass_upload_sample_attr_country_origin,ps_tool_mass_upload_sample_attr_manufacturer_details,ps_tool_mass_upload_sample_attr_packer_details,ps_tool_mass_upload_sample_attr_importer_details
+basic,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+Kategori,Nama Produk,Deskripsi Produk,SKU Induk,Kode Integrasi Variasi,Nama Variasi 1,Varian untuk Variasi 1,Foto Produk per Varian,Nama Variasi 2,Varian untuk Variasi 2,Harga,Stok,Kode Variasi,HS Code,Tax Code,Foto Sampul,Foto Produk 1,Foto Produk 2,Foto Produk 3,Foto Produk 4,Foto Produk 5,Foto Produk 6,Foto Produk 7,Foto Produk 8,Berat,Panjang,Lebar,Tinggi,Jasa Kirim 1,Jasa Kirim 2,Jasa Kirim 3,Jangka Dikirim Dalam Pre-order,Dikirim Dalam Pre-order,Merek,Manfaat Perawatan Rambut (Text bebas),Tanggal Kedaluwarsa (Tanggal),Panjang Lengan (Dropdown tunggal),Formulasi (Pilihan dengan isian sendiri),Material (Beberapa pilihan),Kesempatan (Beberapa pilihan dengan isian sendiri),Kapasitas (Teks bebas kuantitatif),Ukuran Layar Monitor (Pilihan kuantitatif dengan isian sendiri),Ukuran Layar (Beberapa pilihan kuantitatif dengan isian sendiri),Country of Origin,Manufacturer Details,Packer Details,Importer Details
+Opsional,Wajib,Wajib,Opsional,Wajib Bersyarat,Wajib Bersyarat,Wajib Bersyarat,Wajib Bersyarat,Wajib Bersyarat,Wajib Bersyarat,Wajib,Wajib,Opsional,Wajib,Wajib,Wajib,Opsional,Opsional,Opsional,Opsional,Opsional,Opsional,Opsional,Opsional,Wajib,Opsional,Opsional,Opsional,Wajib Bersyarat,Wajib Bersyarat,Wajib Bersyarat,Opsional,Opsional,Wajib,Wajib Bersyarat,Wajib Bersyarat,Wajib Bersyarat,Wajib Bersyarat,Wajib Bersyarat,Wajib Bersyarat,Wajib Bersyarat,Wajib Bersyarat,Wajib Bersyarat,Wajib,Wajib,Wajib Bersyarat,Wajib Bersyarat
+Mohon masukkan kode kategori yang sesuai untuk tiap produk. Kode kategori yang akurat dapat meningkatkan hasil pencarian produk.,"Nama produk harus termasuk merek dan model. Hindari penggunaan kata kunci yang tidak sesuai karena dapat menyebabkan produkmu diblokir oleh sistem. Untuk produk dengan banyak variasi, hanya isi nama produk pada variasi pertama dan kosongkan untuk variasi lainnya.","Mohon masukkan deskripsi produk yang relevan. Deskripsi produk penting untuk memberikan informasi yang lengkap kepada Pembeli. Untuk produk dengan banyak variasi, hanya isi deskripsi produk pada variasi pertama dan kosongkan untuk variasi lainnya.",SKU induk digunakan untuk mengidentifikasi produk induk. Disarankan untuk tidak menduplikasi SKU induk untuk produk lain dalam tokomu.,Wajib untuk produk yang memiliki variasi. Kamu bisa menggunakan kode ini sebagai kode unik untuk produk induk dan seluruh variasinya.,Masukkan nama variasi pertama (jika ada).,Masukkan varian untuk variasi pertama.,Masukkan link foto produk per varian sesuai dengan varian pada variasi pertama.,Masukkan nama variasi kedua (jika ada).,Masukkan varian untuk variasi kedua.,Masukkan harga produk dalam rupiah dan dalam bilangan positif.,Mohon masukkan stok produk.,Kode variasi digunakan untuk mengidentifikasi setiap variasi produk. Disarankan untuk tidak menduplikasi kode ini untuk produk lain dalam tokomu.,Provide the applicable 4/6/8 digit HSN tax code for your product,Provide applicable GST Tax code for your product,Masukkan link foto produkmu. Foto tidak boleh sama dengan foto produk lain di tokomu.,Masukkan link foto produkmu,Masukkan link foto produkmu,Masukkan link foto produkmu,Masukkan link foto produkmu,Masukkan link foto produkmu,Masukkan link foto produkmu,Masukkan link foto produkmu,Masukkan link foto produkmu,Masukkan berat produk (gram) dengan bilangan positif. Pengaturan ini akan memengaruhi ongkir.,Masukkan panjang produk dengan bilangan positif. Pengaturan ini akan memengaruhi ongkir.,Masukkan lebar produk dengan bilangan positif. Pengaturan ini akan memengaruhi ongkir.,Masukkan tinggi produk dengan bilangan positif. Pengaturan ini akan memengaruhi ongkir.,Aktifkan min. 1 jasa kirim untuk setiap produk.,Aktifkan min. 1 jasa kirim untuk setiap produk.,Aktifkan min. 1 jasa kirim untuk setiap produk.,Silakan mengacu pada jangka Dikirim Dalam Pre-order pada kolom ini.,"Dikirim Dalam Pre-order menunjukkan jumlah hari yang dibutuhkan untuk mengirim produk Pre-order. Jika dikosongkan, kamu harus mengirimkan produk dalam {} hari.",Merek dapat membantu Pembeli mengerti produkmu dengan cepat. Kamu wajib mengisi dengan merek yang sah atau pilih tidak ada merek.,"1. Pilih kategori terlebih dulu
+2. Atribut tidak perlu diisi jika kolom berwarna abu-abu
+3. Atribut opsional untuk diisi jika berwarna biru
+4. Atribut wajib diisi jika kolom berwarna merah
+5. Silakan lihat penjelasan aturan pengisian pada baris selanjutnya
+6. Semua atribut dapat dibiarkan kosong untuk diisi melalau Fitur Atribut","1. Pilih kategori terlebih dulu
+2. Atribut tidak perlu diisi jika kolom berwarna abu-abu
+3. Atribut opsional untuk diisi jika berwarna biru
+4. Atribut wajib diisi jika kolom berwarna merah
+5. Silakan lihat penjelasan aturan pengisian pada baris selanjutnya
+6. Semua atribut dapat dibiarkan kosong untuk diisi melalau Fitur Atribut","1. Pilih kategori terlebih dulu
+2. Atribut tidak perlu diisi jika kolom berwarna abu-abu
+3. Atribut opsional untuk diisi jika berwarna biru
+4. Atribut wajib diisi jika kolom berwarna merah
+5. Silakan lihat penjelasan aturan pengisian pada baris selanjutnya
+6. Semua atribut dapat dibiarkan kosong untuk diisi melalau Fitur Atribut","1. Pilih kategori terlebih dulu
+2. Atribut tidak perlu diisi jika kolom berwarna abu-abu
+3. Atribut opsional untuk diisi jika berwarna biru
+4. Atribut wajib diisi jika kolom berwarna merah
+5. Silakan lihat penjelasan aturan pengisian pada baris selanjutnya
+6. Semua atribut dapat dibiarkan kosong untuk diisi melalau Fitur Atribut","1. Pilih kategori terlebih dulu
+2. Atribut tidak perlu diisi jika kolom berwarna abu-abu
+3. Atribut opsional untuk diisi jika berwarna biru
+4. Atribut wajib diisi jika kolom berwarna merah
+5. Silakan lihat penjelasan aturan pengisian pada baris selanjutnya
+6. Semua atribut dapat dibiarkan kosong untuk diisi melalau Fitur Atribut","1. Pilih kategori terlebih dulu
+2. Atribut tidak perlu diisi jika kolom berwarna abu-abu
+3. Atribut opsional untuk diisi jika berwarna biru
+4. Atribut wajib diisi jika kolom berwarna merah
+5. Silakan lihat penjelasan aturan pengisian pada baris selanjutnya
+6. Semua atribut dapat dibiarkan kosong untuk diisi melalau Fitur Atribut","1. Pilih kategori terlebih dulu
+2. Atribut tidak perlu diisi jika kolom berwarna abu-abu
+3. Atribut opsional untuk diisi jika berwarna biru
+4. Atribut wajib diisi jika kolom berwarna merah
+5. Silakan lihat penjelasan aturan pengisian pada baris selanjutnya
+6. Semua atribut dapat dibiarkan kosong untuk diisi melalau Fitur Atribut","1. Pilih kategori terlebih dulu
+2. Atribut tidak perlu diisi jika kolom berwarna abu-abu
+3. Atribut opsional untuk diisi jika berwarna biru
+4. Atribut wajib diisi jika kolom berwarna merah
+5. Silakan lihat penjelasan aturan pengisian pada baris selanjutnya
+6. Semua atribut dapat dibiarkan kosong untuk diisi melalau Fitur Atribut","1. Pilih kategori terlebih dulu
+2. Atribut tidak perlu diisi jika kolom berwarna abu-abu
+3. Atribut opsional untuk diisi jika berwarna biru
+4. Atribut wajib diisi jika kolom berwarna merah
+5. Silakan lihat penjelasan aturan pengisian pada baris selanjutnya
+6. Semua atribut dapat dibiarkan kosong untuk diisi melalau Fitur Atribut",The country in which the product was manufactured and/or assembled,Details of the manufacturer(s) name and address with pincode of the product,"Details of the packer(s) name and contact details / address with the pincode of the product. Shopee will list as ""Not available"" if information not provided by seller","Details of the importer (s) name and contact details / address with the pincode of the product. Shopee will list as ""Not available"" if information not provided by seller"
+Pilih kategori yang tepat dari menu drop-down.,Masukkan {} s/d {} karakter untuk nama produk.,Masukkan {} s/d {} karakter untuk deskripsi produk.,Masukkan 1-100 karakter untuk SKU induk.,Masukkan 1-100 karakter untuk kode integrasi variasi,Masukkan {} sampai {} karakter untuk nama variasi.,Masukkan {} sampai {} karakter untuk nama pilihan variasi.,Masukkan link foto produk.,Masukkan {} sampai {} karakter untuk nama variasi.,Masukkan {} sampai {} karakter untuk nama pilihan variasi.,Mohon masukkan {} sampai {} untuk harga produk. Batas harga produk termahal dibagi harga harga produk termurah: {},Masukkan {} s/d {} untuk stok produk.,Masukkan maks. 100 karakter untuk kode variasi.,"HSN code should be 4, 6 or 8 digits","Please refer to Shopee Tax codes. Note: For certain categories like Apparel, Shopee can overwrite depending on the selling  price","""Ukuran file: maks. 2 MB untuk setiap foto. Format file: JPG, JPEG, PNG. Minimum dimensi yang diperbolehkan: {} x {} px""",,,,,,,,,Masukkan {} s/d {} untuk berat produk.,Masukkan {} s/d {} untuk panjang produk.,Masukkan {} s/d {} untuk lebar produk.,Masukkan {} s/d {} untuk tinggi produk.,Aktif/ Nonaktif,Aktif/ Nonaktif,Aktif/ Nonaktif,Silakan mengacu pada jangka Dikirim Dalam Pre-order pada kolom ini.,"Silakan mengacu pada jangka Dikirim Dalam Pre-order pada tab ""Kategori"" dalam file ini jika kamu ingin mengatur produkmu sebagai Pre-order.","[Tipe input] Masukkan nilai yang sah
+[Validasi input] Kode merek
+[Nilai yang sah] Lihat kode merek yang sah pada halaman {}. Atau biarkan kosong dan isi nilai atribut di Fitur Atribut.","[Tipe Input] Masukkan nilai sendiri
+[Validasi Input] Teks","[Tipe Input] Masukkan nilai sendiri
+[Validasi Input] Tanggal dalam format YYYY/MM/DD","[Tipe Input] Pilih dari opsi dropdown
+[Validasi Input] Opsi dropdown
+[Nilai Sah]Akan ditampilkan di opsi dropdown setelah kategori dipilih","[Tipe Input] Masukkan nilai yang disarankan atau nilai sendiri
+[Validasi Input] Masukkan nilai yang disarankan atau teks
+[Nilai yang disarankan] Silakan lihat nilai yang sah pada halaman ""Pemetaan nilai atribut"". Silakan lihat kategori dan atribut untuk mengonfirmasi nilai yang sah.","[Tipe Input] Masukkan minimal satu nilai yang sah
+[Validasi Input] Masukkan maksimal 5 nilai yang sah. Pisahkan setiap nilai dengan titik koma tanpa spasi
+[Nilai sah]Silakan lihat nilai yang sah pada halaman ""Pemetaan nilai atribut"". Silakan lihat kategori dan atribut untuk mengonfirmasi nilai yang sah
+[Contoh Input]Merah;Hijau;Kuning","[Tipe Input] Masukkan minimal satu nilai yang disarankan atau nilai sendiri
+[Validasi Input] Masukkan maksimal 5 nilai yang disarankan atau teks. Pisahkan setiap nilai dengan titik koma tanpa spasi
+[Nilai yang disarakan] Silakan lihat nilai yang sah pada halaman ""Pemetaan nilai atribut"". Silakan lihat kategori dan atribut untuk mengonfirmasi nilai yang sah
+[Contoh Input] Merah;Hijau;Kuning","[Tipe Input] Masukkan minimal satu nilai yang disarankan atau nilai sendiri
+[Validasi Input] Masukkan maksimal 5 nilai yang disarankan atau teks. Pisahkan setiap nilai dengan titik koma tanpa spasi
+[Nilai yang disarakan] Silakan lihat nilai yang sah pada halaman ""Pemetaan nilai atribut"". Silakan lihat kategori dan atribut untuk mengonfirmasi nilai yang sah
+[Contoh Input] Merah;Hijau;Kuning","[Tipe Input] Masukkan nilai yang disarankan atau nilai sendiri
+[Validasi Input] Masukkan nilai yang disarankan atau bilangan bulat
+[Nilai sah] Satuan sah: {Kg, g}. Kamu harus memasukkan satuan yang sah tepat setelah angka tanpa spasi, atau sistem akan mengenalinya sebagai satuan yang tidak sah
+[Nilai yang disarankan] Silakan lihat nilai yang sah pada halaman ""Pemetaan nilai atribut"". Silakan lihat kategori dan atribut untuk mengonfirmasi nilai yang sah
+[Contoh input] 8Kg","[Tipe Input] Masukkan nilai yang disarankan atau nilai sendiri
+[Validasi Input] Masukkan nilai yang disarankan atau bilangan bulat. Untuk nilai sendiri, silakan masukkan nilai yang sah, format yang diperbolehkan seperti ""3Kg"". Kamu dapat memasukkan hingga 5 nilai, mohon pisahkan setiap nilai dengan titik koma tanpa spasi
+[Nilai sah] Satuan sah: {Kg, g}. Kamu harus memasukkan satuan yang sah tepat setelah angka tanpa spasi, atau sistem akan mengenalinya sebagai satuan yang tidak sah
+[Nilai yang disarankan] Silakan lihat nilai yang sah pada halaman ""Pemetaan nilai atribut"". Silakan lihat kategori dan atribut untuk mengonfirmasi nilai yang sah
+[Contoh input] 8Kg;9Kg;10Kg",Select dropdown options,Please input from of 10 to 250 characters for manufacturer details.,Please input from of 10 to 250 characters for packer details.,Please input from of 10 to 250 characters for importer details.
+120039,Kaos santai,"Kaos santai, 100% katun, desain simpel",,101,warna,merah,<masukkan link di sini>,ukuran,L,30000,100,1001,1234,GEN_Zero,<masukkan link disini>,,,,,,,,,"0,2",,,,Aktif,Aktif,Aktif,Produk kategori ini tidak mendukung Pre-order,,2200345,,,opsi3,,,opsi1;opsi2,,,,India,"ABC Makers,8989898989, 450, Mary Lane, Mumbai - 4000014, Maharashtra","XYZ Importers, 9999999999, D-42, St. Andrews, Chennai - 6000007, Tamil Nadu","PQR packers, 8787878787, 2nd Floor, Anant tower, Ranchi - 834001, Jharkhand"
+120039,Kaos santai,"Kaos santai, 100% katun, desain simpel",,101,warna,merah,<masukkan link yang sama dengan baris 5>,ukuran,M,30000,100,1002,123456,GEN_0.25%,<masukkan link yang sama dengan baris 5>,,,,,,,,,"0,2",,,,Aktif,Aktif,Aktif,Produk kategori ini tidak mendukung Pre-order,,2200345,,,opsi2,,,opsi1;opsi2,,,,China,"ABC Makers,8989898989, 450, Mary Lane, Mumbai - 4000014, Maharashtra","XYZ Importers, 9999999999, D-42, St. Andrews, Chennai - 6000007, Tamil Nadu","PQR packers, 8787878787, 2nd Floor, Anant tower, Ranchi - 834001, Jharkhand"
+120039,Kaos santai,"Kaos santai, 100% katun, desain simpel",,101,warna,kuning,<masukkan link di sini>,ukuran,S,30000,100,1003,12345678,GEN_5%,<masukkan link yang sama dengan baris 5>,,,,,,,,,"0,2",,,,Aktif,Aktif,Aktif,Produk kategori ini tidak mendukung Pre-order,,2200345,,,opsi1,,,opsi1;opsi2,,,,Australia,"ABC Makers,8989898989, 450, Mary Lane, Mumbai - 4000014, Maharashtra","XYZ Importers, 9999999999, D-42, St. Andrews, Chennai - 6000007, Tamil Nadu","PQR packers, 8787878787, 2nd Floor, Anant tower, Ranchi - 834001, Jharkhand"
+120055,Gunting rambut,"Gunting rambut, terbuat dari stainless steel premium grade",,,,,,,,20000,50,,1010,GEN_12%,<masukkan link disini>,,,,,,,,,"0,3",,,,Aktif,Nonaktif,Aktif,7-15,10,2200345,Teks bebas,2002/12/31,,opsi1,opsi1;opsi2,,8Kg,,,Austria,"ABC Makers,8989898989, 450, Mary Lane, Mumbai - 4000014, Maharashtra","XYZ Importers, 9999999999, D-42, St. Andrews, Chennai - 6000007, Tamil Nadu","PQR packers, 8787878787, 2nd Floor, Anant tower, Ranchi - 834001, Jharkhand"
+120055,Casing iPhone 11,"Tahan banting, terbuat dari bahan titanium",,543,warna,merah muda,<masukkan link di sini>,,,50000,80,,101010,GEN_18%,<masukkan link disini>,,,,,,,,,"0,1",,,,Aktif,Aktif,Nonaktif,7-15,15,2200345,,2002/12/31,,,,,,100ml;200ml,100ml;200ml,Azerbaijan,"ABC Makers,8989898989, 450, Mary Lane, Mumbai - 4000014, Maharashtra","XYZ Importers, 9999999999, D-42, St. Andrews, Chennai - 6000007, Tamil Nadu","PQR packers, 8787878787, 2nd Floor, Anant tower, Ranchi - 834001, Jharkhand"
+120055,Casing iPhone 11,"Tahan banting, terbuat dari bahan titanium",,543,warna,biru langit,<masukkan link di sini>,,,50000,80,,10101010,GEN_28%,<masukkan link yang sama dengan baris 9>,,,,,,,,,"0,1",,,,Aktif,Aktif,Nonaktif,7-15,15,2200345,,2002/12/31,,,,,,,,Bahrain,"ABC Makers,8989898989, 450, Mary Lane, Mumbai - 4000014, Maharashtra","XYZ Importers, 9999999999, D-42, St. Andrews, Chennai - 6000007, Tamil Nadu","PQR packers, 8787878787, 2nd Floor, Anant tower, Ranchi - 834001, Jharkhand"

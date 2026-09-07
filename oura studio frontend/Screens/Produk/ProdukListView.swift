@@ -11,6 +11,7 @@ struct ProdukListView: View {
     @State private var showAddProduct = false
     @State private var showQRScanner = false
     @State private var showQRGenerator = false
+    @State private var showShopeeBulkUpload = false
     // Set right after "Simpan Tanpa Resep" creates a product with no price/stock/HPP yet — drives
     // an auto-navigation into ProdukDetailView so the user can pick which size(s) to fill in.
     @State private var newlyCreatedProduct: Product?
@@ -113,12 +114,24 @@ struct ProdukListView: View {
                 .accessibilityLabel("Scan QR")
             }
             ToolbarItem(placement: .primaryAction) {
-                Button { showQRGenerator = true } label: {
-                    Image(systemName: "qrcode")
+                HStack(spacing: 16) {
+                    Button { showShopeeBulkUpload = true } label: {
+                        Image(systemName: "square.and.arrow.up")
+                    }
+                    .foregroundStyle(OuraTheme.Colors.accent)
+                    .accessibilityLabel("Ekspor Shopee")
+
+                    Button { showQRGenerator = true } label: {
+                        Image(systemName: "qrcode")
+                    }
+                    .foregroundStyle(OuraTheme.Colors.accent)
+                    .accessibilityLabel("Generator QR")
                 }
-                .foregroundStyle(OuraTheme.Colors.accent)
-                .accessibilityLabel("Generator QR")
             }
+        }
+        .sheet(isPresented: $showShopeeBulkUpload) {
+            ShopeeBulkUploadSheet()
+                .environmentObject(api)
         }
         .sheet(isPresented: $showAddProduct, onDismiss: { Task { await load() } }) {
             TambahProdukLengkapSheet(onCreatedWithoutRecipe: { newlyCreatedProduct = $0 })

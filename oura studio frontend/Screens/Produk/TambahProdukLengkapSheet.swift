@@ -40,6 +40,7 @@ struct TambahProdukLengkapSheet: View {
     // MARK: — Step 1: product fields
     @State private var productName = ""
     @State private var sku = ""
+    @State private var selectedCategory: String? = nil
     @State private var selectedSizes: [String] = ["Free Size"]
     @State private var showCustomSizeAlert = false
     @State private var customSizeInput = ""
@@ -238,6 +239,17 @@ struct TambahProdukLengkapSheet: View {
                         Text("Kode unik singkat. Tidak bisa diubah setelah dibuat.")
                             .font(.system(size: 12))
                             .foregroundStyle(OuraTheme.Colors.textTertiary)
+                    }
+
+                    sectionLabel("Kategori Produk") {
+                        ChipSingleSelect(
+                            label: "Pilih kategori untuk memetakan template ekspor Shopee",
+                            selected: $selectedCategory,
+                            options: [
+                                ("scrunchie", "Scrunchie (100146)"),
+                                ("pouch", "Pouch (101650)")
+                            ]
+                        )
                     }
 
                     sectionLabel("Ukuran") {
@@ -780,7 +792,8 @@ struct TambahProdukLengkapSheet: View {
         do {
             let product = try await api.createProduct(
                 name: productName.trimmingCharacters(in: .whitespaces),
-                sku: sku.trimmingCharacters(in: .whitespaces).isEmpty ? nil : sku.trimmingCharacters(in: .whitespaces)
+                sku: sku.trimmingCharacters(in: .whitespaces).isEmpty ? nil : sku.trimmingCharacters(in: .whitespaces),
+                category: selectedCategory
             )
             for size in selectedSizes {
                 _ = try await api.createProductSize(sku: product.sku, sizeLabel: size)
@@ -815,7 +828,8 @@ struct TambahProdukLengkapSheet: View {
             // 1. Create product
             let product = try await api.createProduct(
                 name: productName.trimmingCharacters(in: .whitespaces),
-                sku: sku.trimmingCharacters(in: .whitespaces).isEmpty ? nil : sku.trimmingCharacters(in: .whitespaces)
+                sku: sku.trimmingCharacters(in: .whitespaces).isEmpty ? nil : sku.trimmingCharacters(in: .whitespaces),
+                category: selectedCategory
             )
 
             // 2. Create all base sizes

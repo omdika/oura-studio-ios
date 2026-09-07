@@ -286,9 +286,9 @@ class APIService: ObservableObject {
         return try await get(path: "/products")
     }
 
-    func createProduct(name: String, sku: String? = nil) async throws -> Product {
-        if useMock { return try await MockAPIService.shared.createProduct(name: name, sku: sku) }
-        return try await post(path: "/products", body: CreateProductRequest(name: name, sku: sku))
+    func createProduct(name: String, sku: String? = nil, category: String? = nil) async throws -> Product {
+        if useMock { return try await MockAPIService.shared.createProduct(name: name, sku: sku, category: category) }
+        return try await post(path: "/products", body: CreateProductRequest(name: name, sku: sku, category: category))
     }
 
     func getProductSizes(sku: String) async throws -> [ProductSizeDetail] {
@@ -317,9 +317,42 @@ class APIService: ObservableObject {
         return try await post(path: "/products/\(sku)/sizes/\(sizeId.uuidString)/price-advisor", body: req)
     }
 
-    func patchProduct(sku: String, name: String) async throws -> Product {
-        if useMock { return try await MockAPIService.shared.patchProduct(sku: sku, name: name) }
-        return try await patch(path: "/products/\(sku)", body: PatchProductRequest(name: name))
+    func patchProduct(sku: String, name: String, category: String? = nil) async throws -> Product {
+        if useMock { return try await MockAPIService.shared.patchProduct(sku: sku, name: name, category: category) }
+        return try await patch(path: "/products/\(sku)", body: PatchProductRequest(name: name, category: category))
+    }
+
+    func downloadShopeeBulkUploadExcel() async throws -> URL {
+        if useMock { return try await MockAPIService.shared.downloadShopeeBulkUploadExcel() }
+        guard let url = URL(string: baseURL + "/products/shopee-bulk-upload") else {
+            throw APIError.invalidURL
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        if let token = KeychainManager.loadToken() {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        
+        // Wait, execute or download? URLSession.shared.download is used to get a file on disk
+        let (tempLocalURL, response) = try await URLSession.shared.download(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw APIError.serverError(500, "Koneksi ke server gagal")
+        }
+        guard httpResponse.statusCode == 200 else {
+            throw APIError.serverError(httpResponse.statusCode, "Gagal mengunduh file template Shopee (Status: \(httpResponse.statusCode))")
+        }
+        
+        let fileManager = FileManager.default
+        let documentsURL = fileManager.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let destinationURL = documentsURL.appendingPathComponent("Shopee_Mass_Upload_\(Int(Date().timeIntervalSince1970)).xlsx")
+        
+        if fileManager.fileExists(atPath: destinationURL.path) {
+            try? fileManager.removeItem(at: destinationURL)
+        }
+        try fileManager.moveItem(at: tempLocalURL, to: destinationURL)
+        
+        return destinationURL
     }
 
     // Soft-archives a product via PATCH (backend requires name alongside is_archived).

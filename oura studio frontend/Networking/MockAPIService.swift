@@ -146,7 +146,7 @@ class MockAPIService {
 
         _products = [
             Product(id: prodScrunchieId, sku: "SCRUNCHIE", name: "Scrunchie",
-                    isArchived: false, createdAt: ago(days: 14)),
+                    isArchived: false, createdAt: ago(days: 14), category: "scrunchie"),
         ]
 
         // sizeScrunM  → M · Satin Pelangi
@@ -488,13 +488,13 @@ class MockAPIService {
         return _products.filter { !$0.isArchived }
     }
 
-    func createProduct(name: String, sku: String? = nil) async throws -> Product {
+    func createProduct(name: String, sku: String? = nil, category: String? = nil) async throws -> Product {
         await delay()
         let computedSku = (sku ?? name.uppercased().replacingOccurrences(of: " ", with: "-"))
         guard !_products.contains(where: { $0.sku == computedSku }) else {
             throw APIError.conflict("SKU sudah dipakai")
         }
-        let p = Product(id: UUID(), sku: computedSku, name: name, isArchived: false, createdAt: Date())
+        let p = Product(id: UUID(), sku: computedSku, name: name, isArchived: false, createdAt: Date(), category: category)
         _products.append(p)
         _productSizes[computedSku] = []
         return p
@@ -530,13 +530,13 @@ class MockAPIService {
         }
     }
 
-    func patchProduct(sku: String, name: String) async throws -> Product {
+    func patchProduct(sku: String, name: String, category: String? = nil) async throws -> Product {
         await delay()
         guard let idx = _products.firstIndex(where: { $0.sku == sku }) else {
             throw APIError.serverError(404, "Produk tidak ditemukan")
         }
         let old = _products[idx]
-        let updated = Product(id: old.id, sku: old.sku, name: name, isArchived: old.isArchived, createdAt: old.createdAt)
+        let updated = Product(id: old.id, sku: old.sku, name: name, isArchived: old.isArchived, createdAt: old.createdAt, category: category)
         _products[idx] = updated
         if var sizes = _productSizes[sku] {
             sizes = sizes.map { s in
@@ -554,13 +554,32 @@ class MockAPIService {
         return updated
     }
 
+    func downloadShopeeBulkUploadExcel() async throws -> URL {
+        await delay()
+        
+        let fileManager = FileManager.default
+        let documentsURL = fileManager.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let destinationURL = documentsURL.appendingPathComponent("Shopee_Mass_Upload_Mock.xlsx")
+        
+        // Write simple mock data as an .xlsx file (can be a small text payload for testing)
+        let dummyText = "Mock Shopee Excel Sheet data"
+        let dummyData = dummyText.data(using: .utf8) ?? Data()
+        
+        if fileManager.fileExists(atPath: destinationURL.path) {
+            try? fileManager.removeItem(at: destinationURL)
+        }
+        try dummyData.write(to: destinationURL)
+        
+        return destinationURL
+    }
+
     func archiveProduct(sku: String) async throws {
         await delay()
         guard let idx = _products.firstIndex(where: { $0.sku == sku }) else {
             throw APIError.serverError(404, "Produk tidak ditemukan")
         }
         let old = _products[idx]
-        _products[idx] = Product(id: old.id, sku: old.sku, name: old.name, isArchived: true, createdAt: old.createdAt)
+        _products[idx] = Product(id: old.id, sku: old.sku, name: old.name, isArchived: true, createdAt: old.createdAt, category: old.category)
     }
 
     func archiveProductSize(sku: String, sizeId: UUID) async throws {
