@@ -1,16 +1,43 @@
 
 import Foundation
 import CoreBluetooth
+import Combine
 
 class TSPLPrinterService: NSObject, ObservableObject {
     @Published var centralManager: CBCentralManager!
     @Published var discoveredPeripherals: [CBPeripheral] = []
     @Published var connectedPeripheral: CBPeripheral?
+    var writableCharacteristic: CBCharacteristic?
     @Published var connectionStatus: String = "Disconnected"
+
+    private var autoConnectUUIDString: String? {
+        UserDefaults.standard.string(forKey: "printerUUIDString")
+    }
 
     override init() {
         super.init()
         centralManager = CBCentralManager(delegate: self, queue: nil)
+    }
+
+    func attemptAutoConnect() {
+        guard centralManager.state == .poweredOn else { return }
+        guard let uuidString = autoConnectUUIDString, !uuidString.isEmpty,
+              let uuid = UUID(uuidString: uuidString) else {
+            print("No saved printer UUID for auto-connect.")
+            return
+        }
+        
+        connectionStatus = "Auto-reconnecting..."
+        print("Attempting auto-connect to saved printer UUID: \(uuidString)")
+        
+        let retrieved = centralManager.retrievePeripherals(withIdentifiers: [uuid])
+        if let peripheral = retrieved.first {
+            print("Found saved peripheral in retrieved list, connecting...")
+            connect(to: peripheral)
+        } else {
+            print("Saved peripheral not found in retrieved list. Scanning for nearby peripherals...")
+            centralManager.scanForPeripherals(withServices: nil, options: nil)
+        }
     }
 
     func startScanningForPeripherals() {
@@ -45,9 +72,58 @@ class TSPLPrinterService: NSObject, ObservableObject {
             centralManager.cancelPeripheralConnection(peripheral)
         }
         connectedPeripheral = nil
+        writableCharacteristic = nil
         connectionStatus = "Disconnected"
         print("Disconnected from peripheral.")
     }
+
+    func printLabel(qrData: String, width: Double, height: Double, gap: Double, quantity: Int) {
+        guard let peripheral = connectedPeripheral, let characteristic = writableCharacteristic else {
+            print("Printer not connected or writable characteristic not found.")
+            connectionStatus = "Print Error: Not connected or no writable characteristic"
+            return
+        }
+
+        connectionStatus = "Printing..."
+
+        var tsplCommands = ""
+
+        // Setup commands
+        tsplCommands += "SIZE \(width) mm,\\(height) mm\\r\\n"
+        tsplCommands += "GAP \(gap) mm,0 mm\\r\\n"
+        tsplCommands += "CLS\\r\\n" // Clear buffer
+        tsplCommands += "DIRECTION 1\\r\\n" // Print direction (configurable if needed)
+        tsplCommands += "REFERENCE 0,0\\r\\n" // Origin point (configurable if needed)
+        tsplCommands += "SET TEAR ON\\r\\n" // Enable tear-off mode
+
+        // QR Code command - positions need to be calculated based on label size
+        // For 33x15mm, a reasonable cell_width might be 2 or 3.
+        // Assuming QR code should be roughly centered
+        let qrX = Int(width * 8 / 2) - 20 // Example: center horizontally, adjust as needed
+        let qrY = Int(height * 8 / 2) - 20 // Example: center vertically, adjust as needed
+        let cellWidth = 3 // Adjust for desired QR code size
+        tsplCommands += "QRCODE \\(qrX),\\(qrY),L,\\(cellWidth),A,0,M,20,\"\\(qrData)\"\\r\\n"
+
+        // Print command
+        tsplCommands += "PRINT \\(quantity),1\\r\\n"
+
+        print("Generated TSPL Commands:\\n\\(tsplCommands)")
+
+        // Send commands in chunks if necessary
+        let data = tsplCommands.data(using: .ascii)!
+        let chunkSize = peripheral.maximumWriteValueLength(for: .withoutResponse) // Use .withResponse if needed, but .withoutResponse is common for printers
+        var offset = 0
+
+        while offset < data.count {
+            let chunk = data.subdata(in: offset..<min(offset + chunkSize, data.count))
+            peripheral.writeValue(chunk, for: characteristic, type: .withoutResponse)
+            offset += chunkSize
+            // Add a small delay between chunks if the printer struggles with rapid writes
+            // Thread.sleep(forTimeInterval: 0.01)
+        }
+        connectionStatus = "Print command sent"
+    }
+
 }
 
 // MARK: - CBCentralManagerDelegate
@@ -57,11 +133,13 @@ extension TSPLPrinterService: CBCentralManagerDelegate {
         case .poweredOn:
             print("Bluetooth is powered on.")
             connectionStatus = "Ready to scan"
+            attemptAutoConnect()
         case .poweredOff:
             print("Bluetooth is powered off.")
             connectionStatus = "Bluetooth Off"
             discoveredPeripherals.removeAll()
             connectedPeripheral = nil
+            writableCharacteristic = nil
         case .resetting:
             print("Bluetooth is resetting.")
             connectionStatus = "Resetting"
@@ -85,6 +163,13 @@ extension TSPLPrinterService: CBCentralManagerDelegate {
             discoveredPeripherals.append(peripheral)
             print("Discovered peripheral: \(peripheral.name ?? "Unknown"), RSSI: \(RSSI)")
         }
+
+        // Auto-connect if we found our saved printer
+        if let uuidString = autoConnectUUIDString,
+           peripheral.identifier.uuidString == uuidString {
+            print("Discovered saved printer in scan, auto-connecting...")
+            connect(to: peripheral)
+        }
     }
 
     func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
@@ -98,13 +183,20 @@ extension TSPLPrinterService: CBCentralManagerDelegate {
         print("Failed to connect to \(peripheral.name ?? "Unknown Device"). Error: \(error?.localizedDescription ?? "Unknown error")")
         connectionStatus = "Failed to connect"
         connectedPeripheral = nil
+        writableCharacteristic = nil
     }
 
     func centralManager(_ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral, error: Error?) {
         print("Disconnected from \(peripheral.name ?? "Unknown Device"). Error: \(error?.localizedDescription ?? "No error")")
         connectionStatus = "Disconnected"
         connectedPeripheral = nil
-        // Optionally, restart scanning or notify user
+        writableCharacteristic = nil
+        
+        // If it was an unexpected disconnection, we can attempt to auto-reconnect
+        if error != nil {
+            print("Unexpected disconnection. Attempting auto-reconnect...")
+            attemptAutoConnect()
+        }
     }
 }
 
@@ -130,8 +222,13 @@ extension TSPLPrinterService: CBPeripheralDelegate {
         guard let characteristics = service.characteristics else { return }
         for characteristic in characteristics {
             print("Discovered characteristic for service \(service.uuid): \(characteristic.uuid), properties: \(characteristic.properties)")
-            // Here you would typically identify the write characteristic
-            // peripheral.setNotifyValue(true, for: characteristic) // If you need notifications
+            if characteristic.properties.contains(.write) || characteristic.properties.contains(.writeWithoutResponse) {
+                writableCharacteristic = characteristic
+                print("Identified writable characteristic: \(characteristic.uuid)")
+                // Break after finding the first writable characteristic, or refine logic if multiple are possible
+                // For simplicity, we assume one primary write characteristic for printing
+                break
+            }
         }
     }
 

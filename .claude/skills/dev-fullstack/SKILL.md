@@ -50,6 +50,7 @@ For every fullstack feature or modification, you must execute this lifecycle:
 *   **Strict Boundary:** Do not write READMEs, scripts, or functional application code in this phase.
 
 ### Phase 3: Backend Implementation (FastAPI)
+*   **Implement per `doc/versions/v3.xx.md`:** Follow the detailed steps and specifications outlined in the relevant `doc/versions/v3.xx.md` file. Focus on Section 3 (Database Schema Changes) and Section 4 (API Contract).
 *   **Database & Schemas:** Update Pydantic schemas in `app/schemas/` or entity schemas.
 *   **Routers & Queries:** Implement router endpoints in `app/routers/` using performance-first database patterns:
     *   *Avoid N+1 SQL queries:* Leverage `joinedload` on relationships (e.g. `.options(joinedload(ProductSize.product))`).
@@ -57,6 +58,7 @@ For every fullstack feature or modification, you must execute this lifecycle:
 *   **Compile Check:** Compile Python files via `python3 -m py_compile <files>` to ensure zero syntax errors.
 
 ### Phase 4: Frontend Implementation (SwiftUI)
+*   **Implement per `doc/versions/v3.xx.md`:** Follow the detailed steps and specifications outlined in the relevant `doc/versions/v3.xx.md` file. Focus on Section 2 (User Flow & UX), Section 5 (Frontend Changes), and the Incremental Steps.
 *   **Network Models:** Update `Models/` or create new Codable models.
 *   **APIService:** Update `APIService.swift` to invoke the new backend endpoint, avoiding loop-based client-side N+1 requests by fetching in bulk.
 *   **UI Views:** Build or modify views using native SwiftUI, adhering to `OuraTheme.Colors` and card styles. Ensure action buttons are tied to `canSave` state and disabled properly when necessary.

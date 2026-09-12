@@ -114,6 +114,7 @@ struct TambahPembelianSheet: View {
                         else { dismiss() }
                     }
                     .foregroundStyle(OuraTheme.Colors.accent)
+                    .accessibilityIdentifier("pembelian-batal-button")
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     if isSaving {
@@ -122,6 +123,7 @@ struct TambahPembelianSheet: View {
                         Button("Simpan") { Task { await save() } }
                             .foregroundStyle(canSave ? OuraTheme.Colors.accent : OuraTheme.Colors.textDisabled)
                             .disabled(!canSave)
+                            .accessibilityIdentifier("pembelian-simpan-button")
                     }
                 }
             }

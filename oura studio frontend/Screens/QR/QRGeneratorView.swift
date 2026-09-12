@@ -1,9 +1,11 @@
 import SwiftUI
 import CoreImage.CIFilterBuiltins
 import PDFKit
+import CoreBluetooth
 
 struct QRGeneratorView: View {
     @EnvironmentObject private var api: APIService
+    @EnvironmentObject private var tsplPrinterService: TSPLPrinterService
     @Environment(\.dismiss) private var dismiss
 
     @State private var products: [Product] = []
@@ -121,7 +123,15 @@ struct QRGeneratorView: View {
         }
         .sheet(isPresented: $showPrintPreview) {
             if let data = pdfData {
-                PrintPreviewSheet(pdfData: data, count: totalLabelCount)
+                let allSizes = Array(sizesByProduct.values.flatMap { $0 })
+                QRPrintPreviewSheet(
+                    pdfData: data,
+                    count: totalLabelCount,
+                    selectedSizeIds: selectedSizeIds,
+                    qtyPerSize: qtyPerSize,
+                    sizes: allSizes
+                )
+                .environmentObject(tsplPrinterService)
             }
         }
         .onChange(of: isFilterActive) { _ in
@@ -573,32 +583,155 @@ struct QRGeneratorView: View {
 
 // MARK: - Print Preview Sheet
 
-private struct PrintPreviewSheet: View {
+private struct QRPrintPreviewSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject var tsplPrinterService: TSPLPrinterService
+
     let pdfData: Data
     let count: Int
-    @Environment(\.dismiss) private var dismiss
+    let selectedSizeIds: Set<UUID>
+    let qtyPerSize: [UUID: Int]
+    let sizes: [ProductSizeDetail]
+
+    @AppStorage("labelWidth") private var labelWidth: Double = 33.0
+    @AppStorage("labelHeight") private var labelHeight: Double = 15.0
+    @AppStorage("labelGap") private var labelGap: Double = 2.0
+
+    enum PrintMode: Int, CaseIterable {
+        case a4Paper, thermalLabel
+        var title: String { self == .a4Paper ? "📄 Kertas A4" : "🏷️ Label Thermal" }
+    }
+
+    @State private var selectedMode: PrintMode = .a4Paper
+    @State private var isShowingPrinterSelection = false
+    @State private var errorMsg: String?
 
     var body: some View {
         NavigationStack {
-            PDFKitView(data: pdfData)
-                .ignoresSafeArea(edges: .bottom)
-                .background(Color(UIColor.systemGroupedBackground))
-                .navigationTitle("\(count) Label QR")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("Tutup") { dismiss() }
-                            .foregroundStyle(OuraTheme.Colors.accent)
+            VStack(spacing: 0) {
+                // Segmented picker for print mode
+                Picker("", selection: $selectedMode) {
+                    ForEach(PrintMode.allCases, id: \.self) { mode in
+                        Text(mode.title).tag(mode)
                     }
-                    ToolbarItem(placement: .primaryAction) {
+                }
+                .pickerStyle(.segmented)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .background(OuraTheme.Colors.background)
+
+                Divider().overlay(OuraTheme.Colors.separator)
+
+                if selectedMode == .a4Paper {
+                    PDFKitView(data: pdfData)
+                        .ignoresSafeArea(edges: .bottom)
+                        .background(Color(UIColor.systemGroupedBackground))
+                } else {
+                    thermalLabelListView
+                }
+            }
+            .navigationTitle("\(count) Label QR")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Tutup") { dismiss() }
+                        .foregroundStyle(OuraTheme.Colors.accent)
+                }
+                ToolbarItem(placement: .primaryAction) {
+                    if selectedMode == .a4Paper {
                         Button {
                             sharePDF()
                         } label: {
                             Label("Print", systemImage: "printer.fill")
                         }
                         .foregroundStyle(OuraTheme.Colors.accent)
+                    } else {
+                        Button {
+                            printThermalLabels()
+                        } label: {
+                            Label("Cetak", systemImage: "printer.fill")
+                        }
+                        .disabled(tsplPrinterService.connectedPeripheral == nil || tsplPrinterService.writableCharacteristic == nil || selectedSizeIds.isEmpty)
+                        .foregroundStyle(tsplPrinterService.connectedPeripheral != nil && !selectedSizeIds.isEmpty ? OuraTheme.Colors.accent : OuraTheme.Colors.textDisabled)
                     }
                 }
+            }
+            .sheet(isPresented: $isShowingPrinterSelection) {
+                PrinterSelectionView()
+                    .environmentObject(tsplPrinterService)
+            }
+        }
+    }
+
+    private var thermalLabelListView: some View {
+        Form {
+            Section(header: Text("Koneksi Printer Bluetooth")) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(tsplPrinterService.connectedPeripheral?.name ?? "Tidak Terhubung")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(tsplPrinterService.connectedPeripheral != nil ? OuraTheme.Colors.greenAccent : OuraTheme.Colors.textTertiary)
+                        Text(tsplPrinterService.connectionStatus)
+                            .font(.system(size: 12))
+                            .foregroundStyle(.gray)
+                    }
+                    Spacer()
+                    Button {
+                        isShowingPrinterSelection = true
+                    } label: {
+                        Text(tsplPrinterService.connectedPeripheral != nil ? "Ubah Printer" : "Pilih Printer")
+                            .font(.system(size: 13, weight: .semibold))
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(OuraTheme.Colors.accentLight)
+                            .foregroundColor(OuraTheme.Colors.accent)
+                            .cornerRadius(6)
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                if tsplPrinterService.connectedPeripheral == nil {
+                    Text("Silakan hubungkan printer thermal Anda terlebih dahulu untuk mencetak.")
+                        .font(.system(size: 11))
+                        .foregroundStyle(OuraTheme.Colors.warningText)
+                }
+            }
+
+            Section(header: Text("Daftar Label yang Akan Dicetak")) {
+                let selectedSizes = sizes.filter { selectedSizeIds.contains($0.id) }
+                if selectedSizes.isEmpty {
+                    Text("Tidak ada label terpilih.")
+                        .font(.system(size: 13))
+                        .foregroundColor(.gray)
+                } else {
+                    ForEach(selectedSizes) { size in
+                        let qty = qtyPerSize[size.id] ?? 1
+                        HStack {
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(size.productSku)
+                                    .font(.system(size: 13, weight: .bold))
+                                    .foregroundStyle(OuraTheme.Colors.textPrimary)
+                                Text("\(size.productName) · \(size.displayLabel)")
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(OuraTheme.Colors.textSecondary)
+                            }
+                            Spacer()
+                            Text("\(qty) pcs")
+                                .font(.system(size: 13, weight: .bold))
+                                .foregroundStyle(OuraTheme.Colors.accent)
+                        }
+                    }
+                }
+            }
+
+            if let err = errorMsg {
+                Section {
+                    Text(err)
+                        .font(.system(size: 13))
+                        .foregroundStyle(OuraTheme.Colors.dangerText)
+                }
+                .listRowBackground(OuraTheme.Colors.dangerBg)
+            }
         }
     }
 
@@ -622,6 +755,27 @@ private struct PrintPreviewSheet: View {
             )
         }
         topVC.present(activityVC, animated: true)
+    }
+
+    private func printThermalLabels() {
+        errorMsg = nil
+        guard tsplPrinterService.connectedPeripheral != nil, tsplPrinterService.writableCharacteristic != nil else {
+            errorMsg = "Printer tidak terhubung atau karakteristik tulis tidak ditemukan."
+            return
+        }
+
+        let selectedSizes = sizes.filter { selectedSizeIds.contains($0.id) }
+        for size in selectedSizes {
+            let qty = qtyPerSize[size.id] ?? 1
+            tsplPrinterService.printLabel(
+                qrData: "oura:\(size.id.uuidString)",
+                width: labelWidth,
+                height: labelHeight,
+                gap: labelGap,
+                quantity: qty
+            )
+        }
+        dismiss()
     }
 }
 

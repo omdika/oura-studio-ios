@@ -364,6 +364,7 @@ struct BerandaView: View {
             )
         }
         .buttonStyle(.plain)
+        .accessibilityIdentifier("quick-action-\(title.lowercased().replacingOccurrences(of: " ", with: "-"))")
     }
 
     // MARK: - Sales Capsule Bottom Section (Vivid Emerald vs Terracotta Contrast Gradient)

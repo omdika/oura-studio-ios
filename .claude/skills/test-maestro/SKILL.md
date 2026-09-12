@@ -14,10 +14,10 @@ This skill governs the creation of declarative UI automation tests using Maestro
 Following the standards of the `dev-fullstack` skill, this skill enforces a strict, specification-driven workflow with zero-tolerance for code-first or guess-work development:
 
 1.  **Xcode Visibility Rule:** 
-    All scenario documentation markdown files MUST be written directly inside the **`doc/`** folder (e.g., `doc/TC-{NNN}-{kebab-case-title}.md`) so they are fully visible and editable in Xcode's Navigator.
+    All scenario documentation markdown files MUST be written directly inside the **`doc/test/`** folder (e.g., `doc/test/TC-{NNN}-{kebab-case-title}.md`) so they are fully visible and editable in Xcode's Navigator.
 2.  **Strict Handoff & Spec Updates FIRST:**
     Do NOT write the Maestro YAML script before updating documentation.
-    -   **Step 1:** Create or update the test specification in the Xcode-visible `doc/TC-{NNN}-{kebab-case-title}.md` file.
+    -   **Step 1:** Create or update the test specification in the Xcode-visible `doc/test/TC-{NNN}-{kebab-case-title}.md` file.
     -   **Step 2:** Write/refine the Maestro YAML test script under the `test/scripts/` directory.
 3.  **Token Conservation:**
     -   NEVER use full file reads on long files unless absolutely necessary.
@@ -33,25 +33,26 @@ To maintain consistency and cross-referencing:
 ```
 oura studio frontend/
 ├── doc/
-│   └── TC-{NNN}-{kebab-case-title}.md            ← Scenario Doc (Visible in Xcode!)
+│   └── test/
+│       └── TC-{NNN}-{kebab-case-title}.md            ← Scenario Doc (Visible in Xcode!)
 └── test/
     └── scripts/
         └── TC{NNN}_{PascalCaseTitle}.yaml         ← Maestro YAML Script
 ```
 
 ### Linking Rule
-*   **The Scenario Doc (`doc/TC-xxx.md`)** must contain:
+*   **The Scenario Doc (`doc/test/TC-xxx.md`)** must contain:
     ```markdown
     **Maestro Flow:** `test/scripts/TC{NNN}_{PascalCaseTitle}.yaml`
     ```
 *   **The Maestro YAML Script (`test/scripts/TCxxx.yaml`)** must start with a comment pointing back to the doc:
     ```yaml
-    # Doc: doc/TC-{NNN}-{kebab-case-title}.md
+    # Doc: doc/test/TC-{NNN}-{kebab-case-title}.md
     ```
 
 ---
 
-## 📝 Part 1: Scenario Document Template (`doc/TC-xxx.md`)
+## 📝 Part 1: Scenario Document Template (`doc/test/TC-xxx.md`)
 
 ```markdown
 # TC-{NNN} — {Short Title} - Maestro UI Test

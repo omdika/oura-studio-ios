@@ -289,9 +289,11 @@ private struct GoogleGIcon: View {
 
 
 #Preview {
-    LoginView()
-        .environmentObject(AppState())
+    let state = AppState()
+    return LoginView()
+        .environmentObject(state)
         .environmentObject(APIService.shared)
+        .environmentObject(state.tsplPrinterService)
 }
 
 // MARK: - Invite Verification Sheet

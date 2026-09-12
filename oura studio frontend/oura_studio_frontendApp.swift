@@ -16,10 +16,12 @@ struct OuraStudioApp: App {
                     MainTabView()
                         .environmentObject(appState)
                         .environmentObject(api)
+                        .environmentObject(appState.tsplPrinterService)
                 } else {
                     LoginView()
                         .environmentObject(appState)
                         .environmentObject(api)
+                        .environmentObject(appState.tsplPrinterService)
                 }
             }
             .animation(.easeInOut(duration: 0.3), value: appState.isAuthenticated)
@@ -31,13 +33,17 @@ struct OuraStudioApp: App {
 }
 
 #Preview("Login Screen") {
-    LoginView()
-        .environmentObject(AppState())
+    let state = AppState()
+    return LoginView()
+        .environmentObject(state)
         .environmentObject(APIService.shared)
+        .environmentObject(state.tsplPrinterService)
 }
 
 #Preview("Main App") {
-    MainTabView()
-        .environmentObject(AppState())
+    let state = AppState()
+    return MainTabView()
+        .environmentObject(state)
         .environmentObject(APIService.shared)
+        .environmentObject(state.tsplPrinterService)
 }

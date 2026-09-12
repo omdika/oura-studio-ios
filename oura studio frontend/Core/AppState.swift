@@ -4,7 +4,7 @@ import CoreBluetooth // Add this import
 
 class AppState: ObservableObject {
     @Published var isAuthenticated: Bool = false
-    @Published var var isCheckingAuth: Bool = true
+    @Published var isCheckingAuth: Bool = true
     @Published var selectedTab: Int = 0
     @Published var produksiSubTabIndex: Int = 0
     @Published var dashboardNeedsRefresh: Bool = false

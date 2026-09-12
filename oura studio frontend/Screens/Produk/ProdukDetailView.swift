@@ -47,7 +47,16 @@ func makeSizeGroups(from sizes: [ProductSizeDetail]) -> [ProdukSizeGroup] {
 
 struct ProdukDetailView: View {
     @EnvironmentObject private var api: APIService
+    @EnvironmentObject private var tsplPrinterService: TSPLPrinterService
     @Environment(\.dismiss) private var dismiss
+
+    // Thermal Printer Settings (from AppStorage)
+    @AppStorage("labelWidth") private var labelWidth: Double = 33.0
+    @AppStorage("labelHeight") private var labelHeight: Double = 15.0
+    @AppStorage("labelGap") private var labelGap: Double = 2.0
+    @AppStorage("printerUUIDString") private var printerUUIDString: String = ""
+    @AppStorage("printerName") private var printerName: String = ""
+    @State private var isShowingPrintPreview: Bool = false
 
     let product: Product
     var onProductChanged: (() -> Void)? = nil
@@ -91,11 +100,12 @@ struct ProdukDetailView: View {
                     Button {
                         let activeProduct = currentProduct ?? product
                         editName = activeProduct.name
-                        editCategory = activeProduct.category
+                        editCategory = activeProduct.name
                         isEditingProduct = true
                     } label: {
                         Label("Ubah Detail Produk", systemImage: "pencil")
                     }
+                    printButton // Call the helper function
                     Divider()
                     Button(role: .destructive) {
                         showArchiveAlert = true
@@ -171,6 +181,10 @@ struct ProdukDetailView: View {
             Button("Batal", role: .cancel) {}
         } message: {
             Text("Produk tidak akan muncul di daftar dan tidak bisa digunakan untuk transaksi baru.")
+        }
+        .sheet(isPresented: $isShowingPrintPreview) {
+            PrintPreviewSheet(productName: (currentProduct ?? product).name, sizes: sizes)
+                .environmentObject(tsplPrinterService)
         }
     }
 
@@ -309,6 +323,14 @@ struct ProdukDetailView: View {
             onProductChanged?()
         } catch let e as APIError { errorMsg = e.errorDescription }
         catch { errorMsg = error.localizedDescription }
+    }
+
+    private var printButton: some View {
+        Button {
+            isShowingPrintPreview = true
+        } label: {
+            Label("Cetak Label", systemImage: "printer")
+        }
     }
 
     private func archiveProduct() async {
