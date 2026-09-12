@@ -1,25 +1,32 @@
 import SwiftUI
 import Combine
+import CoreBluetooth // Add this import
 
 class AppState: ObservableObject {
     @Published var isAuthenticated: Bool = false
-    @Published var isCheckingAuth: Bool = true
+    @Published var var isCheckingAuth: Bool = true
     @Published var selectedTab: Int = 0
     @Published var produksiSubTabIndex: Int = 0
     @Published var dashboardNeedsRefresh: Bool = false
     @Published var currentUserEmail: String? = nil
     @Published var currentUserRole: String? = nil
 
+    // Add TSPLPrinterService instance
+    let tsplPrinterService: TSPLPrinterService
+
     private let api: APIService
 
     init(api: APIService = .shared) {
         self.api = api
+        self.tsplPrinterService = TSPLPrinterService() // Initialize the service
         checkStoredToken()
         api.onUnauthorized = { [weak self] in self?.handleUnauthorized() }
     }
 
     private func checkStoredToken() {
-        if ProcessInfo.processInfo.arguments.contains("--uitest-bypass-auth") {
+        if ProcessInfo.processInfo.arguments.contains("--uitest-bypass-auth") ||
+            ProcessInfo.processInfo.environment["--uitest-bypass-auth"] == "true" ||
+            ProcessInfo.processInfo.environment["uitest_bypass_auth"] == "true" {
             api.useMock = true
             currentUserEmail = "admin@ourastudio.com"
             currentUserRole = "admin"

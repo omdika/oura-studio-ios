@@ -1,4 +1,5 @@
 import SwiftUI
+import CoreBluetooth
 
 // Known settings definitions — always shown even when DB is empty.
 // PATCH /settings is an upsert, so saving here works whether the row exists or not.
@@ -48,6 +49,7 @@ private let knownSettings: [SettingDef] = [
 
 struct SettingsView: View {
     @EnvironmentObject private var api: APIService
+    @EnvironmentObject private var tsplPrinterService: TSPLPrinterService
 
     @State private var dbValues: [String: Double] = [:]
     @State private var editedValues: [String: Double] = [:]
@@ -55,6 +57,14 @@ struct SettingsView: View {
     @State private var isLoading = true
     @State private var isSaving: Set<String> = []
     @State private var errorMsg: String?
+    @State private var isShowingPrinterSelection: Bool = false
+
+    // Thermal Printer Settings
+    @AppStorage("labelWidth") private var labelWidth: Double = 33.0
+    @AppStorage("labelHeight") private var labelHeight: Double = 15.0
+    @AppStorage("labelGap") private var labelGap: Double = 2.0
+    @AppStorage("printerUUIDString") private var printerUUIDString: String = ""
+    @AppStorage("printerName") private var printerName: String = ""
 
     private var grouped: [(category: String, defs: [SettingDef])] {
         let dict = Dictionary(grouping: knownSettings, by: { $0.category })
@@ -65,26 +75,83 @@ struct SettingsView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: OuraTheme.Spacing.sectionGap) {
-                if isLoading {
-                    ProgressView().frame(maxWidth: .infinity).padding()
-                } else {
-                    if let err = errorMsg {
-                        HStack(spacing: 8) {
-                            Image(systemName: "exclamationmark.triangle.fill")
-                                .foregroundStyle(OuraTheme.Colors.dangerText)
-                                .font(.system(size: 14))
-                            Text(err)
-                                .font(.system(size: 13))
-                                .foregroundStyle(OuraTheme.Colors.dangerText)
+                // MARK: - Pengaturan Umum
+                Section {
+                    if isLoading {
+                        ProgressView().frame(maxWidth: .infinity).padding()
+                    } else {
+                        if let err = errorMsg {
+                            HStack(spacing: 8) {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .foregroundStyle(OuraTheme.Colors.dangerText)
+                                    .font(.system(size: 14))
+                                Text(err)
+                                    .font(.system(size: 13))
+                                    .foregroundStyle(OuraTheme.Colors.dangerText)
+                            }
+                            .padding(12)
+                            .background(OuraTheme.Colors.dangerBg)
+                            .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.medium))
                         }
-                        .padding(12)
-                        .background(OuraTheme.Colors.dangerBg)
-                        .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.medium))
-                    }
 
-                    ForEach(grouped, id: \.category) { group in
-                        settingGroup(group)
+                        ForEach(grouped, id: \.category) { group in
+                            settingGroup(group)
+                        }
                     }
+                } header: {
+                    OuraSectionHeader(title: "Pengaturan Umum")
+                }
+                .padding(.bottom, OuraTheme.Spacing.sectionGap) // Add some spacing between sections
+
+                // MARK: - Pengaturan Printer Thermal
+                Section {
+                    VStack(spacing: 0) {
+                        SettingRow(
+                            def: .init(key: "label_width", displayName: "Lebar Label", unit: "mm", category: "Printer Thermal", hint: "Lebar fisik label thermal dalam milimeter.", defaultValue: 33.0),
+                            displayValue: labelWidth,
+                            isSaving: false, isSaved: false, isDirty: false,
+                            onChange: { labelWidth = $0 },
+                            onSave: { } // AppStorage saves automatically
+                        )
+                        Divider().padding(.leading, 16).overlay(OuraTheme.Colors.separator)
+                        SettingRow(
+                            def: .init(key: "label_height", displayName: "Tinggi Label", unit: "mm", category: "Printer Thermal", hint: "Tinggi fisik label thermal dalam milimeter.", defaultValue: 15.0),
+                            displayValue: labelHeight,
+                            isSaving: false, isSaved: false, isDirty: false,
+                            onChange: { labelHeight = $0 },
+                            onSave: { } // AppStorage saves automatically
+                        )
+                        Divider().padding(.leading, 16).overlay(OuraTheme.Colors.separator)
+                        SettingRow(
+                            def: .init(key: "label_gap", displayName: "Jarak Antar Label", unit: "mm", category: "Printer Thermal", hint: "Jarak antar label (gap) dalam milimeter.", defaultValue: 2.0),
+                            displayValue: labelGap,
+                            isSaving: false, isSaved: false, isDirty: false,
+                            onChange: { labelGap = $0 },
+                            onSave: { } // AppStorage saves automatically
+                        )
+                        Divider().padding(.leading, 16).overlay(OuraTheme.Colors.separator)
+
+                        Button {
+                                isShowingPrinterSelection = true
+                        } label: {
+                            HStack {
+                                Text("Pilih Printer Bluetooth")
+                                Spacer()
+                                Text(tsplPrinterService.connectedPeripheral?.name ?? (tsplPrinterService.centralManager.state == .poweredOn ? "Tidak Terhubung" : "Bluetooth Mati"))
+                                    .foregroundStyle(.gray)
+                                Image(systemName: "chevron.right")
+                                    .font(.caption)
+                                    .foregroundStyle(.gray)
+                            }
+                            .padding()
+                            .background(OuraTheme.Colors.surfaceSheet)
+                            .cornerRadius(OuraTheme.Radius.medium)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .ouraCard()
+                } header: {
+                    OuraSectionHeader(title: "Pengaturan Printer Thermal")
                 }
             }
             .padding(.horizontal, OuraTheme.Spacing.horizontal)
@@ -94,6 +161,10 @@ struct SettingsView: View {
         .background(OuraTheme.Colors.background)
         .refreshable { await load() }
         .task { await load() }
+        .sheet(isPresented: $isShowingPrinterSelection) {
+            PrinterSelectionView()
+                .environmentObject(tsplPrinterService)
+        }
     }
 
     private func settingGroup(_ group: (category: String, defs: [SettingDef])) -> some View {
