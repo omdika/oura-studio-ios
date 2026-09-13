@@ -135,6 +135,11 @@ struct SalesReportDetailView: View {
     @State private var fromDate: Date = Calendar.current.date(byAdding: .day, value: -30, to: Date()) ?? Date()
     @State private var toDate: Date = Date()
 
+    @State private var isExporting = false
+    @State private var exportError: String?
+    @State private var exportFileURL: URL?
+    @State private var showShareSheet = false
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: OuraTheme.Spacing.sectionGap) {
@@ -189,6 +194,26 @@ struct SalesReportDetailView: View {
                         }
                         .padding(OuraTheme.Spacing.cardPad)
                         .ouraCard()
+                    }
+
+                    if report != nil && !(report?.points.isEmpty ?? true) {
+                        Button(action: { Task { await exportJSON() } }) {
+                            HStack(spacing: 8) {
+                                if isExporting {
+                                    ProgressView().controlSize(.small).tint(.white)
+                                } else {
+                                    Image(systemName: "square.and.arrow.up")
+                                }
+                                Text(isExporting ? "Menyiapkan..." : "Export JSON untuk AI")
+                                    .font(.system(size: 14, weight: .semibold))
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .background(OuraTheme.Colors.accent)
+                            .foregroundStyle(.white)
+                            .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.medium))
+                        }
+                        .disabled(isExporting)
                     }
 
                     VStack(alignment: .leading, spacing: 12) {
@@ -272,6 +297,19 @@ struct SalesReportDetailView: View {
         .navigationTitle("Laporan Penjualan")
         .navigationBarTitleDisplayMode(.inline)
         .task { await load() }
+        .sheet(isPresented: $showShareSheet) {
+            if let url = exportFileURL {
+                ActivityViewController(activityItems: [url])
+            }
+        }
+        .alert("Gagal Export", isPresented: Binding(
+            get: { exportError != nil },
+            set: { if !$0 { exportError = nil } }
+        )) {
+            Button("OK") { exportError = nil }
+        } message: {
+            Text(exportError ?? "")
+        }
     }
 
     private func summaryCell(_ label: String, value: String) -> some View {
@@ -296,6 +334,143 @@ struct SalesReportDetailView: View {
             print("🔴 [SalesReport] load error: \(error)")
         }
         isLoading = false
+    }
+
+    private func exportJSON() async {
+        isExporting = true
+        exportError = nil
+        do {
+            // 1. Fetch raw sales orders for the period
+            let orders = try await api.getSalesOrders(from: fromDate, to: toDate)
+
+            // 2. Compose the full export dictionary
+            let export = composeExportJSON(
+                report: report!,
+                byProduct: byProduct,
+                orders: orders,
+                from: fromDate,
+                to: toDate
+            )
+
+            // 3. Serialize to pretty-printed JSON
+            let jsonData = try JSONSerialization.data(withJSONObject: export, options: [.prettyPrinted, .sortedKeys])
+
+            // 4. Write to temp file
+            let fmt = DateFormatter(); fmt.dateFormat = "yyyy-MM-dd"
+            let fileName = "oura_penjualan_\(fmt.string(from: fromDate))_\(fmt.string(from: toDate)).json"
+            let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(fileName)
+            try jsonData.write(to: tempURL)
+
+            exportFileURL = tempURL
+            showShareSheet = true
+        } catch {
+            exportError = error.localizedDescription
+        }
+        isExporting = false
+    }
+
+    private func composeExportJSON(
+        report: SalesReport,
+        byProduct: [SalesByProductItem],
+        orders: [SalesOrder],
+        from: Date, to: Date
+    ) -> [String: Any] {
+        let fmt = DateFormatter(); fmt.dateFormat = "yyyy-MM-dd"
+        let isoFmt = ISO8601DateFormatter()
+
+        let nonCancelled = orders.filter { !$0.isCancelled }
+        let totalDiscount = nonCancelled.flatMap(\.items).reduce(0.0) { $0 + $1.discount * Double($1.qty) }
+
+        // Revenue by payment method
+        var revByPM: [String: Double] = [:]
+        var countByPM: [String: Int] = [:]
+        var countByStatus: [String: Int] = [:]
+        for order in orders {
+            countByStatus[order.status, default: 0] += 1
+            guard !order.isCancelled else { continue }
+            let pm = order.paymentMethod ?? "unknown"
+            revByPM[pm, default: 0] += order.displayRevenue
+            countByPM[pm, default: 0] += 1
+        }
+
+        let totalCogs = nonCancelled.flatMap(\.items).reduce(0.0) { $0 + $1.unitHppSnapshot * Double($1.qty) }
+        let avgMargin = report.totalRevenue > 0 ? ((report.totalRevenue - totalCogs) / report.totalRevenue) * 100 : 0
+
+        return [
+            "export_info": [
+                "generated_at": isoFmt.string(from: Date()),
+                "period_from": fmt.string(from: from),
+                "period_to": fmt.string(from: to),
+                "total_orders": orders.count,
+                "total_items_sold": nonCancelled.flatMap(\.items).reduce(0) { $0 + $1.qty },
+                "currency": "IDR"
+            ],
+            "summary": [
+                "total_revenue": report.totalRevenue,
+                "total_cogs": totalCogs,
+                "total_profit": report.totalProfit,
+                "avg_profit_margin_pct": round(avgMargin * 100) / 100,
+                "total_discount_given": totalDiscount,
+                "revenue_by_payment_method": revByPM,
+                "order_count_by_payment_method": countByPM,
+                "order_count_by_status": countByStatus,
+                "top_selling_products": byProduct.prefix(10).map { item in
+                    [
+                        "product_name": item.productName,
+                        "size_label": item.sizeLabel,
+                        "fabric_variant_name": item.fabricVariantName ?? NSNull(),
+                        "qty_sold": item.qtySold,
+                        "revenue": item.revenue
+                    ] as [String: Any]
+                },
+                "daily_trend": report.points.map { pt in
+                    [
+                        "date": pt.period,
+                        "order_count": pt.orderCount,
+                        "units_sold": pt.unitsSold ?? 0,
+                        "revenue": pt.totalRevenue,
+                        "profit": pt.totalProfit
+                    ] as [String: Any]
+                }
+            ] as [String: Any],
+            "orders": orders.map { order in
+                let orderCogs = order.items.reduce(0.0) { $0 + $1.unitHppSnapshot * Double($1.qty) }
+                let orderDiscount = order.items.reduce(0.0) { $0 + $1.discount * Double($1.qty) }
+                return [
+                    "order_id": order.id.uuidString,
+                    "invoice_no": order.invoiceNo,
+                    "sold_at": isoFmt.string(from: order.soldAt),
+                    "status": order.status,
+                    "customer_name": order.customerName ?? NSNull(),
+                    "payment_method": order.paymentMethod ?? NSNull(),
+                    "marketplace_fee_pct": order.marketplaceFeePct,
+                    "order_total_revenue": order.isCancelled ? 0 : order.displayRevenue,
+                    "order_total_cogs": order.isCancelled ? 0 : orderCogs,
+                    "order_total_profit": order.isCancelled ? 0 : order.displayProfit,
+                    "order_total_discount": orderDiscount,
+                    "items": order.items.map { item in
+                        let eff = item.effectivePrice
+                        let lineRev = item.lineRevenue
+                        let lineCogs = item.unitHppSnapshot * Double(item.qty)
+                        let marginPct = lineRev > 0 ? (item.lineProfit / lineRev) * 100 : 0
+                        return [
+                            "item_id": item.id.uuidString,
+                            "product_name": item.productName ?? NSNull(),
+                            "size_label": item.sizeLabel ?? NSNull(),
+                            "qty": item.qty,
+                            "unit_price": item.unitPrice,
+                            "discount": item.discount,
+                            "effective_price": eff,
+                            "line_revenue": lineRev,
+                            "unit_hpp_snapshot": item.unitHppSnapshot,
+                            "line_cogs": lineCogs,
+                            "line_profit": item.lineProfit,
+                            "profit_margin_pct": round(marginPct * 100) / 100
+                        ] as [String: Any]
+                    }
+                ] as [String: Any]
+            }
+        ]
     }
 }
 
