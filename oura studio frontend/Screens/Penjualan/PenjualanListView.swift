@@ -25,6 +25,15 @@ struct PenjualanListView: View {
                 .padding(.top, 12)
                 .padding(.bottom, 4)
 
+                // Sales Summary Cards Header
+                if !orders.isEmpty {
+                    SalesSummaryHeader(
+                        totalRevenue: totalRevenue,
+                        totalPcs: totalPcsSold,
+                        totalTrx: totalTransactions
+                    )
+                }
+
                 Group {
                     if isLoading {
                         ProgressView()
@@ -142,6 +151,24 @@ struct PenjualanListView: View {
     }
 
     // MARK: - Helpers
+
+    private var validOrders: [SalesOrder] {
+        orders.filter { !$0.isCancelled }
+    }
+
+    private var totalRevenue: Double {
+        validOrders.reduce(0) { $0 + $1.displayRevenue }
+    }
+
+    private var totalPcsSold: Int {
+        validOrders.reduce(0) { sum, order in
+            sum + order.items.reduce(0) { $0 + $1.qty }
+        }
+    }
+
+    private var totalTransactions: Int {
+        validOrders.count
+    }
 
     private var groupedOrders: [(date: String, orders: [SalesOrder])] {
         let fmt = DateFormatter()
@@ -283,13 +310,80 @@ private struct OrderRow: View {
     private var statusTag: some View {
         Group {
             if order.isCancelled {
-                OuraTag(text: "Batal", color: OuraTheme.Colors.dangerText, bg: OuraTheme.Colors.dangerBg)
+                OuraTag(text: "Dibatalkan", color: OuraTheme.Colors.dangerText, bg: OuraTheme.Colors.dangerBg)
             } else if order.isPaid {
                 OuraTag(text: "Lunas", color: OuraTheme.Colors.greenAccent, bg: OuraTheme.Colors.greenBg)
             } else {
                 OuraTag(text: "Pending", color: OuraTheme.Colors.warningText, bg: OuraTheme.Colors.warningBg)
             }
         }
+    }
+}
+
+// MARK: - Summary Header & Tiles
+
+private struct SalesSummaryHeader: View {
+    let totalRevenue: Double
+    let totalPcs: Int
+    let totalTrx: Int
+
+    var body: some View {
+        HStack(spacing: 8) {
+            SummaryTile(
+                title: "Pendapatan",
+                value: totalRevenue.rupiahFormatted,
+                icon: "banknote.fill",
+                accentColor: OuraTheme.Colors.accent
+            )
+            SummaryTile(
+                title: "Terjual",
+                value: "\(totalPcs) pcs",
+                icon: "bag.fill",
+                accentColor: .blue
+            )
+            SummaryTile(
+                title: "Transaksi",
+                value: "\(totalTrx) trx",
+                icon: "doc.text.fill",
+                accentColor: .purple
+            )
+        }
+        .padding(.horizontal, OuraTheme.Spacing.horizontal)
+        .padding(.vertical, 6)
+    }
+}
+
+private struct SummaryTile: View {
+    let title: String
+    let value: String
+    let icon: String
+    let accentColor: Color
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 4) {
+                Image(systemName: icon)
+                    .font(.system(size: 11))
+                    .foregroundStyle(accentColor)
+                Text(title)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(OuraTheme.Colors.textSecondary)
+            }
+            Text(value)
+                .font(.system(size: 13, weight: .bold))
+                .foregroundStyle(OuraTheme.Colors.textPrimary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+        }
+        .padding(.vertical, 10)
+        .padding(.horizontal, 10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(OuraTheme.Colors.surfaceCard)
+        .cornerRadius(10)
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(OuraTheme.Colors.separator.opacity(0.6), lineWidth: 1)
+        )
     }
 }
 
