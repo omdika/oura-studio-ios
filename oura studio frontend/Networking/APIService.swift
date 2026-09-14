@@ -510,7 +510,7 @@ class APIService: ObservableObject {
 
     // Looks up a product's display name from /products by SKU. Falls back to the SKU if not found.
     private func resolveProductName(sku: String) async -> String {
-        let products: [Product] = (try? await get(path: "/products")) ?? []
+        let products: [Product] = (try? await getProducts()) ?? []
         return products.first(where: { $0.sku == sku })?.name ?? sku
     }
 
@@ -577,7 +577,7 @@ class APIService: ObservableObject {
     // Fetches all products and their sizes, returning a lookup from size UUID to (Product, ProductSizeBasic).
     // Used by enrichPatternSpecs and suggestLayouts to resolve product/size names from IDs.
     private func fetchSizeToProductMap() async throws -> [UUID: (product: Product, size: ProductSizeBasic)] {
-        let products: [Product] = try await get(path: "/products")
+        let products: [Product] = try await getProducts()
         var sizeToProduct: [UUID: (product: Product, size: ProductSizeBasic)] = [:]
         await withTaskGroup(of: [(Product, ProductSizeBasic)].self) { group in
             for product in products {
