@@ -281,9 +281,15 @@ class APIService: ObservableObject {
 
     // MARK: - Products
 
+    func getProducts(page: Int = 1, limit: Int = 50) async throws -> PaginatedResponse<Product> {
+        if useMock { return try await MockAPIService.shared.getProducts(page: page, limit: limit) }
+        return try await get(path: "/products?page=\(page)&limit=\(limit)")
+    }
+
     func getProducts() async throws -> [Product] {
         if useMock { return try await MockAPIService.shared.getProducts() }
-        return try await get(path: "/products")
+        let res: PaginatedResponse<Product> = try await get(path: "/products?page=1&limit=500")
+        return res.data
     }
 
     func createProduct(name: String, sku: String? = nil, category: String? = nil) async throws -> Product {
@@ -449,9 +455,15 @@ class APIService: ObservableObject {
         return sizeDetailFromBasic(basic, sku: sku, productName: name)
     }
 
+    func getAllProductSizes(page: Int = 1, limit: Int = 50) async throws -> PaginatedResponse<ProductSizeDetail> {
+        if useMock { return try await MockAPIService.shared.getAllProductSizes(page: page, limit: limit) }
+        return try await get(path: "/product-sizes?page=\(page)&limit=\(limit)")
+    }
+
     func getAllProductSizes() async throws -> [ProductSizeDetail] {
         if useMock { return try await MockAPIService.shared.getAllProductSizes() }
-        return try await get(path: "/product-sizes")
+        let res: PaginatedResponse<ProductSizeDetail> = try await get(path: "/product-sizes?page=1&limit=500")
+        return res.data
     }
 
     func getProductSizeById(id: UUID) async throws -> ProductSizeDetail {

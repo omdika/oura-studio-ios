@@ -7,6 +7,12 @@ struct ProdukListView: View {
     @State private var products: [Product] = []
     @State private var allSizes: [ProductSizeDetail] = []
     @State private var isLoading = true
+    @State private var isLoadingMore = false
+    @State private var currentPage = 1
+    @State private var totalPages = 1
+    @State private var hasMorePages = true
+    @State private var limit = 20
+
     @State private var searchText: String = ""
     @State private var showAddProduct = false
     @State private var showQRScanner = false
@@ -15,9 +21,6 @@ struct ProdukListView: View {
     // Set right after "Simpan Tanpa Resep" creates a product with no price/stock/HPP yet — drives
     // an auto-navigation into ProdukDetailView so the user can pick which size(s) to fill in.
     @State private var newlyCreatedProduct: Product?
-
-    @State private var pageSize = 20
-    @State private var visibleCount = 20
 
     @FocusState private var isSearchFocused: Bool
 
@@ -28,7 +31,7 @@ struct ProdukListView: View {
 
     private var filtered: [Product] {
         let active = products.filter { !$0.isArchived }
-        
+
         let dateFiltered = active.filter { product in
             if isFilterActive {
                 let sizes = allSizes.filter { $0.productId == product.id && !$0.isArchived }
@@ -36,7 +39,7 @@ struct ProdukListView: View {
             }
             return true
         }
-        
+
         guard !searchText.isEmpty else { return dateFiltered }
         let q = searchText.lowercased()
         return dateFiltered.filter { product in
@@ -52,7 +55,7 @@ struct ProdukListView: View {
     }
 
     private var filteredProductsToDisplay: [Product] {
-        Array(filtered.prefix(visibleCount))
+        filtered
     }
 
     private var totalProductsCount: Int {
@@ -98,10 +101,10 @@ struct ProdukListView: View {
         .navigationBarTitleDisplayMode(.large)
         .toolbar(isSearchFocused ? .hidden : .visible, for: .navigationBar)
         .onChange(of: isFilterActive) { _ in
-            Task { await load() }
+            Task { await loadFirstPage() }
         }
-        .task { await load() }
-        .refreshable { await load() }
+        .task { await loadFirstPage() }
+        .refreshable { await loadFirstPage() }
         .toolbar {
             // Split across leading/trailing (not grouped together on one side) so the two very
             // similar-looking QR icons (qrcode.viewfinder vs qrcode) read as two distinct actions
@@ -133,10 +136,10 @@ struct ProdukListView: View {
             ShopeeBulkUploadSheet()
                 .environmentObject(api)
         }
-        .sheet(isPresented: $showAddProduct, onDismiss: { Task { await load() } }) {
+        .sheet(isPresented: $showAddProduct, onDismiss: { Task { await loadFirstPage() } }) {
             TambahProdukLengkapSheet(onCreatedWithoutRecipe: { newlyCreatedProduct = $0 })
         }
-        .sheet(item: $newlyCreatedProduct, onDismiss: { Task { await load() } }) { product in
+        .sheet(item: $newlyCreatedProduct, onDismiss: { Task { await loadFirstPage() } }) { product in
             NavigationStack {
                 ProdukDetailView(product: product)
                     .toolbar {
@@ -300,7 +303,7 @@ struct ProdukListView: View {
             
             if isFilterActive {
                 DateRangeField(from: $filterFrom, to: $filterTo) {
-                    Task { await load() }
+                    Task { await loadFirstPage() }
                 }
                 .transition(.opacity.combined(with: .move(edge: .top)))
             }
@@ -342,12 +345,21 @@ struct ProdukListView: View {
                             product: product,
                             sizes: sizes,
                             additionsByVariant: additionsByVariant,
-                            onProductChanged: { Task { await load() } }
+                            onProductChanged: { Task { await loadFirstPage() } }
                         )
                         .onAppear {
-                            if product.id == filteredProductsToDisplay.last?.id && visibleCount < filtered.count {
-                                visibleCount = min(visibleCount + pageSize, filtered.count)
+                            if product.id == filteredProductsToDisplay.last?.id && hasMorePages && !isLoadingMore {
+                                Task { await loadMoreProducts() }
                             }
+                        }
+                    }
+
+                    if isLoadingMore {
+                        HStack {
+                            Spacer()
+                            ProgressView()
+                                .padding(.vertical, 12)
+                            Spacer()
                         }
                     }
                 }
@@ -378,32 +390,63 @@ struct ProdukListView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    private func load() async {
+    private func loadFirstPage() async {
         isLoading = true
-        async let p = api.getProducts()
-        async let s = api.getAllProductSizes()
-        
-        let fetchedProducts = (try? await p) ?? []
-        let fetchedSizes = (try? await s) ?? []
-        
+        currentPage = 1
+
+        async let p = api.getProducts(page: 1, limit: limit)
+        async let s = api.getAllProductSizes(page: 1, limit: limit * 3)
+
+        let resP = try? await p
+        let resS = try? await s
+
+        products = resP?.data ?? []
+        allSizes = resS?.data ?? []
+        totalPages = resP?.totalPages ?? 1
+        hasMorePages = (resP?.nextPage != nil)
+
         var ledgerAdditions: [UUID: Int] = [:]
         if isFilterActive {
             do {
                 let entries = try await api.getStockLedger(from: filterFrom, to: filterTo)
-                // Group all entries by size, sum all changes (positive and negative) to get the net addition,
-                // and keep only those sizes that had a net positive stock increase in this period.
                 ledgerAdditions = Dictionary(grouping: entries, by: { $0.productSizeId })
                     .mapValues { entries in entries.reduce(0) { $0 + $1.changeQty } }
                     .filter { $0.value > 0 }
             } catch {
-                print("⚠️ [v3.44] Gagal memuat stock ledger dari backend: \(error)")
+                print("⚠️ [v3.56] Gagal memuat stock ledger dari backend: \(error)")
             }
         }
-        
-        products = fetchedProducts
-        allSizes = fetchedSizes
+
         additionsByVariant = ledgerAdditions
         isLoading = false
+    }
+
+    private func loadMoreProducts() async {
+        guard !isLoadingMore && hasMorePages else { return }
+        isLoadingMore = true
+        let nextPage = currentPage + 1
+
+        do {
+            async let p = api.getProducts(page: nextPage, limit: limit)
+            async let s = api.getAllProductSizes(page: nextPage, limit: limit * 3)
+
+            let resP = try await p
+            let resS = try await s
+
+            let newProducts = resP.data.filter { newP in !products.contains(where: { $0.id == newP.id }) }
+            products.append(contentsOf: newProducts)
+
+            let newSizes = resS.data.filter { newS in !allSizes.contains(where: { $0.id == newS.id }) }
+            allSizes.append(contentsOf: newSizes)
+
+            currentPage = nextPage
+            totalPages = resP.totalPages
+            hasMorePages = (resP.nextPage != nil)
+        } catch {
+            print("⚠️ [v3.56] Error loadMoreProducts: \(error)")
+        }
+
+        isLoadingMore = false
     }
 }
 

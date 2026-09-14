@@ -1,5 +1,23 @@
 import Foundation
 
+struct PaginatedResponse<T: Codable>: Codable {
+    let data: [T]
+    let totalItems: Int
+    let totalPages: Int
+    let currentPage: Int
+    let nextPage: Int?
+    let prevPage: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case data
+        case totalItems = "total_items"
+        case totalPages = "total_pages"
+        case currentPage = "current_page"
+        case nextPage = "next_page"
+        case prevPage = "prev_page"
+    }
+}
+
 struct Product: Codable, Identifiable, Hashable {
     let id: UUID
     let sku: String

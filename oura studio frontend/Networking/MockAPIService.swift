@@ -483,9 +483,26 @@ class MockAPIService {
 
     // MARK: - Products
 
-    func getProducts() async throws -> [Product] {
+    func getProducts(page: Int = 1, limit: Int = 50) async throws -> PaginatedResponse<Product> {
         await delay()
-        return _products.filter { !$0.isArchived }
+        let active = _products.filter { !$0.isArchived }
+        let totalItems = active.count
+        let totalPages = max(1, Int(ceil(Double(totalItems) / Double(limit))))
+        let startIndex = (page - 1) * limit
+        let endIndex = min(startIndex + limit, totalItems)
+        let pageData: [Product]
+        if startIndex < totalItems {
+            pageData = Array(active[startIndex..<endIndex])
+        } else {
+            pageData = []
+        }
+        let nextPage = page < totalPages ? page + 1 : nil
+        let prevPage = page > 1 ? page - 1 : nil
+        return PaginatedResponse(data: pageData, totalItems: totalItems, totalPages: totalPages, currentPage: page, nextPage: nextPage, prevPage: prevPage)
+    }
+
+    func getProducts() async throws -> [Product] {
+        return try await getProducts(page: 1, limit: 500).data
     }
 
     func createProduct(name: String, sku: String? = nil, category: String? = nil) async throws -> Product {
@@ -505,9 +522,26 @@ class MockAPIService {
         return (_productSizes[sku] ?? []).filter { !$0.isArchived }
     }
 
-    func getAllProductSizes() async throws -> [ProductSizeDetail] {
+    func getAllProductSizes(page: Int = 1, limit: Int = 50) async throws -> PaginatedResponse<ProductSizeDetail> {
         await delay()
-        return _productSizes.values.flatMap { $0 }.filter { !$0.isArchived }
+        let active = _productSizes.values.flatMap { $0 }.filter { !$0.isArchived }
+        let totalItems = active.count
+        let totalPages = max(1, Int(ceil(Double(totalItems) / Double(limit))))
+        let startIndex = (page - 1) * limit
+        let endIndex = min(startIndex + limit, totalItems)
+        let pageData: [ProductSizeDetail]
+        if startIndex < totalItems {
+            pageData = Array(active[startIndex..<endIndex])
+        } else {
+            pageData = []
+        }
+        let nextPage = page < totalPages ? page + 1 : nil
+        let prevPage = page > 1 ? page - 1 : nil
+        return PaginatedResponse(data: pageData, totalItems: totalItems, totalPages: totalPages, currentPage: page, nextPage: nextPage, prevPage: prevPage)
+    }
+
+    func getAllProductSizes() async throws -> [ProductSizeDetail] {
+        return try await getAllProductSizes(page: 1, limit: 500).data
     }
 
     func getProductSizeById(id: UUID) async throws -> ProductSizeDetail {
