@@ -5,6 +5,9 @@ struct TambahPenjualanSheet: View {
     @EnvironmentObject private var appState: AppState
     @Environment(\.dismiss) private var dismiss
 
+    @AppStorage("eventPriceAdjustmentActive") private var isEventActive: Bool = false
+    @AppStorage("eventPriceAdjustmentAmount") private var eventAdjustmentAmount: Double = 0.0
+
     var onSave: (() -> Void)? = nil
 
     @State private var availableSizes: [ProductSizeDetail] = []
@@ -156,13 +159,15 @@ struct TambahPenjualanSheet: View {
                 sizes: availableSizes,
                 alreadySelected: selectedSizeIds
             ) { size in
+                let basePrice = size.sellingPrice ?? 0.0
+                let finalPrice = basePrice + (isEventActive ? eventAdjustmentAmount : 0.0)
                 items.append(SaleItem(
                     sizeId: size.id,
                     productSku: size.productSku,
                     displayName: "\(size.productName) · \(size.displayLabel)",
                     maxQty: size.currentStockQty,
                     qty: 1,
-                    unitPrice: size.sellingPrice,
+                    unitPrice: size.sellingPrice != nil ? finalPrice : nil,
                     discount: nil
                 ))
             }
@@ -386,13 +391,15 @@ struct TambahPenjualanSheet: View {
             }
         } else {
             // New product, add to list
+            let basePrice = size.sellingPrice ?? 0.0
+            let finalPrice = basePrice + (isEventActive ? eventAdjustmentAmount : 0.0)
             items.append(SaleItem(
                 sizeId: size.id,
                 productSku: size.productSku,
                 displayName: "\(size.productName) · \(size.displayLabel)",
                 maxQty: size.currentStockQty,
                 qty: 1,
-                unitPrice: size.sellingPrice,
+                unitPrice: size.sellingPrice != nil ? finalPrice : nil,
                 discount: nil
             ))
             scanToast = ToastMessage(
@@ -538,6 +545,8 @@ private struct ProductPickerSheet: View {
 
     @Environment(\.dismiss) private var dismiss
     @State private var searchText = ""
+    @AppStorage("eventPriceAdjustmentActive") private var isEventActive: Bool = false
+    @AppStorage("eventPriceAdjustmentAmount") private var eventAdjustmentAmount: Double = 0.0
 
     private var pickable: [ProductSizeDetail] {
         sizes.filter { !alreadySelected.contains($0.id) }
@@ -613,7 +622,8 @@ private struct ProductPickerSheet: View {
                                                     .font(.system(size: 15))
                                                     .foregroundStyle(OuraTheme.Colors.textPrimary)
                                                 if let price = size.sellingPrice {
-                                                    Text(price.rupiahFormatted)
+                                                    let displayedPrice = price + (isEventActive ? eventAdjustmentAmount : 0)
+                                                    Text(displayedPrice.rupiahFormatted)
                                                         .font(.system(size: 12))
                                                         .foregroundStyle(OuraTheme.Colors.textSecondary)
                                                 }

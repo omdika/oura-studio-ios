@@ -906,4 +906,14 @@ class APIService: ObservableObject {
         if useMock { return try await MockAPIService.shared.patchSetting(key: key, value: value) }
         return try await patch(path: "/settings", body: PatchSettingRequest(key: key, value: value))
     }
+
+    func getGenericSettings() async throws -> [GenericSetting] {
+        if useMock { return try await MockAPIService.shared.getGenericSettings() }
+        return try await get(path: "/settings/generic") // Assuming a new endpoint for generic settings
+    }
+
+    func updateGenericSetting(key: String, value: String) async throws -> GenericSetting {
+        if useMock { return try await MockAPIService.shared.updateGenericSetting(key: key, value: value) }
+        return try await patch(path: "/settings/generic", body: UpdateSettingRequest(key: key, value: value)) // Assuming a new endpoint for generic settings
+    }
 }

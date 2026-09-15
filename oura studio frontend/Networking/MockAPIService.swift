@@ -92,6 +92,7 @@ class MockAPIService {
     private var _productionBatches: [ProductionBatch] = []
     private var _salesOrders: [SalesOrder] = []
     private var _settings: [SettingItem] = []
+    private var _genericSettings: [GenericSetting] = []
     private var _ledgerEntries: [StockAdjustmentLedgerEntry] = []
 
     init() { seedData() }
@@ -240,6 +241,11 @@ class MockAPIService {
             SettingItem(key: "default_overhead_per_unit", value: 300, updatedAt: ago(days: 30)),
             SettingItem(key: "pooled_material_rate:thread", value: 500, updatedAt: ago(days: 30)),
             SettingItem(key: "pooled_material_rate:packaging", value: 200, updatedAt: ago(days: 30)),
+        ]
+
+        _genericSettings = [
+            GenericSetting(key: "event_price_adjustment_active", value: "false", updatedAt: ago(days: 30)),
+            GenericSetting(key: "event_price_adjustment_amount", value: "0", updatedAt: ago(days: 30)),
         ]
 
         _ledgerEntries = [
@@ -1695,6 +1701,23 @@ class MockAPIService {
         }
         let new = SettingItem(key: key, value: value, updatedAt: Date())
         _settings.append(new)
+        return new
+    }
+
+    func getGenericSettings() async throws -> [GenericSetting] {
+        await delay()
+        return _genericSettings
+    }
+
+    func updateGenericSetting(key: String, value: String) async throws -> GenericSetting {
+        await delay()
+        if let idx = _genericSettings.firstIndex(where: { $0.key == key }) {
+            let updated = GenericSetting(key: key, value: value, updatedAt: Date())
+            _genericSettings[idx] = updated
+            return updated
+        }
+        let new = GenericSetting(key: key, value: value, updatedAt: Date())
+        _genericSettings.append(new)
         return new
     }
 }

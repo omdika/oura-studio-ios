@@ -29,7 +29,13 @@ struct ProdukSizeGroup: Identifiable {
     }
     var isAnyHabis: Bool { displayVariants.contains { $0.currentStockQty == 0 } }
     var isAnyMenipis: Bool { displayVariants.contains { $0.isLowStock && $0.currentStockQty > 0 } }
-    var lowestPrice: Double? { displayVariants.compactMap { $0.sellingPrice }.min() }
+    var lowestPrice: Double? {
+        let basePrice = displayVariants.compactMap { $0.sellingPrice }.min()
+        guard let basePrice = basePrice else { return nil }
+        let isEventActive = UserDefaults.standard.bool(forKey: "eventPriceAdjustmentActive")
+        let eventAdjustmentAmount = UserDefaults.standard.double(forKey: "eventPriceAdjustmentAmount")
+        return basePrice + (isEventActive ? eventAdjustmentAmount : 0)
+    }
     // Flags a size that's completely unconfigured — no stock and no price set on any variant —
     // e.g. right after "Simpan Tanpa Resep" before the user has filled anything in.
     var needsSetup: Bool { totalStock == 0 && lowestPrice == nil }
@@ -346,6 +352,9 @@ struct ProdukDetailView: View {
 // MARK: - Size group row (used in ProdukDetailView sizesSection)
 
 private struct SizeGroupRow: View {
+    @AppStorage("eventPriceAdjustmentActive") private var isEventActive: Bool = false
+    @AppStorage("eventPriceAdjustmentAmount") private var eventAdjustmentAmount: Double = 0.0
+
     let group: ProdukSizeGroup
 
     var body: some View {
@@ -405,6 +414,9 @@ private struct SizeGroupRow: View {
 // MARK: - Variant row (used in ProdukSizeGroupView)
 
 struct ProdukVariantRow: View {
+    @AppStorage("eventPriceAdjustmentActive") private var isEventActive: Bool = false
+    @AppStorage("eventPriceAdjustmentAmount") private var eventAdjustmentAmount: Double = 0.0
+
     let size: ProductSizeDetail
 
     var body: some View {
@@ -439,7 +451,8 @@ struct ProdukVariantRow: View {
             Spacer()
             VStack(alignment: .trailing, spacing: 3) {
                 if let price = size.sellingPrice {
-                    Text(price.rupiahFormatted)
+                    let displayedPrice = price + (isEventActive ? eventAdjustmentAmount : 0)
+                    Text(displayedPrice.rupiahFormatted)
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(OuraTheme.Colors.textPrimary)
                 }
@@ -1011,6 +1024,8 @@ private struct FabricPickerSheet: View {
 
 struct ProdukSizeDetailView: View {
     @EnvironmentObject private var api: APIService
+    @AppStorage("eventPriceAdjustmentActive") private var isEventActive: Bool = false
+    @AppStorage("eventPriceAdjustmentAmount") private var eventAdjustmentAmount: Double = 0.0
 
     let productSize: ProductSizeDetail
 
@@ -1325,7 +1340,10 @@ struct ProdukSizeDetailView: View {
                 NumericInputField(label: "Reorder Min (pcs)", value: $editReorderMin, unit: "pcs")
             } else {
                 if let fabric = size.fabricVariantName { infoRow("Jenis Kain", value: fabric) }
-                if let price = size.sellingPrice { infoRow("Harga Jual", value: price.rupiahFormatted) }
+                if let price = size.sellingPrice {
+                    let displayedPrice = price + (isEventActive ? eventAdjustmentAmount : 0)
+                    infoRow("Harga Jual", value: displayedPrice.rupiahFormatted)
+                }
                 if let margin = size.marginPct { infoRow("Margin", value: String(format: "%.1f%%", margin * 100)) }
                 if let min = size.reorderMinQty { infoRow("Reorder Min", value: String(format: "%.0f pcs", min)) }
             }

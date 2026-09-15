@@ -103,6 +103,29 @@ struct SettingsView: View {
                 }
                 .padding(.bottom, OuraTheme.Spacing.sectionGap) // Add some spacing between sections
 
+                // MARK: - Intercept Harga Event
+                Section {
+                    NavigationLink {
+                        EventPriceAdjustmentView() // Will define this view next
+                    } label: {
+                        HStack {
+                            Text("Intercept / Ubah Harga Event")
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.caption)
+                                .foregroundStyle(.gray)
+                        }
+                        .padding()
+                        .background(OuraTheme.Colors.surfaceSheet)
+                        .cornerRadius(OuraTheme.Radius.medium)
+                    }
+                    .buttonStyle(.plain)
+                    .ouraCard()
+                } header: {
+                    OuraSectionHeader(title: "Pengaturan Harga")
+                }
+                .padding(.bottom, OuraTheme.Spacing.sectionGap) // Add some spacing between sections
+
                 // MARK: - Pengaturan Printer Thermal
                 Section {
                     VStack(spacing: 0) {

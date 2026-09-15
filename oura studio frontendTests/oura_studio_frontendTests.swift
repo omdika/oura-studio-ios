@@ -130,4 +130,75 @@ struct oura_studio_frontendTests {
         #expect(compressedData != nil)
         #expect(compressedData!.count <= 15000)
     }
+
+    @Test func testGenericSettingsMocking() async throws {
+        let api = MockAPIService.shared
+        
+        // 1. Fetch initial mock generic settings
+        let settings = try await api.getGenericSettings()
+        #expect(settings.count >= 2)
+        
+        let activeSetting = settings.first(where: { $0.key == "event_price_adjustment_active" })
+        #expect(activeSetting != nil)
+        #expect(activeSetting?.value == "false")
+        
+        // 2. Update a setting
+        let updated = try await api.updateGenericSetting(key: "event_price_adjustment_active", value: "true")
+        #expect(updated.key == "event_price_adjustment_active")
+        #expect(updated.value == "true")
+        
+        // 3. Fetch again and verify
+        let updatedSettings = try await api.getGenericSettings()
+        let activeSettingUpdated = updatedSettings.first(where: { $0.key == "event_price_adjustment_active" })
+        #expect(activeSettingUpdated != nil)
+        #expect(activeSettingUpdated?.value == "true")
+    }
+
+    @Test func testEventPriceAdjustmentIntercept() async throws {
+        // Clear previous values
+        UserDefaults.standard.removeObject(forKey: "eventPriceAdjustmentActive")
+        UserDefaults.standard.removeObject(forKey: "eventPriceAdjustmentAmount")
+        
+        let sampleSize = ProductSizeDetail(
+            id: UUID(),
+            productId: UUID(),
+            productSku: "TEST-SKU",
+            productName: "Test Product",
+            sizeLabel: "M",
+            fabricVariantName: "Silk",
+            reorderMinQty: nil,
+            isArchived: false,
+            currentStockQty: 10,
+            productionStockQty: 10,
+            manualStockQty: 0,
+            latestHppBreakdown: nil,
+            sellingPrice: 50000.0,
+            marginPct: nil
+        )
+        
+        let group = ProdukSizeGroup(
+            sizeLabel: "M",
+            variants: [sampleSize]
+        )
+        
+        // 1. Without active event, lowestPrice should be base price (50000)
+        #expect(group.lowestPrice == 50000.0)
+        
+        // 2. Active event but amount is 0, lowestPrice should be base price (50000)
+        UserDefaults.standard.set(true, forKey: "eventPriceAdjustmentActive")
+        UserDefaults.standard.set(0.0, forKey: "eventPriceAdjustmentAmount")
+        #expect(group.lowestPrice == 50000.0)
+        
+        // 3. Active event and amount is 15000, lowestPrice should be adjusted price (65000)
+        UserDefaults.standard.set(15000.0, forKey: "eventPriceAdjustmentAmount")
+        #expect(group.lowestPrice == 65000.0)
+        
+        // 4. Inactive event and amount is 15000, lowestPrice should return to base price (50000)
+        UserDefaults.standard.set(false, forKey: "eventPriceAdjustmentActive")
+        #expect(group.lowestPrice == 50000.0)
+        
+        // Cleanup
+        UserDefaults.standard.removeObject(forKey: "eventPriceAdjustmentActive")
+        UserDefaults.standard.removeObject(forKey: "eventPriceAdjustmentAmount")
+    }
 }

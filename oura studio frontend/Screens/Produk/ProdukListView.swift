@@ -4,6 +4,9 @@ import PhotosUI
 struct ProdukListView: View {
     @EnvironmentObject private var api: APIService
 
+    @AppStorage("eventPriceAdjustmentActive") private var isEventActive: Bool = false
+    @AppStorage("eventPriceAdjustmentAmount") private var eventAdjustmentAmount: Double = 0.0
+
     @State private var products: [Product] = []
     @State private var allSizes: [ProductSizeDetail] = []
     @State private var isLoading = true
@@ -454,6 +457,8 @@ struct ProdukListView: View {
 
 private struct ProductGroupRow: View {
     @EnvironmentObject private var api: APIService
+    @AppStorage("eventPriceAdjustmentActive") private var isEventActive: Bool = false
+    @AppStorage("eventPriceAdjustmentAmount") private var eventAdjustmentAmount: Double = 0.0
 
     let product: Product
     let sizes: [ProductSizeDetail]
@@ -482,7 +487,13 @@ private struct ProductGroupRow: View {
         }
         var isAnyHabis: Bool { displayVariants.contains { $0.currentStockQty == 0 } }
         var isAnyMenipis: Bool { displayVariants.contains { $0.isLowStock && $0.currentStockQty > 0 } }
-        var lowestPrice: Double? { displayVariants.compactMap { $0.sellingPrice }.min() }
+        var lowestPrice: Double? {
+            let basePrice = displayVariants.compactMap { $0.sellingPrice }.min()
+            guard let basePrice = basePrice else { return nil }
+            let isEventActive = UserDefaults.standard.bool(forKey: "eventPriceAdjustmentActive")
+            let eventAdjustmentAmount = UserDefaults.standard.double(forKey: "eventPriceAdjustmentAmount")
+            return basePrice + (isEventActive ? eventAdjustmentAmount : 0)
+        }
         // Flags a size that's completely unconfigured — no stock and no price set on any variant —
         // e.g. right after "Simpan Tanpa Resep" before the user has filled anything in.
         var needsSetup: Bool { totalStock == 0 && lowestPrice == nil }

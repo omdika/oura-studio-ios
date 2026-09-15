@@ -28,7 +28,24 @@ struct SettingItem: Codable, Identifiable {
     }
 }
 
+struct GenericSetting: Codable, Identifiable {
+    var id: String { key }
+    let key: String
+    let value: String
+    let updatedAt: Date?
+
+    enum CodingKeys: String, CodingKey {
+        case key, value
+        case updatedAt = "updated_at"
+    }
+}
+
 struct PatchSettingRequest: Codable {
     let key: String
     let value: Double
+}
+
+struct UpdateSettingRequest: Codable {
+    let key: String
+    let value: String
 }

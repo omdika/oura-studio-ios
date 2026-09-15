@@ -25,7 +25,7 @@ You must always execute this strict 3-step checklist BEFORE any implementation:
       Use `head` or read ONLY the first 30-50 lines of `doc/handoff.md` to locate the Revision History table.
       Add the new version row (e.g. `v3.22`) with status **`PLANNED`** directly at the top of the table in BOTH repos:
       * `doc/handoff.md` (Frontend repo)
-      * `../backend/doc/handoff.md` (Backend repo)
+      * `../../backend/doc/handoff.md` (Backend repo)
 
 - [ ] **Step 2: Create Version Specification File.**
       Create a dedicated lightweight markdown file `doc/versions/v3.xx.md` in BOTH repos.
