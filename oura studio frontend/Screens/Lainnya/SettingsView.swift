@@ -1,52 +1,6 @@
 import SwiftUI
 import CoreBluetooth
 
-// Known settings definitions — always shown even when DB is empty.
-// PATCH /settings is an upsert, so saving here works whether the row exists or not.
-private struct SettingDef {
-    let key: String
-    let displayName: String
-    let unit: String
-    let category: String
-    let hint: String
-    let defaultValue: Double
-}
-
-private let knownSettings: [SettingDef] = [
-    SettingDef(
-        key: "labor_rate_per_minute",
-        displayName: "Tarif Tenaga Kerja",
-        unit: "Rp/menit",
-        category: "Tenaga Kerja",
-        hint: "Dasar perhitungan HPP labor. Contoh: 100 = Rp 100/menit.",
-        defaultValue: 0
-    ),
-    SettingDef(
-        key: "default_overhead_per_unit",
-        displayName: "Overhead per Unit",
-        unit: "Rp/pcs",
-        category: "Overhead",
-        hint: "Biaya tidak langsung per unit produksi (listrik, sewa, dll).",
-        defaultValue: 0
-    ),
-    SettingDef(
-        key: "pooled_material_rate:thread",
-        displayName: "Benang per Unit",
-        unit: "Rp/pcs",
-        category: "Bahan Pooled",
-        hint: "Estimasi biaya benang per unit. Dibagi rata ke semua produk.",
-        defaultValue: 0
-    ),
-    SettingDef(
-        key: "pooled_material_rate:packaging",
-        displayName: "Packaging per Unit",
-        unit: "Rp/pcs",
-        category: "Bahan Pooled",
-        hint: "Estimasi biaya packaging per unit.",
-        defaultValue: 0
-    ),
-]
-
 struct SettingsView: View {
     @EnvironmentObject private var api: APIService
     @EnvironmentObject private var tsplPrinterService: TSPLPrinterService
@@ -101,12 +55,12 @@ struct SettingsView: View {
                 } header: {
                     OuraSectionHeader(title: "Pengaturan Umum")
                 }
-                .padding(.bottom, OuraTheme.Spacing.sectionGap) // Add some spacing between sections
+                .padding(.bottom, OuraTheme.Spacing.sectionGap)
 
                 // MARK: - Intercept Harga Event
                 Section {
                     NavigationLink {
-                        EventPriceAdjustmentView() // Will define this view next
+                        EventPriceAdjustmentView()
                     } label: {
                         HStack {
                             Text("Intercept / Ubah Harga Event")
@@ -124,7 +78,7 @@ struct SettingsView: View {
                 } header: {
                     OuraSectionHeader(title: "Pengaturan Harga")
                 }
-                .padding(.bottom, OuraTheme.Spacing.sectionGap) // Add some spacing between sections
+                .padding(.bottom, OuraTheme.Spacing.sectionGap)
 
                 // MARK: - Pengaturan Printer Thermal
                 Section {
@@ -134,7 +88,7 @@ struct SettingsView: View {
                             displayValue: labelWidth,
                             isSaving: false, isSaved: false, isDirty: false,
                             onChange: { labelWidth = $0 },
-                            onSave: { } // AppStorage saves automatically
+                            onSave: { }
                         )
                         Divider().padding(.leading, 16).overlay(OuraTheme.Colors.separator)
                         SettingRow(
@@ -142,7 +96,7 @@ struct SettingsView: View {
                             displayValue: labelHeight,
                             isSaving: false, isSaved: false, isDirty: false,
                             onChange: { labelHeight = $0 },
-                            onSave: { } // AppStorage saves automatically
+                            onSave: { }
                         )
                         Divider().padding(.leading, 16).overlay(OuraTheme.Colors.separator)
                         SettingRow(
@@ -150,18 +104,24 @@ struct SettingsView: View {
                             displayValue: labelGap,
                             isSaving: false, isSaved: false, isDirty: false,
                             onChange: { labelGap = $0 },
-                            onSave: { } // AppStorage saves automatically
+                            onSave: { }
                         )
                         Divider().padding(.leading, 16).overlay(OuraTheme.Colors.separator)
 
                         Button {
-                                isShowingPrinterSelection = true
+                            isShowingPrinterSelection = true
                         } label: {
                             HStack {
                                 Text("Pilih Printer Bluetooth")
                                 Spacer()
-                                Text(tsplPrinterService.connectedPeripheral?.name ?? (tsplPrinterService.centralManager.state == .poweredOn ? "Tidak Terhubung" : "Bluetooth Mati"))
-                                    .foregroundStyle(.gray)
+                                VStack(alignment: .trailing, spacing: 2) {
+                                    Text(tsplPrinterService.connectedPeripheral?.name ?? "Tidak Terhubung")
+                                        .font(.system(size: 13, weight: .semibold))
+                                        .foregroundStyle(tsplPrinterService.connectedPeripheral != nil ? OuraTheme.Colors.greenAccent : OuraTheme.Colors.textTertiary)
+                                    Text(bluetoothStatusText)
+                                        .font(.system(size: 11))
+                                        .foregroundStyle(.gray)
+                                }
                                 Image(systemName: "chevron.right")
                                     .font(.caption)
                                     .foregroundStyle(.gray)
@@ -187,6 +147,25 @@ struct SettingsView: View {
         .sheet(isPresented: $isShowingPrinterSelection) {
             PrinterSelectionView()
                 .environmentObject(tsplPrinterService)
+        }
+    }
+
+    private var bluetoothStatusText: String {
+        switch tsplPrinterService.bluetoothState {
+        case .poweredOn:
+            return tsplPrinterService.isScanning ? "Sedang mencari..." : "Siap"
+        case .poweredOff:
+            return "Mati"
+        case .resetting:
+            return "Mengatur ulang"
+        case .unauthorized:
+            return "Tidak diizinkan"
+        case .unsupported:
+            return "Tidak didukung"
+        case .unknown:
+            return "Menginisialisasi..."
+        @unknown default:
+            return "Status tidak diketahui"
         }
     }
 
@@ -255,8 +234,52 @@ struct SettingsView: View {
     }
 }
 
-// MARK: - Setting row
+// MARK: - Known Settings
+private struct SettingDef {
+    let key: String
+    let displayName: String
+    let unit: String
+    let category: String
+    let hint: String
+    let defaultValue: Double
+}
 
+private let knownSettings: [SettingDef] = [
+    SettingDef(
+        key: "labor_rate_per_minute",
+        displayName: "Tarif Tenaga Kerja",
+        unit: "Rp/menit",
+        category: "Tenaga Kerja",
+        hint: "Dasar perhitungan HPP labor. Contoh: 100 = Rp 100/menit.",
+        defaultValue: 0
+    ),
+    SettingDef(
+        key: "default_overhead_per_unit",
+        displayName: "Overhead per Unit",
+        unit: "Rp/pcs",
+        category: "Overhead",
+        hint: "Biaya tidak langsung per unit produksi (listrik, sewa, dll).",
+        defaultValue: 0
+    ),
+    SettingDef(
+        key: "pooled_material_rate:thread",
+        displayName: "Benang per Unit",
+        unit: "Rp/pcs",
+        category: "Bahan Pooled",
+        hint: "Estimasi biaya benang per unit. Dibagi rata ke semua produk.",
+        defaultValue: 0
+    ),
+    SettingDef(
+        key: "pooled_material_rate:packaging",
+        displayName: "Packaging per Unit",
+        unit: "Rp/pcs",
+        category: "Bahan Pooled",
+        hint: "Estimasi biaya packaging per unit.",
+        defaultValue: 0
+    ),
+]
+
+// MARK: - Setting Row
 private struct SettingRow: View {
     let def: SettingDef
     let displayValue: Double
