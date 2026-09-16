@@ -77,6 +77,35 @@ class TSPLPrinterService: NSObject, ObservableObject {
         print("Disconnected from peripheral.")
     }
 
+    func printReceipt(order: SalesOrder) {
+        guard let peripheral = connectedPeripheral, let characteristic = writableCharacteristic else {
+            print("Printer not connected or writable characteristic not found.")
+            connectionStatus = "Printer tidak terhubung"
+            attemptAutoConnect()
+            return
+        }
+
+        connectionStatus = "Mencetak..."
+
+        let tsplCommands = ReceiptGenerator.generateTSPL(order: order)
+        print("Generated TSPL Commands:\n\(tsplCommands)")
+
+        guard let data = tsplCommands.data(using: .ascii) else {
+            connectionStatus = "Gagal memproses data"
+            return
+        }
+
+        let chunkSize = peripheral.maximumWriteValueLength(for: .withoutResponse)
+        var offset = 0
+
+        while offset < data.count {
+            let chunk = data.subdata(in: offset..<min(offset + chunkSize, data.count))
+            peripheral.writeValue(chunk, for: characteristic, type: .withoutResponse)
+            offset += chunkSize
+        }
+        connectionStatus = "Struk dicetak"
+    }
+
     func printLabel(qrData: String, width: Double, height: Double, gap: Double, quantity: Int) {
         guard let peripheral = connectedPeripheral, let characteristic = writableCharacteristic else {
             print("Printer not connected or writable characteristic not found.")

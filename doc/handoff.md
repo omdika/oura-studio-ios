@@ -25,6 +25,7 @@ To keep context windows lean and token-efficient for developers and AI agents, t
 
 | Version | Date | Changed by | Summary |
 |---|---|---|---|
+| v3.59 | 2026-09-16 | Frontend | **IMPLEMENTED: Fitur Cetak Resi Penjualan (Thermal Bluetooth & PDF).** Menambahkan opsi cetak struk otomatis setelah simpan penjualan dan tombol cetak/simpan PDF di halaman detail penjualan, mendukung printer thermal Bluetooth (TSPL) dan kertas 57mm, dilengkapi QR code sosmed. Rincian spesifikasi: `doc/versions/v3.59.md`. |
 | v3.58 | 2026-09-15 | Fullstack | **SPECIFIED: Intercept Harga Event (Temporary Price Adjustment).** Menambahkan fungsionalitas untuk menyesuaikan harga jual produk secara sementara untuk event tertentu melalui pengaturan, yang akan mempengaruhi tampilan harga di daftar produk dan harga yang tersimpan saat pencatatan penjualan. Rincian spesifikasi: `doc/versions/v3.58.md`. |
 | v3.57 | 2026-09-14 | Fullstack | **PLANNED: Perbaikan JSON Decoding Error Saat Load Resep.** Memperbaiki kesalahan decoding `typeMismatch expected Array<Any> at []` dengan mengarahkan pemanggilan internal `/products` ke helper `getProducts()` yang menangani objek paginasi dengan benar. Rincian spesifikasi: `doc/versions/v3.57.md`. |
 | v3.56 | 2026-09-14 | Fullstack | **PLANNED: Perbaikan Performa Load Data Produk.** Mengimplementasikan pagination (lazy loading) di ProdukListView untuk endpoint produk dan ukuran, serta mengoptimasi performa backend dan ukuran payload data. Rincian spesifikasi: `doc/versions/v3.56.md`. |

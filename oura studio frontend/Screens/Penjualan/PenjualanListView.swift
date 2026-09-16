@@ -135,6 +135,7 @@ struct PenjualanListView: View {
         .sheet(item: $editingOrder, onDismiss: { Task { await load() } }) { order in
             EditPenjualanSheet(order: order)
                 .environmentObject(api)
+                .environmentObject(appState)
         }
         .confirmationDialog(
             "Hapus \(orderToDelete?.invoiceNo ?? "penjualan ini")?",
@@ -391,6 +392,7 @@ private struct SummaryTile: View {
 
 private struct EditPenjualanSheet: View {
     @EnvironmentObject private var api: APIService
+    @EnvironmentObject private var appState: AppState
     @Environment(\.dismiss) private var dismiss
 
     let order: SalesOrder
@@ -473,6 +475,38 @@ private struct EditPenjualanSheet: View {
                       }
                   }
 
+                Section {
+                    Button {
+                        appState.tsplPrinterService.printReceipt(order: order)
+                    } label: {
+                        HStack {
+                            Image(systemName: "printer.fill")
+                                .foregroundStyle(OuraTheme.Colors.accent)
+                            Text("Cetak Struk")
+                                .foregroundStyle(OuraTheme.Colors.accent)
+                            Spacer()
+                            Text(appState.tsplPrinterService.connectionStatus)
+                                .font(.system(size: 11))
+                                .foregroundStyle(OuraTheme.Colors.textTertiary)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .listRowBackground(OuraTheme.Colors.surfaceCard)
+
+                    Button {
+                        shareReceiptPDF()
+                    } label: {
+                        HStack {
+                            Image(systemName: "doc.plaintext.fill")
+                                .foregroundStyle(OuraTheme.Colors.accent)
+                            Text("Simpan sebagai PDF")
+                                .foregroundStyle(OuraTheme.Colors.accent)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .listRowBackground(OuraTheme.Colors.surfaceCard)
+                } header: { OuraSectionHeader(title: "Struk Penjualan") }
+
                 if !order.isPaid && !order.isCancelled {
                     Section {
                         Button {
@@ -536,5 +570,25 @@ private struct EditPenjualanSheet: View {
         isSaving = true; defer { isSaving = false }
         _ = try? await api.markSalesOrderPaid(id: order.id)
         dismiss()
+    }
+
+    private func shareReceiptPDF() {
+        let pdfData = ReceiptPDFGenerator.generatePDF(order: order)
+        let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("Struk_\(order.invoiceNo).pdf")
+        do {
+            try pdfData.write(to: tempURL)
+            let activityVC = UIActivityViewController(activityItems: [tempURL], applicationActivities: nil)
+            if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+               let rootVC = windowScene.windows.first?.rootViewController {
+                if let popoverController = activityVC.popoverPresentationController {
+                    popoverController.sourceView = rootVC.view
+                    popoverController.sourceRect = CGRect(x: rootVC.view.bounds.midX, y: rootVC.view.bounds.midY, width: 0, height: 0)
+                    popoverController.permittedArrowDirections = []
+                }
+                rootVC.present(activityVC, animated: true, completion: nil)
+            }
+        } catch {
+            errorMsg = "Gagal membuat file PDF: \(error.localizedDescription)"
+        }
     }
 }

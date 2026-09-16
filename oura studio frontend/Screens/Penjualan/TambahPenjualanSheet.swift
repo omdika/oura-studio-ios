@@ -7,6 +7,7 @@ struct TambahPenjualanSheet: View {
 
     @AppStorage("eventPriceAdjustmentActive") private var isEventActive: Bool = false
     @AppStorage("eventPriceAdjustmentAmount") private var eventAdjustmentAmount: Double = 0.0
+    @AppStorage("isAutoPrintEnabled") private var isAutoPrintEnabled: Bool = false
 
     var onSave: (() -> Void)? = nil
 
@@ -84,6 +85,19 @@ struct TambahPenjualanSheet: View {
                     }
                 }
                 .tint(OuraTheme.Colors.greenAccent)
+                .listRowBackground(OuraTheme.Colors.surfaceCard)
+
+                Toggle(isOn: $isAutoPrintEnabled) {
+                    HStack(spacing: 6) {
+                        Image(systemName: isAutoPrintEnabled ? "printer.fill" : "printer")
+                            .foregroundStyle(isAutoPrintEnabled ? OuraTheme.Colors.accent : OuraTheme.Colors.textTertiary)
+                            .font(.system(size: 15))
+                        Text("Cetak Struk Otomatis")
+                            .font(.system(size: 15))
+                            .foregroundStyle(OuraTheme.Colors.textPrimary)
+                    }
+                }
+                .tint(OuraTheme.Colors.accent)
                 .listRowBackground(OuraTheme.Colors.surfaceCard)
             } header: { OuraSectionHeader(title: "Info Penjualan") }
             .listSectionSeparator(.hidden)
@@ -439,7 +453,15 @@ struct TambahPenjualanSheet: View {
         )
         do {
             let order = try await api.createSalesOrder(req)
-            if isOrderPaid { _ = try? await api.markSalesOrderPaid(id: order.id) }
+            var finalOrder = order
+            if isOrderPaid {
+                if let paidOrder = try? await api.markSalesOrderPaid(id: order.id) {
+                    finalOrder = paidOrder
+                }
+            }
+            if isAutoPrintEnabled {
+                appState.tsplPrinterService.printReceipt(order: finalOrder)
+            }
             onSave?()
             appState.dashboardNeedsRefresh = true
             dismiss()
