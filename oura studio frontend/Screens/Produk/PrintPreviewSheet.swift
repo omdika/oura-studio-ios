@@ -167,6 +167,12 @@ struct PrintPreviewSheet: View {
 
         tsplPrinterService.printLabel(
             qrData: "oura:\(size.id.uuidString)",
+            caption: TSPLPrinterService.labelCaption(
+                productSku: size.productSku,
+                productName: size.productName,
+                sizeLabel: size.sizeLabel,
+                fabricVariantName: size.fabricVariantName
+            ),
             width: labelWidth,
             height: labelHeight,
             gap: labelGap,
@@ -180,6 +186,19 @@ struct PrintPreviewSheet: View {
 struct ThermalLabelPreviewCard: View {
     let size: ProductSizeDetail
     let qrImage: UIImage?
+
+    /// Font caption mengecil otomatis mengikuti panjang caption (mirip fallback font TSPL).
+    private var captionFontSize: CGFloat {
+        let len = TSPLPrinterService.labelCaption(
+            productSku: size.productSku,
+            productName: size.productName,
+            sizeLabel: size.sizeLabel,
+            fabricVariantName: size.fabricVariantName
+        ).count
+        if len > 40 { return 8.5 }
+        if len > 28 { return 9.5 }
+        return 11
+    }
 
     var body: some View {
         HStack(spacing: 12) {
@@ -197,26 +216,19 @@ struct ThermalLabelPreviewCard: View {
                     .overlay(Image(systemName: "qrcode").foregroundColor(.gray))
             }
 
-            // Right: Product Meta Data
+            // Right: Caption gaya A4 persis seperti hasil cetak thermal
+            // ("SKU - Nama - Size - Varian"), font mengecil otomatis bila panjang.
             VStack(alignment: .leading, spacing: 2) {
-                Text(size.productSku)
-                    .font(.system(size: 11, weight: .bold))
+                Text(TSPLPrinterService.labelCaption(
+                    productSku: size.productSku,
+                    productName: size.productName,
+                    sizeLabel: size.sizeLabel,
+                    fabricVariantName: size.fabricVariantName
+                ))
+                    .font(.system(size: captionFontSize, weight: .medium))
                     .foregroundStyle(OuraTheme.Colors.textPrimary)
-                    .lineLimit(1)
-                Text(size.productName)
-                    .font(.system(size: 10))
-                    .foregroundStyle(OuraTheme.Colors.textSecondary)
-                    .lineLimit(1)
-                if let fabric = size.fabricVariantName {
-                    Text(fabric)
-                        .font(.system(size: 9))
-                        .foregroundStyle(OuraTheme.Colors.textTertiary)
-                        .lineLimit(1)
-                }
-                Text("Size \(size.sizeLabel)")
-                    .font(.system(size: 9, weight: .semibold))
-                    .foregroundStyle(OuraTheme.Colors.accent)
-                    .lineLimit(1)
+                    .lineLimit(3)
+                    .minimumScaleFactor(0.8)
             }
             Spacer()
         }

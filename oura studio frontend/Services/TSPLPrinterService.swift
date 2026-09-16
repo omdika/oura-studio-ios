@@ -154,7 +154,123 @@ class TSPLPrinterService: NSObject, ObservableObject {
         connectionStatus = "Struk dicetak"
     }
 
-    func printLabel(qrData: String, width: Double, height: Double, gap: Double, quantity: Int) {
+    /// Caption gaya A4 persis seperti `QRGeneratorView.generatePDF`:
+    /// `"SKU - Nama - Size - Varian"` (tanpa varian bila nil).
+    static func labelCaption(productSku: String, productName: String, sizeLabel: String, fabricVariantName: String?) -> String {
+        if let fabric = fabricVariantName, !fabric.isEmpty {
+            return "\(productSku) - \(productName) - \(sizeLabel) - \(fabric)"
+        }
+        return "\(productSku) - \(productName) - \(sizeLabel)"
+    }
+
+    /// Bersihkan teks agar aman untuk perintah TSPL TEXT (ASCII, tanpa kutip/baris baru).
+    nonisolated static func sanitizeForTSPL(_ text: String) -> String {
+        var out = text.replacingOccurrences(of: "\"", with: "'")
+            .replacingOccurrences(of: "\n", with: " ")
+            .replacingOccurrences(of: "\r", with: " ")
+            .replacingOccurrences(of: "·", with: "-")
+            .replacingOccurrences(of: "–", with: "-")
+            .replacingOccurrences(of: "—", with: "-")
+        // Collapse spasi ganda dari hasil replace di atas
+        while out.contains("  ") { out = out.replacingOccurrences(of: "  ", with: " ") }
+        // Buang karakter non-ASCII agar data(using: .ascii) tidak gagal
+        out = String(out.unicodeScalars.filter { $0.isASCII }.map { Character($0) })
+        return out.trimmingCharacters(in: .whitespaces)
+    }
+
+    /// Bungkus caption ke beberapa baris TEXT dengan font dinamis:
+    /// coba font "2" dulu, turun ke font "1" bila caption panjang, truncate bila masih berlebih.
+    /// Mengembalikan baris-baris perintah `TEXT x,y,"font",0,1,1,"..."`.
+    nonisolated static func captionTextCommands(caption: String, textX: Int, labelHeightDots: Int, maxWidthDots: Int) -> String {
+        let clean = sanitizeForTSPL(caption)
+        guard !clean.isEmpty else { return "" }
+
+        // Lebar karakter mono per font built-in TSPL (dots): font "2" = 12x20, font "1" = 8x12.
+        // Tinggi baris diberi jarak baca: font "2" = 22, font "1" = 14.
+        struct Choice { let font: String; let charW: Int; let lineStep: Int; let maxLines: Int }
+        let choices = [
+            Choice(font: "2", charW: 12, lineStep: 22, maxLines: 4),
+            Choice(font: "1", charW: 8, lineStep: 14, maxLines: 5),
+        ]
+
+        var pickedFont = "2"
+        var pickedStep = 22
+        var pickedLines: [String] = []
+
+        for c in choices {
+            let maxChars = max(4, maxWidthDots / c.charW)
+            var lines = wordWrap(clean, maxChars: maxChars)
+            if lines.count > c.maxLines {
+                // Truncate: potong ke maxLines, baris terakhir diakhiri "..."
+                lines = Array(lines.prefix(c.maxLines))
+                if var last = lines.last {
+                    if last.count > maxChars - 3 {
+                        last = String(last.prefix(max(0, maxChars - 3))) + "..."
+                    } else {
+                        last += "..."
+                    }
+                    lines[lines.count - 1] = last
+                }
+            }
+            // Font "2" dipakai bila caption muat apa adanya; font "1" sebagai fallback.
+            if c.font == "2", wordWrap(clean, maxChars: maxChars).count <= c.maxLines {
+                pickedFont = c.font; pickedStep = c.lineStep; pickedLines = wordWrap(clean, maxChars: maxChars)
+                break
+            } else if c.font == "1" {
+                pickedFont = c.font; pickedStep = c.lineStep; pickedLines = lines
+            }
+        }
+
+        // Blok teks di-center vertikal dalam label agar selalu rapi
+        let blockH = pickedLines.count * pickedStep
+        let topY = max(4, (labelHeightDots - blockH) / 2)
+
+        var out = ""
+        for (i, line) in pickedLines.enumerated() {
+            let y = topY + i * pickedStep
+            out += "TEXT \(textX),\(y),\"\(pickedFont)\",0,1,1,\"\(line)\"\r\n"
+        }
+        return out
+    }
+
+    /// Greedy word-wrap sederhana berdasarkan spasi.
+    nonisolated static func wordWrap(_ text: String, maxChars: Int) -> [String] {
+        var lines: [String] = []
+        var current = ""
+        for word in text.split(separator: " ") {
+            let w = String(word)
+            if current.isEmpty {
+                // Kata tunggal yang lebih panjang dari batas: potong keras
+                if w.count > maxChars {
+                    var rest = w
+                    while !rest.isEmpty {
+                        lines.append(String(rest.prefix(maxChars)))
+                        rest = String(rest.dropFirst(maxChars))
+                    }
+                } else {
+                    current = w
+                }
+            } else if current.count + 1 + w.count <= maxChars {
+                current += " " + w
+            } else {
+                lines.append(current)
+                if w.count > maxChars {
+                    var rest = w
+                    while !rest.isEmpty {
+                        lines.append(String(rest.prefix(maxChars)))
+                        rest = String(rest.dropFirst(maxChars))
+                    }
+                    current = ""
+                } else {
+                    current = w
+                }
+            }
+        }
+        if !current.isEmpty { lines.append(current) }
+        return lines.isEmpty ? [text] : lines
+    }
+
+    func printLabel(qrData: String, caption: String? = nil, width: Double, height: Double, gap: Double, quantity: Int) {
         guard let peripheral = connectedPeripheral, let characteristic = writableCharacteristic else {
             print("Printer not connected or writable characteristic not found.")
             connectionStatus = "Print Error: Not connected or no writable characteristic"
@@ -173,13 +289,34 @@ class TSPLPrinterService: NSObject, ObservableObject {
         tsplCommands += "REFERENCE 0,0\r\n" // Origin point (configurable if needed)
         tsplCommands += "SET TEAR ON\r\n" // Enable tear-off mode
 
-        // QR Code command - positions need to be calculated based on label size
-        // For 33x15mm, a reasonable cell_width might be 2 or 3.
-        // Assuming QR code should be roughly centered
-        let qrX = Int(width * 8 / 2) - 20 // Example: center horizontally, adjust as needed
-        let qrY = Int(height * 8 / 2) - 20 // Example: center vertically, adjust as needed
-        let cellWidth = 3 // Adjust for desired QR code size
-        tsplCommands += "QRCODE \(qrX),\(qrY),L,\(cellWidth),A,0,M,20,\"\(qrData)\"\r\n"
+        // QR Code — ukuran TIDAK diubah (cellWidth tetap 3 seperti sebelumnya).
+        // Bila ada caption: QR di kiri + teks di kanan. Bila tidak ada: posisi tengah (legacy).
+        let cellWidth = 3 // Jangan diubah — ukuran QR yang sudah pas di 33x15mm
+        let dotsPerMM = 8 // 203 dpi
+        let labelHeightDots = Int(height * Double(dotsPerMM))
+        let labelWidthDots = Int(width * Double(dotsPerMM))
+        // Estimasi lebar QR: data "oura:<UUID>" (41 char, ECC L) ≈ 29 modul × 3 dots ≈ 87 dots
+        let estimatedQRDots = 29 * cellWidth
+
+        if let caption = caption, !caption.trimmingCharacters(in: .whitespaces).isEmpty {
+            let qrX = 8 // margin kiri 1mm
+            let qrY = max(4, (labelHeightDots - estimatedQRDots) / 2) // center vertikal
+            tsplCommands += "QRCODE \(qrX),\(qrY),L,\(cellWidth),A,0,M,20,\"\(qrData)\"\r\n"
+
+            let textX = qrX + estimatedQRDots + 8 // 1mm spasi antara QR dan teks
+            let maxTextW = max(40, labelWidthDots - textX - 8) // margin kanan 1mm
+            tsplCommands += Self.captionTextCommands(
+                caption: caption,
+                textX: textX,
+                labelHeightDots: labelHeightDots,
+                maxWidthDots: maxTextW
+            )
+        } else {
+            // Legacy: QR di tengah (perilaku lama bila tanpa caption)
+            let qrX = Int(width * 8 / 2) - 20
+            let qrY = Int(height * 8 / 2) - 20
+            tsplCommands += "QRCODE \(qrX),\(qrY),L,\(cellWidth),A,0,M,20,\"\(qrData)\"\r\n"
+        }
 
         // Print command
         tsplCommands += "PRINT \(quantity),1\r\n"
@@ -187,7 +324,10 @@ class TSPLPrinterService: NSObject, ObservableObject {
         print("Generated TSPL Commands:\n\(tsplCommands)")
 
         // Send commands in chunks if necessary
-        let data = tsplCommands.data(using: .ascii)!
+        guard let data = tsplCommands.data(using: .ascii, allowLossyConversion: true) else {
+            connectionStatus = "Gagal memproses data label"
+            return
+        }
         let writeType: CBCharacteristicWriteType = characteristic.properties.contains(.writeWithoutResponse) ? .withoutResponse : .withResponse
         let chunkSize = peripheral.maximumWriteValueLength(for: writeType)
         print("Writing label with type \(writeType == .withoutResponse ? "withoutResponse" : "withResponse"), chunk size: \(chunkSize)")
