@@ -3,20 +3,40 @@ import Foundation
 import CoreBluetooth
 import Combine
 
+// Standard TSPL Printer Service UUIDs (common across most BLE thermal printers)
+let TSPL_SERVICE_UUIDS: [CBUUID] = [
+    CBUUID(string: "FFE0"),        // Generic UART service (many printers use this)
+    CBUUID(string: "0000180A-0000-1000-8000-00805F9B34FB"), // Device Information Service
+]
+
+let TSPL_CHARACTERISTIC_UUIDS: [CBUUID] = [
+    CBUUID(string: "FFE1"),        // Generic UART RX/TX (most common)
+    CBUUID(string: "2A29"),        // Manufacturer Name String
+]
+
 class TSPLPrinterService: NSObject, ObservableObject {
     @Published var centralManager: CBCentralManager!
     @Published var discoveredPeripherals: [CBPeripheral] = []
     @Published var connectedPeripheral: CBPeripheral?
     var writableCharacteristic: CBCharacteristic?
     @Published var connectionStatus: String = "Disconnected"
+    @Published var isScanning: Bool = false
 
     private var autoConnectUUIDString: String? {
         UserDefaults.standard.string(forKey: "printerUUIDString")
     }
+    
+    // Scanning timeout timer
+    private var scanningTimeoutTimer: Timer?
+    private let SCAN_TIMEOUT_INTERVAL: TimeInterval = 15.0 // 15 seconds
 
     override init() {
         super.init()
         centralManager = CBCentralManager(delegate: self, queue: nil)
+    }
+    
+    deinit {
+        stopScanningForPeripherals()
     }
 
     func attemptAutoConnect() {
@@ -36,23 +56,41 @@ class TSPLPrinterService: NSObject, ObservableObject {
             connect(to: peripheral)
         } else {
             print("Saved peripheral not found in retrieved list. Scanning for nearby peripherals...")
-            centralManager.scanForPeripherals(withServices: nil, options: nil)
+            startScanningForPeripherals()
         }
     }
 
     func startScanningForPeripherals() {
         guard centralManager.state == .poweredOn else {
             print("Bluetooth is not powered on.")
+            connectionStatus = "Bluetooth Off"
             return
         }
+        
+        // Stop any existing scan
+        centralManager.stopScan()
+        
         discoveredPeripherals.removeAll()
-        centralManager.scanForPeripherals(withServices: nil, options: nil)
+        isScanning = true
         connectionStatus = "Scanning..."
-        print("Started scanning for peripherals...")
+        print("Started scanning for BLE peripherals with TSPL services...")
+        
+        // Scan with specific TSPL service UUIDs for better results
+        centralManager.scanForPeripherals(withServices: TSPL_SERVICE_UUIDS, options: nil)
+        
+        // Set a timeout to stop scanning after 15 seconds
+        scanningTimeoutTimer = Timer.scheduledTimer(withTimeInterval: SCAN_TIMEOUT_INTERVAL, repeats: false) { [weak self] _ in
+            self?.stopScanningForPeripherals()
+            print("Scanning timeout reached - stopping scan")
+        }
     }
 
     func stopScanningForPeripherals() {
         centralManager.stopScan()
+        isScanning = false
+        scanningTimeoutTimer?.invalidate()
+        scanningTimeoutTimer = nil
+        
         if connectedPeripheral == nil {
             connectionStatus = "Disconnected"
         }
@@ -61,6 +99,10 @@ class TSPLPrinterService: NSObject, ObservableObject {
 
     func connect(to peripheral: CBPeripheral) {
         centralManager.stopScan()
+        isScanning = false
+        scanningTimeoutTimer?.invalidate()
+        scanningTimeoutTimer = nil
+        
         connectedPeripheral = peripheral
         centralManager.connect(peripheral, options: nil)
         connectionStatus = "Connecting to \(peripheral.name ?? "Unknown Device")..."
@@ -118,12 +160,12 @@ class TSPLPrinterService: NSObject, ObservableObject {
         var tsplCommands = ""
 
         // Setup commands
-        tsplCommands += "SIZE \(width) mm,\\(height) mm\\r\\n"
-        tsplCommands += "GAP \(gap) mm,0 mm\\r\\n"
-        tsplCommands += "CLS\\r\\n" // Clear buffer
-        tsplCommands += "DIRECTION 1\\r\\n" // Print direction (configurable if needed)
-        tsplCommands += "REFERENCE 0,0\\r\\n" // Origin point (configurable if needed)
-        tsplCommands += "SET TEAR ON\\r\\n" // Enable tear-off mode
+        tsplCommands += "SIZE \(width) mm,\(height) mm\r\n"
+        tsplCommands += "GAP \(gap) mm,0 mm\r\n"
+        tsplCommands += "CLS\r\n" // Clear buffer
+        tsplCommands += "DIRECTION 1\r\n" // Print direction (configurable if needed)
+        tsplCommands += "REFERENCE 0,0\r\n" // Origin point (configurable if needed)
+        tsplCommands += "SET TEAR ON\r\n" // Enable tear-off mode
 
         // QR Code command - positions need to be calculated based on label size
         // For 33x15mm, a reasonable cell_width might be 2 or 3.
@@ -131,16 +173,16 @@ class TSPLPrinterService: NSObject, ObservableObject {
         let qrX = Int(width * 8 / 2) - 20 // Example: center horizontally, adjust as needed
         let qrY = Int(height * 8 / 2) - 20 // Example: center vertically, adjust as needed
         let cellWidth = 3 // Adjust for desired QR code size
-        tsplCommands += "QRCODE \\(qrX),\\(qrY),L,\\(cellWidth),A,0,M,20,\"\\(qrData)\"\\r\\n"
+        tsplCommands += "QRCODE \(qrX),\(qrY),L,\(cellWidth),A,0,M,20,\"\(qrData)\"\r\n"
 
         // Print command
-        tsplCommands += "PRINT \\(quantity),1\\r\\n"
+        tsplCommands += "PRINT \(quantity),1\r\n"
 
-        print("Generated TSPL Commands:\\n\\(tsplCommands)")
+        print("Generated TSPL Commands:\n\(tsplCommands)")
 
         // Send commands in chunks if necessary
         let data = tsplCommands.data(using: .ascii)!
-        let chunkSize = peripheral.maximumWriteValueLength(for: .withoutResponse) // Use .withResponse if needed, but .withoutResponse is common for printers
+        let chunkSize = peripheral.maximumWriteValueLength(for: .withoutResponse)
         var offset = 0
 
         while offset < data.count {
@@ -169,6 +211,7 @@ extension TSPLPrinterService: CBCentralManagerDelegate {
             discoveredPeripherals.removeAll()
             connectedPeripheral = nil
             writableCharacteristic = nil
+            stopScanningForPeripherals()
         case .resetting:
             print("Bluetooth is resetting.")
             connectionStatus = "Resetting"
@@ -188,9 +231,13 @@ extension TSPLPrinterService: CBCentralManagerDelegate {
     }
 
     func centralManager(_ central: CBCentralManager, didDiscover peripheral: CBPeripheral, advertisementData: [String : Any], rssi RSSI: NSNumber) {
+        // Filter out duplicates and devices without names
         if !discoveredPeripherals.contains(where: { $0.identifier == peripheral.identifier }) {
-            discoveredPeripherals.append(peripheral)
-            print("Discovered peripheral: \(peripheral.name ?? "Unknown"), RSSI: \(RSSI)")
+            // Prioritize devices with local names
+            if peripheral.name != nil && !peripheral.name!.isEmpty {
+                discoveredPeripherals.append(peripheral)
+                print("Discovered peripheral: \(peripheral.name ?? "Unknown"), RSSI: \(RSSI)")
+            }
         }
 
         // Auto-connect if we found our saved printer
@@ -205,7 +252,7 @@ extension TSPLPrinterService: CBCentralManagerDelegate {
         print("Connected to \(peripheral.name ?? "Unknown Device").")
         connectionStatus = "Connected to \(peripheral.name ?? "Unknown Device")"
         peripheral.delegate = self
-        peripheral.discoverServices(nil) // Discover all services
+        peripheral.discoverServices(TSPL_SERVICE_UUIDS) // Discover TSPL services specifically
     }
 
     func centralManager(_ central: CBCentralManager, didFailToConnect peripheral: CBPeripheral, error: Error?) {
@@ -239,7 +286,7 @@ extension TSPLPrinterService: CBPeripheralDelegate {
         guard let services = peripheral.services else { return }
         for service in services {
             print("Discovered service: \(service.uuid)")
-            peripheral.discoverCharacteristics(nil, for: service)
+            peripheral.discoverCharacteristics(TSPL_CHARACTERISTIC_UUIDS, for: service)
         }
     }
 
@@ -251,12 +298,18 @@ extension TSPLPrinterService: CBPeripheralDelegate {
         guard let characteristics = service.characteristics else { return }
         for characteristic in characteristics {
             print("Discovered characteristic for service \(service.uuid): \(characteristic.uuid), properties: \(characteristic.properties)")
+            
+            // Look for write or writeWithoutResponse capability
             if characteristic.properties.contains(.write) || characteristic.properties.contains(.writeWithoutResponse) {
                 writableCharacteristic = characteristic
                 print("Identified writable characteristic: \(characteristic.uuid)")
-                // Break after finding the first writable characteristic, or refine logic if multiple are possible
-                // For simplicity, we assume one primary write characteristic for printing
-                break
+                // Don't break - continue to see all characteristics
+            }
+            
+            // Also enable notifications if supported for feedback
+            if characteristic.properties.contains(.notify) || characteristic.properties.contains(.indicate) {
+                peripheral.setNotifyValue(true, for: characteristic)
+                print("Enabled notifications for characteristic: \(characteristic.uuid)")
             }
         }
     }
@@ -267,6 +320,9 @@ extension TSPLPrinterService: CBPeripheralDelegate {
             return
         }
         // Handle incoming data if this is a notify/read characteristic
+        if let data = characteristic.value {
+            print("Received data from printer: \(data.map { String(format: "%02x", $0) }.joined())")
+        }
     }
 
     func peripheral(_ peripheral: CBPeripheral, didWriteValueFor characteristic: CBCharacteristic, error: Error?) {
