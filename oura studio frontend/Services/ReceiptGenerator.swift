@@ -14,35 +14,16 @@ extension Double {
 
 class ReceiptGenerator {
     static func generateTSPL(order: SalesOrder) -> String {
-        var tspl = ""
+        var body = ""
         
-        // Setup printer: printable width 48mm, dynamic height
-        // Height calculation:
-        // Header: ~3 lines
-        // Details: ~4 lines
-        // Item Header: ~2 lines
-        // Items: ~order.items.count * 2 lines
-        // Totals: ~5 lines
-        // Footer: ~3 lines
-        // Social Media & QR: ~12 lines
-        // Total lines is around 30 + items.count * 2
-        let totalLines = 30 + (order.items.count * 2)
-        let heightMm = max(100, Int(Double(totalLines) * 3.5)) // 24 dots = 3mm plus safety
-        
-        tspl += "SIZE 48 mm,\(heightMm) mm\r\n"
-        tspl += "GAP 0 mm,0 mm\r\n" // continuous paper, no gap
-        tspl += "CLS\r\n"
-        tspl += "DIRECTION 1\r\n"
-        tspl += "REFERENCE 0,0\r\n"
-        
-        var y = 10
+        var y = 5
         let charLimit = 32
         
         func addCenteredText(_ text: String) {
             let trimmed = text.prefix(charLimit)
             let spaces = max(0, (charLimit - trimmed.count) / 2)
             let padded = String(repeating: " ", count: spaces) + trimmed
-            tspl += "TEXT 0,\(y),\"2\",0,1,1,\"\(padded)\"\r\n"
+            body += "TEXT 0,\(y),\"2\",0,1,1,\"\(padded)\"\r\n"
             y += 24
         }
         
@@ -51,17 +32,17 @@ class ReceiptGenerator {
             let leftTrunc = left.prefix(leftMax)
             let spaces = max(1, charLimit - leftTrunc.count - right.count)
             let line = leftTrunc + String(repeating: " ", count: spaces) + right
-            tspl += "TEXT 0,\(y),\"2\",0,1,1,\"\(line)\"\r\n"
+            body += "TEXT 0,\(y),\"2\",0,1,1,\"\(line)\"\r\n"
             y += 24
         }
         
         func addSeparator() {
-            tspl += "TEXT 0,\(y),\"2\",0,1,1,\"" + String(repeating: "-", count: charLimit) + "\"\r\n"
+            body += "TEXT 0,\(y),\"2\",0,1,1,\"" + String(repeating: "-", count: charLimit) + "\"\r\n"
             y += 24
         }
         
         func addLeftText(_ text: String) {
-            tspl += "TEXT 0,\(y),\"2\",0,1,1,\"\(text.prefix(charLimit))\"\r\n"
+            body += "TEXT 0,\(y),\"2\",0,1,1,\"\(text.prefix(charLimit))\"\r\n"
             y += 24
         }
         
@@ -125,19 +106,34 @@ class ReceiptGenerator {
         
         // Social Media QR Codes
         addCenteredText("[ Instagram ]")
-        tspl += "QRCODE 120,\(y),L,4,A,0,M,2,\"https://www.instagram.com/ourastudio20\"\r\n"
+        body += "QRCODE 120,\(y),L,4,A,0,M,2,\"https://www.instagram.com/ourastudio20\"\r\n"
         y += 120
         addCenteredText("ourastudio20")
         addSeparator()
         
         addCenteredText("[ TikTok ]")
-        tspl += "QRCODE 120,\(y),L,4,A,0,M,2,\"https://www.tiktok.com/@ourastudio20\"\r\n"
+        body += "QRCODE 120,\(y),L,4,A,0,M,2,\"https://www.tiktok.com/@ourastudio20\"\r\n"
         y += 120
         addCenteredText("@ourastudio20")
         addSeparator()
         
+        // Dynamically calculate height in mm based on y (content height)
+        // 8 dots = 1 mm. Let's add 10 mm safety margin so it feeds past the cutter.
+        let heightMm = Int(ceil(Double(y) / 8.0)) + 10
+        
+        var tspl = ""
+        tspl += "SIZE 48 mm,\(heightMm) mm\r\n"
+        tspl += "GAP 0 mm,0 mm\r\n" // continuous paper, no gap
+        tspl += "CLS\r\n"
+        tspl += "DIRECTION 1\r\n"
+        tspl += "REFERENCE 0,0\r\n"
+        
+        tspl += body
+        
+        // Print command
+        tspl += "PRINT 1,1\r\n"
+        
         // Cut paper
-        tspl += "FEED 24\r\n"
         tspl += "CUT\r\n"
         
         return tspl
