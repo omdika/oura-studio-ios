@@ -18,8 +18,9 @@ class TSPLPrinterService: NSObject, ObservableObject {
     @Published var centralManager: CBCentralManager!
     @Published var discoveredPeripherals: [CBPeripheral] = []
     @Published var connectedPeripheral: CBPeripheral?
+    @Published var bluetoothState: CBManagerState = .unknown
     var writableCharacteristic: CBCharacteristic?
-    @Published var connectionStatus: String = "Disconnected"
+    @Published var connectionStatus: String = "Initializing..."
     @Published var isScanning: Bool = false
 
     private var autoConnectUUIDString: String? {
@@ -32,7 +33,7 @@ class TSPLPrinterService: NSObject, ObservableObject {
 
     override init() {
         super.init()
-        centralManager = CBCentralManager(delegate: self, queue: nil)
+        centralManager = CBCentralManager(delegate: self, queue: .main)
     }
     
     deinit {
@@ -40,7 +41,10 @@ class TSPLPrinterService: NSObject, ObservableObject {
     }
 
     func attemptAutoConnect() {
-        guard centralManager.state == .poweredOn else { return }
+        guard bluetoothState == .poweredOn else { 
+            print("Bluetooth not ready for auto-connect. State: \(bluetoothState)")
+            return 
+        }
         guard let uuidString = autoConnectUUIDString, !uuidString.isEmpty,
               let uuid = UUID(uuidString: uuidString) else {
             print("No saved printer UUID for auto-connect.")
@@ -61,9 +65,9 @@ class TSPLPrinterService: NSObject, ObservableObject {
     }
 
     func startScanningForPeripherals() {
-        guard centralManager.state == .poweredOn else {
-            print("Bluetooth is not powered on.")
-            connectionStatus = "Bluetooth Off"
+        guard bluetoothState == .poweredOn else {
+            print("Bluetooth is not powered on. State: \(bluetoothState)")
+            connectionStatus = "Bluetooth not ready"
             return
         }
         
@@ -200,43 +204,64 @@ class TSPLPrinterService: NSObject, ObservableObject {
 // MARK: - CBCentralManagerDelegate
 extension TSPLPrinterService: CBCentralManagerDelegate {
     func centralManagerDidUpdateState(_ central: CBCentralManager) {
+        // Update bluetoothState to trigger UI refresh
+        DispatchQueue.main.async {
+            self.bluetoothState = central.state
+        }
+        
         switch central.state {
         case .poweredOn:
             print("Bluetooth is powered on.")
-            connectionStatus = "Ready to scan"
+            DispatchQueue.main.async {
+                self.connectionStatus = "Ready to scan"
+            }
             attemptAutoConnect()
         case .poweredOff:
             print("Bluetooth is powered off.")
-            connectionStatus = "Bluetooth Off"
-            discoveredPeripherals.removeAll()
-            connectedPeripheral = nil
-            writableCharacteristic = nil
+            DispatchQueue.main.async {
+                self.connectionStatus = "Bluetooth Off"
+                self.discoveredPeripherals.removeAll()
+                self.connectedPeripheral = nil
+                self.writableCharacteristic = nil
+            }
             stopScanningForPeripherals()
         case .resetting:
             print("Bluetooth is resetting.")
-            connectionStatus = "Resetting"
+            DispatchQueue.main.async {
+                self.connectionStatus = "Resetting"
+            }
         case .unauthorized:
             print("Bluetooth is unauthorized.")
-            connectionStatus = "Unauthorized"
+            DispatchQueue.main.async {
+                self.connectionStatus = "Unauthorized"
+            }
         case .unknown:
             print("Bluetooth state is unknown.")
-            connectionStatus = "Unknown State"
+            DispatchQueue.main.async {
+                self.connectionStatus = "Initializing..."
+            }
         case .unsupported:
             print("Bluetooth is unsupported on this device.")
-            connectionStatus = "Unsupported"
+            DispatchQueue.main.async {
+                self.connectionStatus = "Unsupported"
+            }
         @unknown default:
             print("A new Bluetooth state was added that is not yet handled.")
-            connectionStatus = "Unknown New State"
+            DispatchQueue.main.async {
+                self.connectionStatus = "Unknown New State"
+            }
         }
     }
 
     func centralManager(_ central: CBCentralManager, didDiscover peripheral: CBPeripheral, advertisementData: [String : Any], rssi RSSI: NSNumber) {
         // Filter out duplicates and devices without names
-        if !discoveredPeripherals.contains(where: { $0.identifier == peripheral.identifier }) {
-            // Prioritize devices with local names
-            if peripheral.name != nil && !peripheral.name!.isEmpty {
-                discoveredPeripherals.append(peripheral)
-                print("Discovered peripheral: \(peripheral.name ?? "Unknown"), RSSI: \(RSSI)")
+        DispatchQueue.main.async {
+            if !self.discoveredPeripherals.contains(where: { $0.identifier == peripheral.identifier }) {
+                // Prioritize devices with local names
+                if peripheral.name != nil && !peripheral.name!.isEmpty {
+                    self.discoveredPeripherals.append(peripheral)
+                    print("Discovered peripheral: \(peripheral.name ?? "Unknown"), RSSI: \(RSSI)")
+                }
             }
         }
 
@@ -250,23 +275,29 @@ extension TSPLPrinterService: CBCentralManagerDelegate {
 
     func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
         print("Connected to \(peripheral.name ?? "Unknown Device").")
-        connectionStatus = "Connected to \(peripheral.name ?? "Unknown Device")"
+        DispatchQueue.main.async {
+            self.connectionStatus = "Connected to \(peripheral.name ?? "Unknown Device")"
+        }
         peripheral.delegate = self
         peripheral.discoverServices(TSPL_SERVICE_UUIDS) // Discover TSPL services specifically
     }
 
     func centralManager(_ central: CBCentralManager, didFailToConnect peripheral: CBPeripheral, error: Error?) {
         print("Failed to connect to \(peripheral.name ?? "Unknown Device"). Error: \(error?.localizedDescription ?? "Unknown error")")
-        connectionStatus = "Failed to connect"
-        connectedPeripheral = nil
-        writableCharacteristic = nil
+        DispatchQueue.main.async {
+            self.connectionStatus = "Failed to connect"
+            self.connectedPeripheral = nil
+            self.writableCharacteristic = nil
+        }
     }
 
     func centralManager(_ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral, error: Error?) {
         print("Disconnected from \(peripheral.name ?? "Unknown Device"). Error: \(error?.localizedDescription ?? "No error")")
-        connectionStatus = "Disconnected"
-        connectedPeripheral = nil
-        writableCharacteristic = nil
+        DispatchQueue.main.async {
+            self.connectionStatus = "Disconnected"
+            self.connectedPeripheral = nil
+            self.writableCharacteristic = nil
+        }
         
         // If it was an unexpected disconnection, we can attempt to auto-reconnect
         if error != nil {
@@ -301,7 +332,9 @@ extension TSPLPrinterService: CBPeripheralDelegate {
             
             // Look for write or writeWithoutResponse capability
             if characteristic.properties.contains(.write) || characteristic.properties.contains(.writeWithoutResponse) {
-                writableCharacteristic = characteristic
+                DispatchQueue.main.async {
+                    self.writableCharacteristic = characteristic
+                }
                 print("Identified writable characteristic: \(characteristic.uuid)")
                 // Don't break - continue to see all characteristics
             }
