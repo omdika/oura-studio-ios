@@ -178,46 +178,54 @@ class TSPLPrinterService: NSObject, ObservableObject {
         return out.trimmingCharacters(in: .whitespaces)
     }
 
-    /// Bungkus caption ke beberapa baris TEXT dengan font dinamis:
-    /// coba font "2" dulu, turun ke font "1" bila caption panjang, truncate bila masih berlebih.
+    /// Bungkus caption ke beberapa baris TEXT dengan font dinamis multi-tier:
+    /// pilih font TERBESAR yang membuat seluruh caption muat di ruang tersisa
+    /// (font "3" -> "2" -> "1"). Tidak ada truncate kecuali pengaman terakhir
+    /// bila caption ekstrem (font "1" pun tidak muat).
     /// Mengembalikan baris-baris perintah `TEXT x,y,"font",0,1,1,"..."`.
     nonisolated static func captionTextCommands(caption: String, textX: Int, labelHeightDots: Int, maxWidthDots: Int) -> String {
         let clean = sanitizeForTSPL(caption)
         guard !clean.isEmpty else { return "" }
 
-        // Lebar karakter mono per font built-in TSPL (dots): font "2" = 12x20, font "1" = 8x12.
-        // Tinggi baris diberi jarak baca: font "2" = 22, font "1" = 14.
-        struct Choice { let font: String; let charW: Int; let lineStep: Int; let maxLines: Int }
-        let choices = [
-            Choice(font: "2", charW: 12, lineStep: 22, maxLines: 4),
-            Choice(font: "1", charW: 8, lineStep: 14, maxLines: 5),
+        // Lebar karakter mono per font built-in TSPL (dots): "3" = 16x24, "2" = 12x20, "1" = 8x12.
+        // Tinggi baris diberi jarak baca: "3" = 26, "2" = 22, "1" = 14.
+        struct Tier { let font: String; let charW: Int; let lineStep: Int }
+        let tiers = [
+            Tier(font: "3", charW: 16, lineStep: 26),
+            Tier(font: "2", charW: 12, lineStep: 22),
+            Tier(font: "1", charW: 8, lineStep: 14),
         ]
 
-        var pickedFont = "2"
-        var pickedStep = 22
+        var pickedFont = "1"
+        var pickedStep = 14
         var pickedLines: [String] = []
 
-        for c in choices {
-            let maxChars = max(4, maxWidthDots / c.charW)
-            var lines = wordWrap(clean, maxChars: maxChars)
-            if lines.count > c.maxLines {
-                // Truncate: potong ke maxLines, baris terakhir diakhiri "..."
-                lines = Array(lines.prefix(c.maxLines))
-                if var last = lines.last {
-                    if last.count > maxChars - 3 {
-                        last = String(last.prefix(max(0, maxChars - 3))) + "..."
-                    } else {
-                        last += "..."
-                    }
-                    lines[lines.count - 1] = last
-                }
-            }
-            // Font "2" dipakai bila caption muat apa adanya; font "1" sebagai fallback.
-            if c.font == "2", wordWrap(clean, maxChars: maxChars).count <= c.maxLines {
-                pickedFont = c.font; pickedStep = c.lineStep; pickedLines = wordWrap(clean, maxChars: maxChars)
+        for t in tiers {
+            let maxChars = max(4, maxWidthDots / t.charW)
+            let maxLines = max(1, (labelHeightDots - 8) / t.lineStep)
+            let lines = wordWrap(clean, maxChars: maxChars)
+            if lines.count <= maxLines {
+                pickedFont = t.font; pickedStep = t.lineStep; pickedLines = lines
                 break
-            } else if c.font == "1" {
-                pickedFont = c.font; pickedStep = c.lineStep; pickedLines = lines
+            }
+            // Simpan hasil tier terkecil sebagai fallback pengaman
+            pickedFont = t.font; pickedStep = t.lineStep; pickedLines = lines
+        }
+
+        // Pengaman terakhir: bila tier terkecil pun overflow, potong dengan "..."
+        // (seharusnya tidak terjadi untuk caption produk normal).
+        let smallest = tiers.last!
+        let maxLinesFinal = max(1, (labelHeightDots - 8) / smallest.lineStep)
+        if pickedFont == smallest.font, pickedLines.count > maxLinesFinal {
+            let maxChars = max(4, maxWidthDots / smallest.charW)
+            pickedLines = Array(pickedLines.prefix(maxLinesFinal))
+            if var last = pickedLines.last {
+                if last.count > maxChars - 3 {
+                    last = String(last.prefix(max(0, maxChars - 3))) + "..."
+                } else {
+                    last += "..."
+                }
+                pickedLines[pickedLines.count - 1] = last
             }
         }
 
@@ -289,22 +297,28 @@ class TSPLPrinterService: NSObject, ObservableObject {
         tsplCommands += "REFERENCE 0,0\r\n" // Origin point (configurable if needed)
         tsplCommands += "SET TEAR ON\r\n" // Enable tear-off mode
 
-        // QR Code — ukuran TIDAK diubah (cellWidth tetap 3 seperti sebelumnya).
-        // Bila ada caption: QR di kiri + teks di kanan. Bila tidak ada: posisi tengah (legacy).
-        let cellWidth = 3 // Jangan diubah — ukuran QR yang sudah pas di 33x15mm
+        // QR Code — ukuran MAKSIMAL yang muat di tinggi label.
+        // Data "oura:<UUID>" (41 char, byte mode, ECC L) memakai QR Version 3 = 29x29 modul,
+        // jadi cell 4 -> 116 dots = 14.5mm, pas untuk label 15mm. Bila label diset lebih
+        // pendek di Pengaturan, cell turun otomatis (4 -> 3 -> 2) agar tidak terpotong.
         let dotsPerMM = 8 // 203 dpi
         let labelHeightDots = Int(height * Double(dotsPerMM))
         let labelWidthDots = Int(width * Double(dotsPerMM))
-        // Estimasi lebar QR: data "oura:<UUID>" (41 char, ECC L) ≈ 29 modul × 3 dots ≈ 87 dots
-        let estimatedQRDots = 29 * cellWidth
+        let qrModules = 29 // Version 3 minimal untuk payload "oura:<UUID>"
+        var cellWidth = 4
+        while cellWidth > 2 && qrModules * cellWidth > labelHeightDots - 4 {
+            cellWidth -= 1
+        }
+        let qrDots = qrModules * cellWidth
 
         if let caption = caption, !caption.trimmingCharacters(in: .whitespaces).isEmpty {
-            let qrX = 8 // margin kiri 1mm
-            let qrY = max(4, (labelHeightDots - estimatedQRDots) / 2) // center vertikal
+            let qrX = 6
+            let qrY = max(2, (labelHeightDots - qrDots) / 2) // center vertikal
             tsplCommands += "QRCODE \(qrX),\(qrY),L,\(cellWidth),A,0,M,20,\"\(qrData)\"\r\n"
 
-            let textX = qrX + estimatedQRDots + 8 // 1mm spasi antara QR dan teks
-            let maxTextW = max(40, labelWidthDots - textX - 8) // margin kanan 1mm
+            // Ruang tersisa di kanan QR dimaksimalkan untuk caption (margin kecil 4-6 dots)
+            let textX = qrX + qrDots + 6
+            let maxTextW = max(40, labelWidthDots - textX - 4)
             tsplCommands += Self.captionTextCommands(
                 caption: caption,
                 textX: textX,
