@@ -220,7 +220,7 @@ struct ThermalLabelPreviewCard: View {
                         .foregroundStyle(OuraTheme.Colors.textTertiary)
                         .lineLimit(1)
                 }
-                Text("Size \(size.sizeLabel)")
+                Text(size.sizeLabel)
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundStyle(OuraTheme.Colors.accent)
                     .lineLimit(1)

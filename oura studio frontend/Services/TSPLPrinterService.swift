@@ -182,10 +182,11 @@ class TSPLPrinterService: NSObject, ObservableObject {
     ///   Baris 1: SKU — font "3" (besar & jelas), turun ke "2" bila SKU > 8 char.
     ///   Baris 2-3: Nama produk — font "1" (sekecil mungkin), maks 2 baris.
     ///   Baris 4: Varian kain — font "1", 1 baris (dilewati bila tidak ada).
-    ///   Baris terakhir: Size — font "2" agar terlihat jelas.
-    /// Setiap baris punya slot-y sendiri (step > tinggi glyph) sehingga tidak
-    /// mungkin tumpuk, dan blok teks di-center vertikal. Total worst-case
-    /// (30+32+16+24=102 dots) selalu muat di label 15mm (120 dots).
+    ///   Baris terakhir: Size saja ("XXL", tanpa prefix) — font "2" agar jelas.
+    /// Blok teks RATA ATAS (sejajar atas QR) dan step antar baris dibuat longgar
+    /// (melebihi tinggi glyph nominal) agar baris tidak mungkin tumpuk walau
+    /// metrik font firmware sedikit lebih besar. Worst-case (30+40+20+26=116 dots)
+    /// selalu muat di label 15mm (120 dots).
     nonisolated static func structuredCaptionCommands(content: ThermalLabelContent, textX: Int, labelHeightDots: Int, maxWidthDots: Int) -> String {
         let skuClean = sanitizeForTSPL(content.sku)
         let nameClean = sanitizeForTSPL(content.productName)
@@ -207,7 +208,7 @@ class TSPLPrinterService: NSObject, ObservableObject {
         } else {
             let skuMax2 = max(4, maxWidthDots / 12)
             let t = skuClean.count > skuMax2 ? String(skuClean.prefix(max(0, skuMax2 - 3))) + "..." : skuClean
-            rows.append(Row(font: "2", text: t, step: 24))
+            rows.append(Row(font: "2", text: t, step: 26))
         }
 
         // Nama produk — font "1" (8x12, sekecil mungkin), maks 2 baris.
@@ -224,26 +225,25 @@ class TSPLPrinterService: NSObject, ObservableObject {
             nameLines[1] = last
         }
         for line in nameLines {
-            rows.append(Row(font: "1", text: line, step: 16))
+            rows.append(Row(font: "1", text: line, step: 20))
         }
 
         // Varian — font "1", 1 baris.
         if let fabric = fabricClean {
             let t = fabric.count > nameMax ? String(fabric.prefix(max(0, nameMax - 3))) + "..." : fabric
-            rows.append(Row(font: "1", text: t, step: 16))
+            rows.append(Row(font: "1", text: t, step: 20))
         }
 
-        // Size — font "2" agar terlihat jelas.
+        // Size saja tanpa prefix ("XXL") — font "2" agar terlihat jelas.
         let sizeMax = max(4, maxWidthDots / 12)
-        var sizeText = sizeClean.isEmpty ? "-" : "Size \(sizeClean)"
+        var sizeText = sizeClean.isEmpty ? "-" : sizeClean
         if sizeText.count > sizeMax {
             sizeText = String(sizeText.prefix(max(0, sizeMax - 3))) + "..."
         }
-        rows.append(Row(font: "2", text: sizeText, step: 24))
+        rows.append(Row(font: "2", text: sizeText, step: 26))
 
-        // Slot-y deterministik + center vertikal
-        let blockH = rows.reduce(0) { $0 + $1.step }
-        var y = max(2, (labelHeightDots - blockH) / 2)
+        // Slot-y deterministik, RATA ATAS sejajar QR (bukan center)
+        var y = 2
         var out = ""
         for row in rows where !row.text.isEmpty {
             out += "TEXT \(textX),\(y),\"\(row.font)\",0,1,1,\"\(row.text)\"\r\n"
