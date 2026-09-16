@@ -598,11 +598,11 @@ private struct QRPrintPreviewSheet: View {
     @AppStorage("labelGap") private var labelGap: Double = 2.0
 
     enum PrintMode: Int, CaseIterable {
-        case a4Paper, thermalLabel
+        case thermalLabel, a4Paper
         var title: String { self == .a4Paper ? "📄 Kertas A4" : "🏷️ Label Thermal" }
     }
 
-    @State private var selectedMode: PrintMode = .a4Paper
+    @State private var selectedMode: PrintMode = .thermalLabel
     @State private var isShowingPrinterSelection = false
     @State private var errorMsg: String?
 
