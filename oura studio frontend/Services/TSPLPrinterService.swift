@@ -184,7 +184,7 @@ class TSPLPrinterService: NSObject, ObservableObject {
     ///   Baris 2-3: Nama produk — font "1" (sekecil mungkin), maks 2 baris.
     ///   Baris 4: Varian kain — font "1", 1 baris (dilewati bila tidak ada).
     ///   Size saja ("XXL", tanpa prefix) — font "2", dipin di bawah dengan
-    ///     margin 8 dots (~1mm) agar tidak mepet garis bawah label.
+    ///     margin 16 dots (~2mm) agar tidak mepet garis bawah label.
     /// Blok teks RATA ATAS (SKU sejajar atas QR, y=2). Step antar baris longgar
     /// agar tidak tumpuk. Lebar char dikalibrasi dari hasil cetak fisik printer
     /// ini (font "3" ≈ 18 dots, "2" ≈ 15, "1" ≈ 10) + margin kanan 14 dots
@@ -200,9 +200,9 @@ class TSPLPrinterService: NSObject, ObservableObject {
         let sizeClean = sanitizeForTSPL(content.sizeLabel)
         guard !skuClean.isEmpty else { return "" }
 
-        // Size dipin di bawah label dengan margin 8 dots (~1mm) agar tidak
-        // mepet garis bawah. Sebelumnya margin 4 terbukti terlalu mepet.
-        let sizeY = max(2, labelHeightDots - 28)
+        // Size dipin di bawah label dengan margin 16 dots (~2mm) agar tidak
+        // mepet garis bawah.
+        let sizeY = max(2, labelHeightDots - 36)
 
         var y = 2 // RATA ATAS sejajar QR
         var out = ""
