@@ -179,14 +179,16 @@ class TSPLPrinterService: NSObject, ObservableObject {
     }
 
     /// Caption TERSTRUKTUR per baris dengan hierarki font tetap:
-    ///   Baris 1: SKU — font "3" (besar & jelas), turun ke "2" bila SKU > 8 char.
+    ///   Baris 1: SKU — font "3" -> "2" -> "1", otomatis mengecil sampai muat
+    ///     (tidak pernah terpotong kanan kecuali SKU > 12 char).
     ///   Baris 2-3: Nama produk — font "1" (sekecil mungkin), maks 2 baris.
     ///   Baris 4: Varian kain — font "1", 1 baris (dilewati bila tidak ada).
-    ///   Baris terakhir: Size saja ("XXL", tanpa prefix) — font "2" agar jelas.
-    /// Blok teks RATA ATAS (sejajar atas QR) dan step antar baris dibuat longgar
-    /// (melebihi tinggi glyph nominal) agar baris tidak mungkin tumpuk walau
-    /// metrik font firmware sedikit lebih besar. Worst-case (30+40+20+26=116 dots)
-    /// selalu muat di label 15mm (120 dots).
+    ///   Size saja ("XXL", tanpa prefix) — font "2", dipin di bawah dengan
+    ///     margin 8 dots (~1mm) agar tidak mepet garis bawah label.
+    /// Blok teks RATA ATAS (SKU sejajar atas QR, y=2). Step antar baris longgar
+    /// agar tidak tumpuk. Lebar char dikalibrasi dari hasil cetak fisik printer
+    /// ini (font "3" ≈ 18 dots, "2" ≈ 15, "1" ≈ 10) + margin kanan 14 dots
+    /// (~1.75mm) toleransi geser label saat feed.
     nonisolated static func structuredCaptionCommands(content: ThermalLabelContent, textX: Int, labelHeightDots: Int, maxWidthDots: Int) -> String {
         let skuClean = sanitizeForTSPL(content.sku)
         let nameClean = sanitizeForTSPL(content.productName)
@@ -198,57 +200,64 @@ class TSPLPrinterService: NSObject, ObservableObject {
         let sizeClean = sanitizeForTSPL(content.sizeLabel)
         guard !skuClean.isEmpty else { return "" }
 
-        struct Row { let font: String; let text: String; let step: Int }
-        var rows: [Row] = []
+        // Size dipin di bawah label dengan margin 8 dots (~1mm) agar tidak
+        // mepet garis bawah. Sebelumnya margin 4 terbukti terlalu mepet.
+        let sizeY = max(2, labelHeightDots - 28)
 
-        // SKU — prioritas jelas: font "3" (16x24) bila muat, else font "2" (12x20).
-        let skuMax3 = max(4, maxWidthDots / 16)
+        var y = 2 // RATA ATAS sejajar QR
+        var out = ""
+
+        // SKU — auto-shrink 3 tier sampai terlihat semua: "3" (muat 7 char)
+        // -> "2" (muat 8 char) -> "1" (muat 12 char, truncate hanya bila lebih).
+        let skuMax3 = max(4, maxWidthDots / 18)
+        let skuMax2 = max(4, maxWidthDots / 15)
+        let skuMax1 = max(4, maxWidthDots / 10)
         if skuClean.count <= skuMax3 {
-            rows.append(Row(font: "3", text: skuClean, step: 30))
+            out += "TEXT \(textX),\(y),\"3\",0,1,1,\"\(skuClean)\"\r\n"
+            y += 30
+        } else if skuClean.count <= skuMax2 {
+            out += "TEXT \(textX),\(y),\"2\",0,1,1,\"\(skuClean)\"\r\n"
+            y += 26
         } else {
-            let skuMax2 = max(4, maxWidthDots / 12)
-            let t = skuClean.count > skuMax2 ? String(skuClean.prefix(max(0, skuMax2 - 3))) + "..." : skuClean
-            rows.append(Row(font: "2", text: t, step: 26))
+            let t = skuClean.count > skuMax1 ? String(skuClean.prefix(max(0, skuMax1 - 3))) + "..." : skuClean
+            out += "TEXT \(textX),\(y),\"1\",0,1,1,\"\(t)\"\r\n"
+            y += 20
         }
 
-        // Nama produk — font "1" (8x12, sekecil mungkin), maks 2 baris.
-        let nameMax = max(4, maxWidthDots / 8)
+        // Nama produk — font "1", maks 2 baris, dibatasi ruang sebelum size.
+        let nameMax = skuMax1
+        let roomForName = max(0, sizeY - y)
+        let nameAllowed = max(1, min(2, roomForName / 20))
         var nameLines = wordWrap(nameClean.isEmpty ? "-" : nameClean, maxChars: nameMax)
-        if nameLines.count > 2 {
-            nameLines = Array(nameLines.prefix(2))
-            var last = nameLines[1]
+        if nameLines.count > nameAllowed {
+            nameLines = Array(nameLines.prefix(nameAllowed))
+            var last = nameLines[nameLines.count - 1]
             if last.count > nameMax - 3 {
                 last = String(last.prefix(max(0, nameMax - 3))) + "..."
             } else {
                 last += "..."
             }
-            nameLines[1] = last
+            nameLines[nameLines.count - 1] = last
         }
         for line in nameLines {
-            rows.append(Row(font: "1", text: line, step: 20))
+            out += "TEXT \(textX),\(y),\"1\",0,1,1,\"\(line)\"\r\n"
+            y += 20
         }
 
-        // Varian — font "1", 1 baris.
-        if let fabric = fabricClean {
+        // Varian — font "1", 1 baris, hanya bila masih ada ruang sebelum size.
+        if let fabric = fabricClean, y + 20 <= sizeY {
             let t = fabric.count > nameMax ? String(fabric.prefix(max(0, nameMax - 3))) + "..." : fabric
-            rows.append(Row(font: "1", text: t, step: 20))
+            out += "TEXT \(textX),\(y),\"1\",0,1,1,\"\(t)\"\r\n"
+            y += 20
         }
 
-        // Size saja tanpa prefix ("XXL") — font "2" agar terlihat jelas.
-        let sizeMax = max(4, maxWidthDots / 12)
+        // Size saja tanpa prefix ("XXL") — font "2", selalu di posisi sizeY.
+        let sizeMax = skuMax2
         var sizeText = sizeClean.isEmpty ? "-" : sizeClean
         if sizeText.count > sizeMax {
             sizeText = String(sizeText.prefix(max(0, sizeMax - 3))) + "..."
         }
-        rows.append(Row(font: "2", text: sizeText, step: 26))
-
-        // Slot-y deterministik, RATA ATAS sejajar QR (bukan center)
-        var y = 2
-        var out = ""
-        for row in rows where !row.text.isEmpty {
-            out += "TEXT \(textX),\(y),\"\(row.font)\",0,1,1,\"\(row.text)\"\r\n"
-            y += row.step
-        }
+        out += "TEXT \(textX),\(sizeY),\"2\",0,1,1,\"\(sizeText)\"\r\n"
         return out
     }
 
@@ -323,14 +332,15 @@ class TSPLPrinterService: NSObject, ObservableObject {
         let qrDots = qrModules * cellWidth
 
         if let content = content {
-            // QR rapat ke kiri agar ruang kanan untuk caption lebih longgar
-            let qrX = 4
+            // QR rapat ke kiri (x=2) + caption 4 dots dari QR agar seluruh
+            // blok teks geser kiri dan margin kanan lebih lega.
+            let qrX = 2
             let qrY = max(2, (labelHeightDots - qrDots) / 2) // center vertikal
             tsplCommands += "QRCODE \(qrX),\(qrY),L,\(cellWidth),A,0,M,20,\"\(qrData)\"\r\n"
 
-            // Ruang tersisa di kanan QR dimaksimalkan untuk caption
+            // Margin kanan 14 dots (~1.75mm) toleransi geser label saat feed.
             let textX = qrX + qrDots + 4
-            let maxTextW = max(40, labelWidthDots - textX - 4)
+            let maxTextW = max(40, labelWidthDots - textX - 14)
             tsplCommands += Self.structuredCaptionCommands(
                 content: content,
                 textX: textX,
