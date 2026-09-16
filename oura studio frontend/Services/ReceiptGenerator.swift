@@ -48,7 +48,7 @@ class ReceiptGenerator {
         
         // Header
         addCenteredText("OURA STUDIO")
-        addCenteredText("Hand Made by Irma")
+        addCenteredText("Handmade by Irma")
         addSeparator()
         
         // Details
@@ -104,17 +104,9 @@ class ReceiptGenerator {
         addCenteredText("TELAH BERBELANJA")
         addSeparator()
         
-        // Social Media QR Codes
-        addCenteredText("[ Instagram ]")
-        body += "QRCODE 120,\(y),L,4,A,0,M,2,\"https://www.instagram.com/ourastudio20\"\r\n"
-        y += 120
-        addCenteredText("ourastudio20")
-        addSeparator()
-        
-        addCenteredText("[ TikTok ]")
-        body += "QRCODE 120,\(y),L,4,A,0,M,2,\"https://www.tiktok.com/@ourastudio20\"\r\n"
-        y += 120
-        addCenteredText("@ourastudio20")
+        // Social media - 2 lines (no QR codes)
+        addCenteredText("IG : ourastudio20")
+        addCenteredText("TikTok : @ourastudio20")
         addSeparator()
         
         // Dynamically calculate height in mm based on y (content height)
@@ -154,7 +146,7 @@ class ReceiptPDFGenerator {
         // Let's use 162 pt width.
         let width: CGFloat = 162
         let lineSpacing: CGFloat = 14
-        let totalLines = 26 + (order.items.count * 2) + 12
+        let totalLines = 26 + (order.items.count * 2) + 8
         let height: CGFloat = CGFloat(totalLines) * lineSpacing
         
         let bounds = CGRect(x: 0, y: 0, width: width, height: height)
@@ -232,7 +224,7 @@ class ReceiptPDFGenerator {
             
             // Header
             addCenteredText("OURA STUDIO", font: boldFont)
-            addCenteredText("Hand Made by Irma", font: regularFont)
+            addCenteredText("Handmade by Irma", font: regularFont)
             addSeparator()
             
             // Details
@@ -288,12 +280,9 @@ class ReceiptPDFGenerator {
             addCenteredText("TELAH BERBELANJA", font: regularFont)
             addSeparator()
             
-            addCenteredText("[ Instagram ]", font: boldFont)
-            addCenteredText("ourastudio20", font: regularFont)
-            addSeparator()
-            
-            addCenteredText("[ TikTok ]", font: boldFont)
-            addCenteredText("@ourastudio20", font: regularFont)
+            // Social media - 2 lines, no QR codes.
+            addCenteredText("IG : ourastudio20", font: regularFont)
+            addCenteredText("TikTok : @ourastudio20", font: regularFont)
             addSeparator()
         }
         
