@@ -769,11 +769,11 @@ private struct QRPrintPreviewSheet: View {
             let qty = qtyPerSize[size.id] ?? 1
             tsplPrinterService.printLabel(
                 qrData: "oura:\(size.id.uuidString)",
-                caption: TSPLPrinterService.labelCaption(
-                    productSku: size.productSku,
+                content: TSPLPrinterService.ThermalLabelContent(
+                    sku: size.productSku,
                     productName: size.productName,
-                    sizeLabel: size.sizeLabel,
-                    fabricVariantName: size.fabricVariantName
+                    fabricVariantName: size.fabricVariantName,
+                    sizeLabel: size.sizeLabel
                 ),
                 width: labelWidth,
                 height: labelHeight,

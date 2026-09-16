@@ -154,13 +154,13 @@ class TSPLPrinterService: NSObject, ObservableObject {
         connectionStatus = "Struk dicetak"
     }
 
-    /// Caption gaya A4 persis seperti `QRGeneratorView.generatePDF`:
-    /// `"SKU - Nama - Size - Varian"` (tanpa varian bila nil).
-    static func labelCaption(productSku: String, productName: String, sizeLabel: String, fabricVariantName: String?) -> String {
-        if let fabric = fabricVariantName, !fabric.isEmpty {
-            return "\(productSku) - \(productName) - \(sizeLabel) - \(fabric)"
-        }
-        return "\(productSku) - \(productName) - \(sizeLabel)"
+    /// Isi caption label thermal — per field agar layout terstruktur per baris
+    /// (SKU besar, nama/varian kecil, size jelas), bukan satu string di-wrap.
+    struct ThermalLabelContent {
+        let sku: String
+        let productName: String
+        let fabricVariantName: String?
+        let sizeLabel: String
     }
 
     /// Bersihkan teks agar aman untuk perintah TSPL TEXT (ASCII, tanpa kutip/baris baru).
@@ -178,65 +178,76 @@ class TSPLPrinterService: NSObject, ObservableObject {
         return out.trimmingCharacters(in: .whitespaces)
     }
 
-    /// Bungkus caption ke beberapa baris TEXT dengan font dinamis multi-tier:
-    /// pilih font TERBESAR yang membuat seluruh caption muat di ruang tersisa
-    /// (font "3" -> "2" -> "1"). Tidak ada truncate kecuali pengaman terakhir
-    /// bila caption ekstrem (font "1" pun tidak muat).
-    /// Mengembalikan baris-baris perintah `TEXT x,y,"font",0,1,1,"..."`.
-    nonisolated static func captionTextCommands(caption: String, textX: Int, labelHeightDots: Int, maxWidthDots: Int) -> String {
-        let clean = sanitizeForTSPL(caption)
-        guard !clean.isEmpty else { return "" }
+    /// Caption TERSTRUKTUR per baris dengan hierarki font tetap:
+    ///   Baris 1: SKU — font "3" (besar & jelas), turun ke "2" bila SKU > 8 char.
+    ///   Baris 2-3: Nama produk — font "1" (sekecil mungkin), maks 2 baris.
+    ///   Baris 4: Varian kain — font "1", 1 baris (dilewati bila tidak ada).
+    ///   Baris terakhir: Size — font "2" agar terlihat jelas.
+    /// Setiap baris punya slot-y sendiri (step > tinggi glyph) sehingga tidak
+    /// mungkin tumpuk, dan blok teks di-center vertikal. Total worst-case
+    /// (30+32+16+24=102 dots) selalu muat di label 15mm (120 dots).
+    nonisolated static func structuredCaptionCommands(content: ThermalLabelContent, textX: Int, labelHeightDots: Int, maxWidthDots: Int) -> String {
+        let skuClean = sanitizeForTSPL(content.sku)
+        let nameClean = sanitizeForTSPL(content.productName)
+        let fabricClean: String? = {
+            guard let raw = content.fabricVariantName else { return nil }
+            let s = sanitizeForTSPL(raw)
+            return s.isEmpty ? nil : s
+        }()
+        let sizeClean = sanitizeForTSPL(content.sizeLabel)
+        guard !skuClean.isEmpty else { return "" }
 
-        // Lebar karakter mono per font built-in TSPL (dots): "3" = 16x24, "2" = 12x20, "1" = 8x12.
-        // Tinggi baris diberi jarak baca: "3" = 26, "2" = 22, "1" = 14.
-        struct Tier { let font: String; let charW: Int; let lineStep: Int }
-        let tiers = [
-            Tier(font: "3", charW: 16, lineStep: 26),
-            Tier(font: "2", charW: 12, lineStep: 22),
-            Tier(font: "1", charW: 8, lineStep: 14),
-        ]
+        struct Row { let font: String; let text: String; let step: Int }
+        var rows: [Row] = []
 
-        var pickedFont = "1"
-        var pickedStep = 14
-        var pickedLines: [String] = []
-
-        for t in tiers {
-            let maxChars = max(4, maxWidthDots / t.charW)
-            let maxLines = max(1, (labelHeightDots - 8) / t.lineStep)
-            let lines = wordWrap(clean, maxChars: maxChars)
-            if lines.count <= maxLines {
-                pickedFont = t.font; pickedStep = t.lineStep; pickedLines = lines
-                break
-            }
-            // Simpan hasil tier terkecil sebagai fallback pengaman
-            pickedFont = t.font; pickedStep = t.lineStep; pickedLines = lines
+        // SKU — prioritas jelas: font "3" (16x24) bila muat, else font "2" (12x20).
+        let skuMax3 = max(4, maxWidthDots / 16)
+        if skuClean.count <= skuMax3 {
+            rows.append(Row(font: "3", text: skuClean, step: 30))
+        } else {
+            let skuMax2 = max(4, maxWidthDots / 12)
+            let t = skuClean.count > skuMax2 ? String(skuClean.prefix(max(0, skuMax2 - 3))) + "..." : skuClean
+            rows.append(Row(font: "2", text: t, step: 24))
         }
 
-        // Pengaman terakhir: bila tier terkecil pun overflow, potong dengan "..."
-        // (seharusnya tidak terjadi untuk caption produk normal).
-        let smallest = tiers.last!
-        let maxLinesFinal = max(1, (labelHeightDots - 8) / smallest.lineStep)
-        if pickedFont == smallest.font, pickedLines.count > maxLinesFinal {
-            let maxChars = max(4, maxWidthDots / smallest.charW)
-            pickedLines = Array(pickedLines.prefix(maxLinesFinal))
-            if var last = pickedLines.last {
-                if last.count > maxChars - 3 {
-                    last = String(last.prefix(max(0, maxChars - 3))) + "..."
-                } else {
-                    last += "..."
-                }
-                pickedLines[pickedLines.count - 1] = last
+        // Nama produk — font "1" (8x12, sekecil mungkin), maks 2 baris.
+        let nameMax = max(4, maxWidthDots / 8)
+        var nameLines = wordWrap(nameClean.isEmpty ? "-" : nameClean, maxChars: nameMax)
+        if nameLines.count > 2 {
+            nameLines = Array(nameLines.prefix(2))
+            var last = nameLines[1]
+            if last.count > nameMax - 3 {
+                last = String(last.prefix(max(0, nameMax - 3))) + "..."
+            } else {
+                last += "..."
             }
+            nameLines[1] = last
+        }
+        for line in nameLines {
+            rows.append(Row(font: "1", text: line, step: 16))
         }
 
-        // Blok teks di-center vertikal dalam label agar selalu rapi
-        let blockH = pickedLines.count * pickedStep
-        let topY = max(4, (labelHeightDots - blockH) / 2)
+        // Varian — font "1", 1 baris.
+        if let fabric = fabricClean {
+            let t = fabric.count > nameMax ? String(fabric.prefix(max(0, nameMax - 3))) + "..." : fabric
+            rows.append(Row(font: "1", text: t, step: 16))
+        }
 
+        // Size — font "2" agar terlihat jelas.
+        let sizeMax = max(4, maxWidthDots / 12)
+        var sizeText = sizeClean.isEmpty ? "-" : "Size \(sizeClean)"
+        if sizeText.count > sizeMax {
+            sizeText = String(sizeText.prefix(max(0, sizeMax - 3))) + "..."
+        }
+        rows.append(Row(font: "2", text: sizeText, step: 24))
+
+        // Slot-y deterministik + center vertikal
+        let blockH = rows.reduce(0) { $0 + $1.step }
+        var y = max(2, (labelHeightDots - blockH) / 2)
         var out = ""
-        for (i, line) in pickedLines.enumerated() {
-            let y = topY + i * pickedStep
-            out += "TEXT \(textX),\(y),\"\(pickedFont)\",0,1,1,\"\(line)\"\r\n"
+        for row in rows where !row.text.isEmpty {
+            out += "TEXT \(textX),\(y),\"\(row.font)\",0,1,1,\"\(row.text)\"\r\n"
+            y += row.step
         }
         return out
     }
@@ -278,7 +289,7 @@ class TSPLPrinterService: NSObject, ObservableObject {
         return lines.isEmpty ? [text] : lines
     }
 
-    func printLabel(qrData: String, caption: String? = nil, width: Double, height: Double, gap: Double, quantity: Int) {
+    func printLabel(qrData: String, content: ThermalLabelContent? = nil, width: Double, height: Double, gap: Double, quantity: Int) {
         guard let peripheral = connectedPeripheral, let characteristic = writableCharacteristic else {
             print("Printer not connected or writable characteristic not found.")
             connectionStatus = "Print Error: Not connected or no writable characteristic"
@@ -311,16 +322,17 @@ class TSPLPrinterService: NSObject, ObservableObject {
         }
         let qrDots = qrModules * cellWidth
 
-        if let caption = caption, !caption.trimmingCharacters(in: .whitespaces).isEmpty {
-            let qrX = 6
+        if let content = content {
+            // QR rapat ke kiri agar ruang kanan untuk caption lebih longgar
+            let qrX = 4
             let qrY = max(2, (labelHeightDots - qrDots) / 2) // center vertikal
             tsplCommands += "QRCODE \(qrX),\(qrY),L,\(cellWidth),A,0,M,20,\"\(qrData)\"\r\n"
 
-            // Ruang tersisa di kanan QR dimaksimalkan untuk caption (margin kecil 4-6 dots)
-            let textX = qrX + qrDots + 6
+            // Ruang tersisa di kanan QR dimaksimalkan untuk caption
+            let textX = qrX + qrDots + 4
             let maxTextW = max(40, labelWidthDots - textX - 4)
-            tsplCommands += Self.captionTextCommands(
-                caption: caption,
+            tsplCommands += Self.structuredCaptionCommands(
+                content: content,
                 textX: textX,
                 labelHeightDots: labelHeightDots,
                 maxWidthDots: maxTextW
