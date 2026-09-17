@@ -133,6 +133,20 @@ struct SettingsView: View {
                         .buttonStyle(.plain)
                     }
                     .ouraCard()
+
+                    // X265L dual-mode: bahasa harus sesuai mode printer.
+                    HStack(alignment: .top, spacing: 8) {
+                        Image(systemName: "info.circle.fill")
+                            .font(.system(size: 13))
+                            .foregroundStyle(OuraTheme.Colors.accent)
+                            .padding(.top, 1)
+                        Text("Printer ini punya 2 mode: Label (kertas label, untuk QR) dan Receipt (kertas struk). Ganti mode: nyalakan printer, TAHAN tombol FEED 5 detik sampai tercetak \"Shift to ... mode\", lalu nyalakan lagi.")
+                            .font(.system(size: 12))
+                            .foregroundStyle(OuraTheme.Colors.textSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .padding(.horizontal, 4)
+                    .padding(.top, 8)
                 } header: {
                     OuraSectionHeader(title: "Pengaturan Printer Thermal")
                 }

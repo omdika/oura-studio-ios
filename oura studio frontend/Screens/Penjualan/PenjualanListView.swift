@@ -514,6 +514,15 @@ private struct EditPenjualanSheet: View {
                     .disabled(!canPrintReceipt)
                     .listRowBackground(OuraTheme.Colors.surfaceCard)
 
+                    HStack(alignment: .top, spacing: 6) {
+                        Image(systemName: "info.circle")
+                            .font(.system(size: 11))
+                        Text("Butuh kertas struk + mode Receipt (tahan FEED 5 dtk untuk ganti mode). Jika keluar teks perintah, printer masih dalam mode Label.")
+                            .font(.system(size: 11))
+                    }
+                    .foregroundStyle(OuraTheme.Colors.textTertiary)
+                    .listRowBackground(Color.clear)
+
                     Button {
                         shareReceiptPDF()
                     } label: {

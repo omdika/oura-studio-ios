@@ -81,40 +81,16 @@ class TSPLPrinterService: NSObject, ObservableObject {
     private var lastReceiptSentAt: Date?
     private static let bootTime = Date()
 
-    /// Estimasi durasi cetak fisik: base render + tinggi/kecepatan konservatif
-    /// head portable (~30mm/dtk). 80mm -> ~4,7 dtk. Sengaja konservatif: yang
-    /// penting printer SUDAH idle saat job berikutnya tiba.
-    nonisolated static func estimatedReceiptPrintSeconds(heightMm: Int) -> TimeInterval {
-        2.0 + Double(max(30, heightMm)) / 30.0
-    }
-
-    // MARK: - Wake + resync preamble antar job struk
+    // MARK: - Struk = ESC/POS dalam Receipt mode (PENTING, X265L dual-mode)
     //
-    // Bukti log: job ke-2 dikirim 20,4 dtk SETELAH job ke-1 selesai (busy-window
-    // sudah lama habis), byte identik, semua chunk ter-ACK modul BLE, tapi
-    // kertas diam dan printer tidak membalas apa pun. Jadi byte hilang BUKAN
-    // karena tabrakan dengan cetakan sebelumnya, melainkan karena sisi
-    // print-engine/MCU sudah tidak mendengarkan: pola klasik printer thermal
-    // portabel yang (a) MCU-nya tidur setelah idle belasan detik sementara
-    // modul BLE tetap terjaga dan tetap me-ACK, atau (b) parser TSPL-nya
-    // butuh resync setelah satu job continuous-paper selesai.
-    // Label QR lolos karena selalu dicetak beruntun saat printer terjaga.
-    //
-    // Mitigasi buta-model yang aman: bila jeda sejak kirim-terakhir > ambang,
-    // kirim dulu preamble secukupnya ("\r\nCLS\r\n" = akhiri baris sampah yang
-    // mungkin menggantung + bersihkan buffer; no-op bila printer sehat),
-    // beri jeda bangun, BARU kirim job. Aktivitas UART membangunkan MCU yang
-    // tidur; CLS me-resync parser yang desync. Tanpa jeda ini, byte job
-    // langsung masuk ke kehampaan.
-
-    /// Bila idle lebih lama dari ini sejak kirim-terakhir, pakai preamble.
-    private let RECEIPT_WAKE_IDLE_THRESHOLD: TimeInterval = 5.0
-    /// Jeda setelah preamble agar MCU sempat bangun sebelum job tiba.
-    private let RECEIPT_WAKE_DELAY: TimeInterval = 0.8
-    private let RECEIPT_WAKE_PAYLOAD = "\r\nCLS\r\n"
-    /// true bila write-withResponse yang outstanding adalah preamble wake
-    /// (ACK-nya JANGAN dihitung sebagai ACK chunk).
-    private var receiptWakeOutstanding = false
+    // Printer ini punya DUA MODE persisten (ganti via TAHAN FEED 5 detik):
+    // Label mode (parser TSPL/CPCL, kertas gap) dan Receipt mode (ESC/POS,
+    // kertas continuous). Job TSPL/CPCL dalam Receipt mode TERCETAK SEBAGAI
+    // TEKS MENTAH; job teks dalam Label mode DIABAIKAN. Karena itu:
+    // struk = ESC/POS + printer wajib Receipt mode; label = TSPL + Label mode.
+    // Aturan pengiriman yang tetap berlaku: JANGAN memecah pembuka job menjadi
+    // dua burst terpisah + jeda. Pacing antar chunk di dalam satu job
+    // (RECEIPT_CHUNK_DELAY/RECEIPT_WR_DELAY, 30-60ms) tetap aman.
 
     /// Log diagnostik ber-stempel waktu untuk korelasi jeda antar job.
     private func rlog(_ msg: String) {
@@ -220,7 +196,6 @@ class TSPLPrinterService: NSObject, ObservableObject {
         pendingReceiptWorkItem = nil
         pendingReceiptOrder = nil
         receiptBusyUntil = .distantPast
-        receiptWakeOutstanding = false
         connectedPeripheral = nil
         writableCharacteristic = nil
         isPrinterReady = false
@@ -243,14 +218,16 @@ class TSPLPrinterService: NSObject, ObservableObject {
             return
         }
 
-        let job = ReceiptGenerator.generateTSPL(order: order)
-        print("Generated TSPL Commands:\n\(job.commands)")
+        // Struk dikirim sebagai ESC/POS (printer WAJIB dalam Receipt mode) —
+        // lihat alasan di ReceiptGenerator.generateESCPOS. Label QR tetap
+        // TSPL (printer dalam Label mode) dan tak tersentuh.
+        let job = ReceiptGenerator.generateESCPOS(order: order)
+        print("Generated ESC/POS Commands:\n\(ReceiptGenerator.debugESCPOS(job.bytes))")
 
-        // allowLossyConversion:true — sama seperti jalur label yang selalu
-        // sukses. Strict .ascii mengembalikan nil untuk SATU saja karakter
-        // non-ASCII (nama produk/pelanggan) sehingga cetak gagal total.
-        // (generateTSPL sudah sanitasi, ini jaring pengaman lapis kedua.)
-        guard let data = job.commands.data(using: .ascii, allowLossyConversion: true), !data.isEmpty else {
+        // Byte ESC/POS sudah murni 0x20-0x7E + LF + prefix ESC/GS dari
+        // generator; tidak ada konversi encoding (Data langsung dikirim).
+        let data = job.bytes
+        guard !data.isEmpty else {
             connectionStatus = "Gagal memproses data"
             return
         }
@@ -281,7 +258,7 @@ class TSPLPrinterService: NSObject, ObservableObject {
             return
         }
 
-        startReceiptSend(order: order, data: data, heightMm: job.heightMm,
+        startReceiptSend(order: order, data: data, printSeconds: job.printSecondsEstimate,
                          peripheral: peripheral, characteristic: characteristic)
     }
 
@@ -307,11 +284,11 @@ class TSPLPrinterService: NSObject, ObservableObject {
         DispatchQueue.main.asyncAfter(deadline: .now() + (delay ?? 0.5), execute: item)
     }
 
-    private func startReceiptSend(order: SalesOrder, data: Data, heightMm: Int,
+    private func startReceiptSend(order: SalesOrder, data: Data, printSeconds: TimeInterval,
                                   peripheral: CBPeripheral, characteristic: CBCharacteristic) {
         let writeType: CBCharacteristicWriteType = characteristic.properties.contains(.writeWithoutResponse) ? .withoutResponse : .withResponse
         let chunkSize = max(1, peripheral.maximumWriteValueLength(for: writeType))
-        rlog("send \(order.invoiceNo): type=\(writeType == .withoutResponse ? "withoutResponse" : "withResponse") chunk=\(chunkSize) bytes=\(data.count) height=\(heightMm)mm")
+        rlog("send \(order.invoiceNo): lang=CPCL type=\(writeType == .withoutResponse ? "withoutResponse" : "withResponse") chunk=\(chunkSize) bytes=\(data.count)")
 
         var chunks: [Data] = []
         var offset = 0
@@ -322,11 +299,9 @@ class TSPLPrinterService: NSObject, ObservableObject {
 
         receiptJobSeq += 1
         let seq = receiptJobSeq
-        receiptPrintSeconds = Self.estimatedReceiptPrintSeconds(heightMm: heightMm)
-        // Preamble bila printer mungkin sudah idle-tidur/desync.
+        receiptPrintSeconds = printSeconds
         let idleGap = lastReceiptSentAt.map { Date().timeIntervalSince($0) }
-        let needWake = idleGap == nil || idleGap! > RECEIPT_WAKE_IDLE_THRESHOLD
-        rlog("send \(order.invoiceNo): seq=\(seq) chunks=\(chunks.count) estPrint=\(String(format: "%.1f", receiptPrintSeconds))s idleGap=\(idleGap.map { String(format: "%.1f", $0) } ?? "first")s wake=\(needWake)")
+        rlog("send \(order.invoiceNo): seq=\(seq) chunks=\(chunks.count) estPrint=\(String(format: "%.1f", receiptPrintSeconds))s idleGap=\(idleGap.map { String(format: "%.1f", $0) } ?? "first")s")
 
         DispatchQueue.main.async {
             self.isPrinting = true
@@ -337,34 +312,14 @@ class TSPLPrinterService: NSObject, ObservableObject {
         receiptPeripheral = peripheral
         receiptCharacteristic = characteristic
         receiptWriteType = writeType
-        receiptWakeOutstanding = false
 
-        guard let wakeData = RECEIPT_WAKE_PAYLOAD.data(using: .ascii), needWake else {
-            sendFirstReceiptChunk(seq: seq)
-            return
-        }
-        // Kirim preamble dulu; chunk[0] menyusul setelah ACK (+ jeda bangun
-        // untuk withResponse) atau setelah jeda bangun (withoutResponse).
-        if writeType == .withResponse {
-            receiptWakeOutstanding = true
-            rlog("send \(order.invoiceNo): seq=\(seq) wake preamble sent, awaiting ACK")
-            peripheral.writeValue(wakeData, for: characteristic, type: .withResponse)
-        } else {
-            receiptSendQueue.async { [weak self] in
-                guard let self, seq == self.receiptJobSeq else { return }
-                guard let p = self.receiptPeripheral, let c = self.receiptCharacteristic else {
-                    self.finishReceipt(success: false, status: "Printer terputus saat mencetak")
-                    return
-                }
-                self.rlog("send: wake preamble sent, waiting \(self.RECEIPT_WAKE_DELAY)s")
-                p.writeValue(wakeData, for: c, type: .withoutResponse)
-                Thread.sleep(forTimeInterval: self.RECEIPT_WAKE_DELAY)
-                self.pumpWithoutResponseChunks(seq: seq)
-            }
-        }
+        // SATU burst kontinyu diawali "!" (CPCL) — JANGAN pecah jadi preamble +
+        // jeda (lihat MARK di atas). Chunk[0] langsung dikirim; pacing hanya
+        // antar chunk di dalam job yang sama.
+        sendFirstReceiptChunk(seq: seq)
     }
 
-    /// Kirim chunk[0] job struk (dipakai saat tanpa preamble).
+    /// Kirim chunk[0] job struk.
     private func sendFirstReceiptChunk(seq: Int) {
         guard seq == receiptJobSeq,
               let peripheral = receiptPeripheral,
@@ -427,7 +382,6 @@ class TSPLPrinterService: NSObject, ObservableObject {
         receiptIndex = 0
         receiptPeripheral = nil
         receiptCharacteristic = nil
-        receiptWakeOutstanding = false
         let now = Date()
         lastReceiptSentAt = now
         if success {
@@ -766,7 +720,6 @@ extension TSPLPrinterService: CBCentralManagerDelegate {
             self.pendingReceiptWorkItem = nil
             self.pendingReceiptOrder = nil
             self.receiptBusyUntil = .distantPast
-            self.receiptWakeOutstanding = false
             // Bebaskan busy guard bila disconnect terjadi di tengah job struk.
             self.receiptChunks = []
             self.receiptIndex = 0
@@ -876,21 +829,6 @@ extension TSPLPrinterService: CBPeripheralDelegate {
            receiptWriteType == .withResponse,
            !receiptChunks.isEmpty {
             let seq = receiptJobSeq
-            if receiptWakeOutstanding {
-                // ACK ini milik preamble wake, BUKAN chunk: jangan majukan
-                // receiptIndex. Beri jeda bangun lalu mulai dari chunk[0].
-                receiptWakeOutstanding = false
-                rlog("wake preamble ACKed (seq=\(seq)), starting job in \(RECEIPT_WAKE_DELAY)s")
-                DispatchQueue.main.asyncAfter(deadline: .now() + RECEIPT_WAKE_DELAY) { [weak self] in
-                    guard let self, seq == self.receiptJobSeq else { return }
-                    guard peripheral === self.receiptPeripheral,
-                          characteristic == self.receiptCharacteristic,
-                          self.receiptWriteType == .withResponse,
-                          !self.receiptChunks.isEmpty else { return }
-                    peripheral.writeValue(self.receiptChunks[0], for: characteristic, type: .withResponse)
-                }
-                return
-            }
             // Jeda drain UART antar chunk: ACK BLE != print-head menerima.
             DispatchQueue.main.asyncAfter(deadline: .now() + RECEIPT_WR_DELAY) { [weak self] in
                 guard let self, seq == self.receiptJobSeq else { return }
