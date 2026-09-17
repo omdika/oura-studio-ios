@@ -133,7 +133,7 @@ struct PenjualanListView: View {
                 .environmentObject(appState)
         }
         .sheet(item: $editingOrder, onDismiss: { Task { await load() } }) { order in
-            EditPenjualanSheet(order: order)
+            EditPenjualanSheet(order: order, printerService: appState.tsplPrinterService)
                 .environmentObject(api)
                 .environmentObject(appState)
         }
@@ -394,6 +394,10 @@ private struct EditPenjualanSheet: View {
     @EnvironmentObject private var api: APIService
     @EnvironmentObject private var appState: AppState
     @Environment(\.dismiss) private var dismiss
+    // @ObservedObject (bukan via appState) agar status printer live-update
+    // dan tombol Cetak bisa disable saat belum siap/sedang mencetak —
+    // pola yang sama dipakai sheet label QR.
+    @ObservedObject private var printerService: TSPLPrinterService
 
     let order: SalesOrder
 
@@ -402,13 +406,29 @@ private struct EditPenjualanSheet: View {
     @State private var isSaving = false
     @State private var errorMsg: String?
 
-    init(order: SalesOrder) {
+    init(order: SalesOrder, printerService: TSPLPrinterService) {
         self.order = order
+        _printerService = ObservedObject(initialValue: printerService)
         _customerName = State(initialValue: order.customerName ?? "")
         _selectedMethod = State(initialValue: PaymentMethod(rawValue: order.paymentMethod ?? "cash") ?? .cash)
     }
 
     private var isEditable: Bool { !order.isCancelled }
+
+    /// Tombol Cetak aktif hanya bila printer benar-benar siap tulis dan
+    /// tidak sedang mengirim job — mencegah burst tumpang-tindih yang
+    /// membuat "cetak pertama OK, berikutnya gagal".
+    private var canPrintReceipt: Bool {
+        printerService.isPrinterReady
+            && printerService.connectedPeripheral != nil
+            && printerService.writableCharacteristic != nil
+            && !printerService.isPrinting
+    }
+
+    private var printStatusText: String {
+        if printerService.isPrinting { return "Mencetak..." }
+        return printerService.connectionStatus
+    }
 
     var body: some View {
         NavigationStack {
@@ -477,20 +497,21 @@ private struct EditPenjualanSheet: View {
 
                 Section {
                     Button {
-                        appState.tsplPrinterService.printReceipt(order: order)
+                        printerService.printReceipt(order: order)
                     } label: {
                         HStack {
                             Image(systemName: "printer.fill")
-                                .foregroundStyle(OuraTheme.Colors.accent)
-                            Text("Cetak Struk")
-                                .foregroundStyle(OuraTheme.Colors.accent)
+                                .foregroundStyle(canPrintReceipt ? OuraTheme.Colors.accent : OuraTheme.Colors.textDisabled)
+                            Text(printerService.isPrinting ? "Mencetak..." : "Cetak Struk")
+                                .foregroundStyle(canPrintReceipt ? OuraTheme.Colors.accent : OuraTheme.Colors.textDisabled)
                             Spacer()
-                            Text(appState.tsplPrinterService.connectionStatus)
+                            Text(printStatusText)
                                 .font(.system(size: 11))
                                 .foregroundStyle(OuraTheme.Colors.textTertiary)
                         }
                     }
                     .buttonStyle(.plain)
+                    .disabled(!canPrintReceipt)
                     .listRowBackground(OuraTheme.Colors.surfaceCard)
 
                     Button {

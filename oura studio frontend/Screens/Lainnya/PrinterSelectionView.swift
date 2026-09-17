@@ -12,7 +12,17 @@ struct PrinterSelectionView: View {
         NavigationView {
             List {
                 Section(header: Text("Status Bluetooth")) {
-                    Text(tsplPrinterService.connectionStatus)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(tsplPrinterService.connectionStatus)
+                        // Bedakan "connect" vs "siap cetak": service-discovery
+                        // BLE butuh waktu setelah connect sebelum karakteristik
+                        // tulis ditemukan. Sheet baru tutup saat siap cetak.
+                        if tsplPrinterService.connectedPeripheral != nil && !tsplPrinterService.isPrinterReady {
+                            Text("Menghubungkan layanan printer...")
+                                .font(.caption)
+                                .foregroundColor(.orange)
+                        }
+                    }
                 }
 
                 Section(header: Text("Perangkat Ditemukan")) {
@@ -66,9 +76,18 @@ struct PrinterSelectionView: View {
                 tsplPrinterService.stopScanningForPeripherals()
             }
             .onChange(of: tsplPrinterService.connectedPeripheral) { newPeripheral in
+                // Simpan pilihan segera, tapi JANGAN dismiss di sini:
+                // service/characteristic discovery belum selesai sehingga
+                // writableCharacteristic masih nil (cetak pertama gagal).
                 if let peripheral = newPeripheral {
                     printerUUIDString = peripheral.identifier.uuidString
                     printerName = peripheral.name ?? "Unknown Device"
+                }
+            }
+            .onChange(of: tsplPrinterService.isPrinterReady) { ready in
+                // Tutup hanya setelah karakteristik tulis valid ditemukan —
+                // pola yang membuat label QR selalu sukses dicetak berulang.
+                if ready && tsplPrinterService.connectedPeripheral != nil {
                     dismiss()
                 }
             }

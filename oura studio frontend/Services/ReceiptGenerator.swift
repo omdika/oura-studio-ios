@@ -12,37 +12,52 @@ extension Double {
     }
 }
 
+/// Hasil generate struk: perintah TSPL + tinggi deklarasi (dipakai untuk
+/// estimasi durasi cetak fisik pada printer busy-window guard).
+struct ReceiptTSPLJob {
+    let commands: String
+    let heightMm: Int
+}
+
 class ReceiptGenerator {
-    static func generateTSPL(order: SalesOrder) -> String {
+    static func generateTSPL(order: SalesOrder) -> ReceiptTSPLJob {
         var body = ""
-        
+
         var y = 5
         let charLimit = 32
-        
+
+        // Sanitasi pola yang sama dengan jalur label QR (TSPLPrinterService.sanitizeForTSPL):
+        // buang kutip/baris baru/karakter non-ASCII agar framing perintah TEXT "..."
+        // tidak rusak dan encoding .ascii tidak pernah gagal (return nil).
+        func clean(_ text: String) -> String {
+            TSPLPrinterService.sanitizeForTSPL(text)
+        }
+
         func addCenteredText(_ text: String) {
-            let trimmed = text.prefix(charLimit)
+            let trimmed = String(clean(text).prefix(charLimit))
             let spaces = max(0, (charLimit - trimmed.count) / 2)
             let padded = String(repeating: " ", count: spaces) + trimmed
             body += "TEXT 0,\(y),\"2\",0,1,1,\"\(padded)\"\r\n"
             y += 24
         }
-        
+
         func addLeftRightText(left: String, right: String) {
-            let leftMax = max(0, charLimit - right.count - 1)
-            let leftTrunc = left.prefix(leftMax)
-            let spaces = max(1, charLimit - leftTrunc.count - right.count)
-            let line = leftTrunc + String(repeating: " ", count: spaces) + right
+            let rightClean = clean(right)
+            let leftMax = max(0, charLimit - rightClean.count - 1)
+            let leftTrunc = String(clean(left).prefix(leftMax))
+            let spaces = max(1, charLimit - leftTrunc.count - rightClean.count)
+            let line = leftTrunc + String(repeating: " ", count: spaces) + rightClean
             body += "TEXT 0,\(y),\"2\",0,1,1,\"\(line)\"\r\n"
             y += 24
         }
-        
+
         func addSeparator() {
             body += "TEXT 0,\(y),\"2\",0,1,1,\"" + String(repeating: "-", count: charLimit) + "\"\r\n"
             y += 24
         }
-        
+
         func addLeftText(_ text: String) {
-            body += "TEXT 0,\(y),\"2\",0,1,1,\"\(text.prefix(charLimit))\"\r\n"
+            body += "TEXT 0,\(y),\"2\",0,1,1,\"\(String(clean(text).prefix(charLimit)))\"\r\n"
             y += 24
         }
         
@@ -110,25 +125,32 @@ class ReceiptGenerator {
         addSeparator()
         
         // Dynamically calculate height in mm based on y (content height)
-        // 8 dots = 1 mm. Let's add 10 mm safety margin so it feeds past the cutter.
-        let heightMm = Int(ceil(Double(y) / 8.0)) + 10
-        
+        // 8 dots = 1 mm. Let's add 10 mm safety margin so it feeds past the tear bar.
+        // Dijepit 30...250 mm: firmware printer portabel TSPL/CPCL umumnya menolak
+        // SIZE di luar rentang wajar dan masuk ke error-state sampai power-cycle.
+        // (Struk sangat panjang tetap tercetak; printer continuous-paper melanjutkan
+        // feed selama buffer perintah valid — yang dijepit hanya deklarasi SIZE.)
+        let rawHeightMm = Int(ceil(Double(y) / 8.0)) + 10
+        let heightMm = min(250, max(30, rawHeightMm))
+
         var tspl = ""
         tspl += "SIZE 48 mm,\(heightMm) mm\r\n"
         tspl += "GAP 0 mm,0 mm\r\n" // continuous paper, no gap
         tspl += "CLS\r\n"
         tspl += "DIRECTION 1\r\n"
         tspl += "REFERENCE 0,0\r\n"
-        
+        tspl += "SET TEAR ON\r\n" // sama seperti jalur label QR yang selalu sukses
+
         tspl += body
-        
-        // Print command
+
+        // Print command — tanpa perintah CUT dalam stream yang sama.
+        // CUT telanjang yang dikirim berbarengan dengan PRINT membuat sebagian
+        // firmware printer portabel masuk error/busy-state (cetak pertama OK,
+        // cetakan berikutnya gagal sampai printer dimatikan). Tear-off sudah
+        // diaktifkan via SET TEAR ON di atas, sama seperti label QR.
         tspl += "PRINT 1,1\r\n"
-        
-        // Cut paper
-        tspl += "CUT\r\n"
-        
-        return tspl
+
+        return ReceiptTSPLJob(commands: tspl, heightMm: heightMm)
     }
 }
 

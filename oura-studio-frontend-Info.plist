@@ -16,11 +16,9 @@
 	<key>GIDClientID</key>
 	<string>763614853578-khhhap8llgs7a4obnuj2riebn5ci4t9v.apps.googleusercontent.com</string>
 	<key>NSBluetoothAlwaysUsageDescription</key>
-	<string>Aplikasi membutuhkan akses Bluetooth untuk menemukan dan terhubung ke printer thermal BLE guna mencetak label produk.</string>
+	<string>Aplikasi membutuhkan akses Bluetooth untuk menemukan dan terhubung ke printer thermal BLE guna mencetak label produk dan struk penjualan.</string>
 	<key>NSBluetoothPeripheralUsageDescription</key>
-	<string>Aplikasi membutuhkan akses Bluetooth untuk menemukan dan terhubung ke printer thermal BLE guna mencetak label produk.</string>
-	<key>NSBluetoothAlwaysAndWhenInUseUsageDescription</key>
-	<string>Aplikasi membutuhkan akses Bluetooth untuk menemukan dan terhubung ke printer thermal BLE guna mencetak label produk.</string>
+	<string>Aplikasi membutuhkan akses Bluetooth untuk menemukan dan terhubung ke printer thermal BLE guna mencetak label produk dan struk penjualan.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>bluetooth-central</string>
