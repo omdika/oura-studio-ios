@@ -10,6 +10,7 @@ struct ProdukListView: View {
     @State private var products: [Product] = []
     @State private var allSizes: [ProductSizeDetail] = []
     @State private var isLoading = true
+    @State private var isRefreshing = false
     @State private var isLoadingMore = false
     @State private var currentPage = 1
     @State private var totalPages = 1
@@ -31,6 +32,13 @@ struct ProdukListView: View {
     @State private var filterFrom: Date = Date()
     @State private var filterTo: Date = Date()
     @State private var additionsByVariant: [UUID: Int] = [:]
+
+    // Single-flight + debounce for list reloads. Back-navigation from detail fires
+    // onProductChanged + sheet onDismiss in quick succession on the same reused
+    // URLSession connection — without this, parallel loadFirstPage() calls spam the
+    // shared HTTP/2 connection and trigger nw_connection timestamp warnings.
+    @State private var loadTask: Task<Void, Never>? = nil
+    @State private var lastLoadAt: Date? = nil
 
     private var filtered: [Product] {
         let active = products.filter { !$0.isArchived }
@@ -85,9 +93,11 @@ struct ProdukListView: View {
                 Divider().overlay(OuraTheme.Colors.separator)
 
                 Group {
-                    if isLoading {
+                    // Soft reload: cache tetap tampil saat kembali dari detail.
+                    // Full-screen spinner hanya saat list masih kosong (buka pertama).
+                    if isLoading && products.isEmpty {
                         ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
-                    } else if products.filter({ !$0.isArchived }).isEmpty {
+                    } else if products.filter({ !$0.isArchived }).isEmpty && !isRefreshing {
                         emptyView
                     } else {
                         productList
@@ -104,10 +114,17 @@ struct ProdukListView: View {
         .navigationBarTitleDisplayMode(.large)
         .toolbar(isSearchFocused ? .hidden : .visible, for: .navigationBar)
         .onChange(of: isFilterActive) { _ in
-            Task { await loadFirstPage() }
+            requestReload(force: true)
         }
-        .task { await loadFirstPage() }
-        .refreshable { await loadFirstPage() }
+        // .task re-fire saat pop dari detail (SwiftUI cancel + restart task saat view
+        // disappear/appear). Guard products.isEmpty agar kembali ke list instan dari
+        // cache; update terbaru jalan silent via onProductChanged.
+        .task {
+            if products.isEmpty {
+                await loadFirstPage(force: true)
+            }
+        }
+        .refreshable { await loadFirstPage(force: true) }
         .toolbar {
             // Split across leading/trailing (not grouped together on one side) so the two very
             // similar-looking QR icons (qrcode.viewfinder vs qrcode) read as two distinct actions
@@ -139,10 +156,10 @@ struct ProdukListView: View {
             ShopeeBulkUploadSheet()
                 .environmentObject(api)
         }
-        .sheet(isPresented: $showAddProduct, onDismiss: { Task { await loadFirstPage() } }) {
+        .sheet(isPresented: $showAddProduct, onDismiss: { requestReload() }) {
             TambahProdukLengkapSheet(onCreatedWithoutRecipe: { newlyCreatedProduct = $0 })
         }
-        .sheet(item: $newlyCreatedProduct, onDismiss: { Task { await loadFirstPage() } }) { product in
+        .sheet(item: $newlyCreatedProduct, onDismiss: { requestReload() }) { product in
             NavigationStack {
                 ProdukDetailView(product: product)
                     .toolbar {
@@ -306,7 +323,7 @@ struct ProdukListView: View {
             
             if isFilterActive {
                 DateRangeField(from: $filterFrom, to: $filterTo) {
-                    Task { await loadFirstPage() }
+                    requestReload(force: true)
                 }
                 .transition(.opacity.combined(with: .move(edge: .top)))
             }
@@ -318,6 +335,19 @@ struct ProdukListView: View {
     private var productList: some View {
         ScrollView {
             VStack(spacing: 12) {
+                // Indikator refresh non-blocking saat soft reload background.
+                if isRefreshing {
+                    HStack(spacing: 8) {
+                        ProgressView().scaleEffect(0.8)
+                        Text("Memperbarui…")
+                            .font(.system(size: 12))
+                            .foregroundStyle(OuraTheme.Colors.textTertiary)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 4)
+                    .transition(.opacity)
+                }
+
                 summaryHeaderView
                     .padding(.bottom, 4)
 
@@ -348,7 +378,7 @@ struct ProdukListView: View {
                             product: product,
                             sizes: sizes,
                             additionsByVariant: additionsByVariant,
-                            onProductChanged: { Task { await loadFirstPage() } }
+                            onProductChanged: { requestReload() }
                         )
                         .onAppear {
                             if product.id == filteredProductsToDisplay.last?.id && hasMorePages && !isLoadingMore {
@@ -393,8 +423,33 @@ struct ProdukListView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    private func loadFirstPage() async {
-        isLoading = true
+    /// Debounced entry point for non-async callers (onDismiss, onProductChanged).
+    /// Cancels any in-flight reload and skips bursts < 1s apart unless forced.
+    private func requestReload(force: Bool = false) {
+        if !force, let last = lastLoadAt, Date().timeIntervalSince(last) < 1.0 { return }
+        loadTask?.cancel()
+        loadTask = Task { await loadFirstPage(force: force) }
+    }
+
+    private func loadFirstPage(force: Bool = false) async {
+        // Single-flight: ignore overlapping reloads (e.g. pop from detail fires
+        // onProductChanged while .task/refresh is still running).
+        if (isLoading || isRefreshing) && !force { return }
+        if !force, let last = lastLoadAt, Date().timeIntervalSince(last) < 1.0 { return }
+        if Task.isCancelled { return }
+        // Soft reload: kalau cache sudah ada, jangan tampilkan full-screen spinner.
+        // Tampilkan data lama + indikator kecil, swap saat fetch selesai.
+        let silent = !products.isEmpty
+        if silent {
+            isRefreshing = true
+        } else {
+            isLoading = true
+        }
+        lastLoadAt = Date()
+        defer {
+            isLoading = false
+            isRefreshing = false
+        }
         currentPage = 1
 
         async let p = api.getProducts(page: 1, limit: limit)
@@ -402,11 +457,16 @@ struct ProdukListView: View {
 
         let resP = try? await p
         let resS = try? await s
+        if Task.isCancelled { return }
 
-        products = resP?.data ?? []
-        allSizes = resS?.data ?? []
-        totalPages = resP?.totalPages ?? 1
-        hasMorePages = (resP?.nextPage != nil)
+        // Hanya timpa cache kalau fetch berhasil — gagal jaringan tidak boleh
+        // mengosongkan list yang sedang tampil.
+        if let resP { products = resP.data }
+        if let resS { allSizes = resS.data }
+        if let resP {
+            totalPages = resP.totalPages
+            hasMorePages = (resP.nextPage != nil)
+        }
 
         var ledgerAdditions: [UUID: Int] = [:]
         if isFilterActive {
@@ -421,7 +481,6 @@ struct ProdukListView: View {
         }
 
         additionsByVariant = ledgerAdditions
-        isLoading = false
     }
 
     private func loadMoreProducts() async {

@@ -297,24 +297,29 @@ class APIService: ObservableObject {
         return try await post(path: "/products", body: CreateProductRequest(name: name, sku: sku, category: category))
     }
 
-    func getProductSizes(sku: String) async throws -> [ProductSizeDetail] {
+    func getProductSizes(sku: String, productName: String? = nil) async throws -> [ProductSizeDetail] {
         if useMock { return try await MockAPIService.shared.getProductSizes(sku: sku) }
         let basic: [ProductSizeBasic] = try await get(path: "/products/\(sku)/sizes")
-        let name = await resolveProductName(sku: sku)
+        // Skip extra GET /products?page=1&limit=500 when caller already knows the name
+        // (e.g. ProdukDetailView passes product.name). Falls back to resolve for legacy callers.
+        let name: String
+        if let productName { name = productName } else { name = await resolveProductName(sku: sku) }
         return basic.map { sizeDetailFromBasic($0, sku: sku, productName: name) }
     }
 
-    func createProductSize(sku: String, sizeLabel: String, fabricVariantName: String? = nil, reorderMinQty: Double? = nil) async throws -> ProductSizeDetail {
+    func createProductSize(sku: String, sizeLabel: String, fabricVariantName: String? = nil, reorderMinQty: Double? = nil, productName: String? = nil) async throws -> ProductSizeDetail {
         if useMock { return try await MockAPIService.shared.createProductSize(sku: sku, sizeLabel: sizeLabel, fabricVariantName: fabricVariantName, reorderMinQty: reorderMinQty) }
         let basic: ProductSizeBasic = try await post(path: "/products/\(sku)/sizes", body: CreateProductSizeRequest(sizeLabel: sizeLabel, fabricVariantName: fabricVariantName, reorderMinQty: reorderMinQty))
-        let name = await resolveProductName(sku: sku)
+        let name: String
+        if let productName { name = productName } else { name = await resolveProductName(sku: sku) }
         return sizeDetailFromBasic(basic, sku: sku, productName: name)
     }
 
-    func patchProductSize(sku: String, sizeId: UUID, _ req: PatchProductSizeRequest) async throws -> ProductSizeDetail {
+    func patchProductSize(sku: String, sizeId: UUID, _ req: PatchProductSizeRequest, productName: String? = nil) async throws -> ProductSizeDetail {
         if useMock { return try await MockAPIService.shared.patchProductSize(sku: sku, sizeId: sizeId, req) }
         let basic: ProductSizeBasic = try await patch(path: "/products/\(sku)/sizes/\(sizeId.uuidString)", body: req)
-        let name = await resolveProductName(sku: sku)
+        let name: String
+        if let productName { name = productName } else { name = await resolveProductName(sku: sku) }
         return sizeDetailFromBasic(basic, sku: sku, productName: name)
     }
 
@@ -382,12 +387,13 @@ class APIService: ObservableObject {
         return try await getProductSizeById(id: sizeId)
     }
 
-    func addStockFromBahan(sku: String, sizeId: UUID, qty: Int, specId: UUID) async throws -> ProductSizeDetail {
+    func addStockFromBahan(sku: String, sizeId: UUID, qty: Int, specId: UUID, productName: String? = nil) async throws -> ProductSizeDetail {
         if useMock { return try await MockAPIService.shared.addStockFromBahan(sku: sku, sizeId: sizeId, qty: qty, specId: specId) }
         struct Req: Encodable { let qty: Int; let specId: UUID; enum CodingKeys: String, CodingKey { case qty; case specId = "spec_id" } }
         let basic: ProductSizeBasic = try await post(path: "/products/\(sku)/sizes/\(sizeId.uuidString)/stock-from-bahan",
                                                      body: Req(qty: qty, specId: specId))
-        let name = await resolveProductName(sku: sku)
+        let name: String
+        if let productName { name = productName } else { name = await resolveProductName(sku: sku) }
         return sizeDetailFromBasic(basic, sku: sku, productName: name)
     }
 
@@ -443,7 +449,7 @@ class APIService: ObservableObject {
         return try await get(path: "/materials/families")
     }
 
-    func addStockManual(sku: String, sizeId: UUID, qty: Int, materialId: UUID, cutWidthCm: Double, cutLengthCm: Double) async throws -> ProductSizeDetail {
+    func addStockManual(sku: String, sizeId: UUID, qty: Int, materialId: UUID, cutWidthCm: Double, cutLengthCm: Double, productName: String? = nil) async throws -> ProductSizeDetail {
         if useMock { return try await MockAPIService.shared.addStockManual(sku: sku, sizeId: sizeId, qty: qty, materialId: materialId, cutWidthCm: cutWidthCm, cutLengthCm: cutLengthCm) }
         struct Req: Encodable {
             let qty: Int; let materialId: UUID; let cutWidthCm: Double; let cutLengthCm: Double
@@ -451,7 +457,8 @@ class APIService: ObservableObject {
         }
         let basic: ProductSizeBasic = try await post(path: "/products/\(sku)/sizes/\(sizeId.uuidString)/stock-manual",
                                                      body: Req(qty: qty, materialId: materialId, cutWidthCm: cutWidthCm, cutLengthCm: cutLengthCm))
-        let name = await resolveProductName(sku: sku)
+        let name: String
+        if let productName { name = productName } else { name = await resolveProductName(sku: sku) }
         return sizeDetailFromBasic(basic, sku: sku, productName: name)
     }
 

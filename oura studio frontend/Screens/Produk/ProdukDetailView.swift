@@ -129,7 +129,7 @@ struct ProdukDetailView: View {
             await loadSizes()
         }
         .sheet(isPresented: $showAddSize, onDismiss: { Task { await loadSizes() } }) {
-            AddSizeSheet(productSku: product.sku, existingSizes: sizes)
+            AddSizeSheet(productSku: product.sku, existingSizes: sizes, productName: (currentProduct ?? product).name)
         }
         .sheet(isPresented: $isEditingProduct) {
             NavigationStack {
@@ -313,7 +313,8 @@ struct ProdukDetailView: View {
 
     private func loadSizes() async {
         isLoading = true
-        sizes = (try? await api.getProductSizes(sku: product.sku)) ?? []
+        // Pass known product name to skip extra GET /products?page=1&limit=500 inside APIService.
+        sizes = (try? await api.getProductSizes(sku: product.sku, productName: (currentProduct ?? product).name)) ?? []
         isLoading = false
     }
 
@@ -513,7 +514,8 @@ struct ProdukSizeGroupView: View {
             AddSizeSheet(
                 productSku: product.sku,
                 existingSizes: variants,
-                prefilledSizeLabel: sizeLabel
+                prefilledSizeLabel: sizeLabel,
+                productName: product.name
             )
         }
     }
@@ -613,7 +615,7 @@ struct ProdukSizeGroupView: View {
 
     private func load() async {
         isLoading = true
-        let all = (try? await api.getProductSizes(sku: product.sku)) ?? []
+        let all = (try? await api.getProductSizes(sku: product.sku, productName: product.name)) ?? []
         variants = all.filter { !$0.isArchived && $0.sizeLabel == sizeLabel }
         isLoading = false
     }
@@ -636,6 +638,8 @@ struct AddSizeSheet: View {
     let productSku: String
     let existingSizes: [ProductSizeDetail]
     var prefilledSizeLabel: String? = nil
+    // Optional display name to skip extra GET /products inside APIService.
+    var productName: String? = nil
 
     @State private var sizeLabel: String = ""
     @State private var fabricVariantName: String = ""       // non-variant mode (free text)
@@ -857,12 +861,12 @@ struct AddSizeSheet: View {
             if let existing = existingSizes.first(where: { $0.sizeLabel == s && $0.fabricVariantName == fabricName }) {
                 targetSize = existing
             } else {
-                targetSize = try await api.createProductSize(sku: productSku, sizeLabel: s, fabricVariantName: fabricName)
+                targetSize = try await api.createProductSize(sku: productSku, sizeLabel: s, fabricVariantName: fabricName, productName: productName)
             }
             if let qty = initialStockQty, qty > 0 {
                 if let specId = selectedSpecId {
                     do {
-                        _ = try await api.addStockFromBahan(sku: productSku, sizeId: targetSize.id, qty: Int(qty), specId: specId)
+                        _ = try await api.addStockFromBahan(sku: productSku, sizeId: targetSize.id, qty: Int(qty), specId: specId, productName: productName)
                     } catch APIError.serverError(404, _) {
                         // Spec found in picker but doesn't belong to this product on backend — fall back to plain stock add
                         _ = try await api.adjustStock(sku: productSku, sizeId: targetSize.id, qty: Int(qty), reason: "adjustment")
@@ -870,7 +874,7 @@ struct AddSizeSheet: View {
                 } else if let mat = allFabrics.first(where: { $0.name == fabricName }),
                           let w = manualCutWidthCm, w > 0,
                           let l = manualCutLengthCm, l > 0 {
-                    _ = try await api.addStockManual(sku: productSku, sizeId: targetSize.id, qty: Int(qty), materialId: mat.id, cutWidthCm: w, cutLengthCm: l)
+                    _ = try await api.addStockManual(sku: productSku, sizeId: targetSize.id, qty: Int(qty), materialId: mat.id, cutWidthCm: w, cutLengthCm: l, productName: productName)
                 } else {
                     _ = try await api.adjustStock(sku: productSku, sizeId: targetSize.id, qty: Int(qty), reason: "adjustment")
                 }
@@ -1244,7 +1248,7 @@ struct ProdukSizeDetailView: View {
     }
 
     private func refreshSize() async {
-        guard let fresh = try? await api.getProductSizes(sku: size.productSku),
+        guard let fresh = try? await api.getProductSizes(sku: size.productSku, productName: size.productName),
               let updated = fresh.first(where: { $0.id == size.id }) else { return }
         size = updated
     }
@@ -1625,7 +1629,8 @@ struct ProdukSizeDetailView: View {
                     manualHppPooled:   includeManualHpp ? (editHppPooled   ?? 0) : nil,
                     manualHppHardware: includeManualHpp ? (editHppHardware ?? 0) : nil,
                     manualHppLabor:    includeManualHpp ? (editHppLabor    ?? 0) : nil,
-                    manualHppOverhead: includeManualHpp ? (editHppOverhead ?? 0) : nil))
+                    manualHppOverhead: includeManualHpp ? (editHppOverhead ?? 0) : nil),
+                productName: size.productName)
             // Stock adjustment in Edit mode — plain adjustment, no bahan deduction.
             // Calculates difference between new and old stock, then calls adjustStock.
             if let newStock = editStockQty {
@@ -1644,7 +1649,8 @@ struct ProdukSizeDetailView: View {
     private func applyPrice(_ price: Double) async {
         do {
             _ = try await api.patchProductSize(sku: size.productSku, sizeId: size.id,
-                PatchProductSizeRequest(sellingPrice: price))
+                PatchProductSizeRequest(sellingPrice: price),
+                productName: size.productName)
             await refreshSize()
             // When Price Advisor is used while the Harga Jual field above is in Edit mode, that
             // field reads from editSellingPrice (not size.sellingPrice) -- without this, refreshSize()
@@ -1774,13 +1780,15 @@ struct TambahStokSheet: View {
             if deductBahan {
                 if let spec = relatedSpec {
                     _ = try await api.addStockFromBahan(sku: size.productSku, sizeId: size.id,
-                                                        qty: Int(q), specId: spec.id)
+                                                        qty: Int(q), specId: spec.id,
+                                                        productName: size.productName)
                 } else if let mat = relatedMaterial,
                           let cutW = manualCutWidth, cutW > 0,
                           let cutL = manualCutLength, cutL > 0 {
                     _ = try await api.addStockManual(sku: size.productSku, sizeId: size.id,
                                                      qty: Int(q), materialId: mat.id,
-                                                     cutWidthCm: cutW, cutLengthCm: cutL)
+                                                     cutWidthCm: cutW, cutLengthCm: cutL,
+                                                     productName: size.productName)
                 } else {
                     errorMsg = "Data bahan tidak lengkap. Nonaktifkan toggle atau lengkapi ukuran kain."
                     return
