@@ -222,10 +222,21 @@ struct SettingsView: View {
         do {
             let items = try await api.getSettings()
             dbValues = Dictionary(uniqueKeysWithValues: items.map { ($0.key, $0.value) })
-        } catch let e as APIError {
-            errorMsg = e.errorDescription
         } catch {
-            errorMsg = error.localizedDescription
+            // Pembatalan task (.task di-cancel saat pindah tab/segmen, atau
+            // URLSession dibatalkan) bukan error — abaikan agar banner
+            // "Koneksi gagal: cancelled" tidak muncul. APIService membungkus
+            // pembatalan jadi APIError.networkError(URLError.cancelled),
+            // jadi cek underlying error, bukan hanya CancellationError.
+            if isTaskCancellation(error) {
+                isLoading = false
+                return
+            }
+            if let e = error as? APIError {
+                errorMsg = e.errorDescription
+            } else {
+                errorMsg = error.localizedDescription
+            }
         }
         isLoading = false
     }
@@ -239,12 +250,32 @@ struct SettingsView: View {
             dbValues[def.key] = result.value
             editedValues.removeValue(forKey: def.key)
             savedKeys.insert(def.key)
-        } catch let e as APIError {
-            errorMsg = e.errorDescription
         } catch {
-            errorMsg = error.localizedDescription
+            if isTaskCancellation(error) {
+                isSaving.remove(def.key)
+                return
+            }
+            if let e = error as? APIError {
+                errorMsg = e.errorDescription
+            } else {
+                errorMsg = error.localizedDescription
+            }
         }
         isSaving.remove(def.key)
+    }
+
+    /// True jika error hanyalah pembatalan task (pindah tab/segmen, view hilang,
+    /// refresh tertimpa) — bukan kegagalan jaringan/server yang perlu ditampilkan.
+    private func isTaskCancellation(_ error: Error) -> Bool {
+        if error is CancellationError { return true }
+        if let urlErr = error as? URLError, urlErr.code == .cancelled { return true }
+        let nsErr = error as NSError
+        if nsErr.domain == NSURLErrorDomain && nsErr.code == NSURLErrorCancelled { return true }
+        if let apiErr = error as? APIError,
+           case .networkError(let underlying) = apiErr {
+            return isTaskCancellation(underlying)
+        }
+        return false
     }
 }
 

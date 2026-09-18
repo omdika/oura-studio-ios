@@ -132,6 +132,11 @@ class APIService: ObservableObject {
             }
             return data
         } catch let e as APIError { throw e }
+        // Task dibatalkan (pindah tab/halaman, .task di-cancel SwiftUI) BUKAN gangguan
+        // jaringan — teruskan sebagai CancellationError agar caller bisa mengabaikannya
+        // diam-diam, bukan menampilkannya sebagai "Koneksi gagal: cancelled".
+        catch let e as CancellationError { throw e }
+        catch let e as URLError where e.code == .cancelled { throw CancellationError() }
         catch { throw APIError.networkError(error) }
     }
 
