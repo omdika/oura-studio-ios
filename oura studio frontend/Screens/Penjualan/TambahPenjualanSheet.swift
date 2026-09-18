@@ -10,6 +10,9 @@ struct TambahPenjualanSheet: View {
     @AppStorage("isAutoPrintEnabled") private var isAutoPrintEnabled: Bool = false
 
     var onSave: (() -> Void)? = nil
+    /// Jika true, sheet QR scanner langsung dibuka saat sheet muncul.
+    /// Dipakai oleh tombol "Scan & Jual" di dashboard.
+    var autoStartScan: Bool = false
 
     @State private var availableSizes: [ProductSizeDetail] = []
     @State private var customerName: String = ""
@@ -25,6 +28,7 @@ struct TambahPenjualanSheet: View {
     // MARK: - QR Scan additions
     @State private var showQRScanner = false
     @State private var scanToast: ToastMessage? = nil
+    @State private var didAutoStartScan = false
 
     private struct SaleItem: Identifiable {
         let id = UUID()
@@ -199,13 +203,6 @@ struct TambahPenjualanSheet: View {
             }
             .environmentObject(api)
         }
-        // MARK: - QR Scanner Sheet
-        .sheet(isPresented: $showQRScanner) {
-            QRScannerSheet(mode: .addToExistingSale) { scannedSize in
-                handleScannedProduct(scannedSize)
-            }
-            .environmentObject(api)
-        }
 
         NavigationStack {
             ZStack(alignment: .top) { // ZStack for toast overlay
@@ -251,6 +248,24 @@ struct TambahPenjualanSheet: View {
                 .animation(.spring(response: 0.3, dampingFraction: 0.7), value: scanToast != nil)
                 .zIndex(10)
             }
+        }
+        .onAppear {
+            // Auto-buka kamera QR untuk flow "Scan & Jual" dari dashboard.
+            // DispatchQueue + delay agar animasi sheet Catat Penjualan selesai dulu,
+            // kalau pakai .task + sleep present nested sheet sering di-drop iOS.
+            if autoStartScan && !didAutoStartScan {
+                didAutoStartScan = true
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
+                    showQRScanner = true
+                }
+            }
+        }
+        // QR scanner ditempel di root agar present nested sheet stabil.
+        .sheet(isPresented: $showQRScanner) {
+            QRScannerSheet(mode: .addToExistingSale) { scannedSize in
+                handleScannedProduct(scannedSize)
+            }
+            .environmentObject(api)
         }
     }
 

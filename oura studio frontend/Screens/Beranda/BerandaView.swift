@@ -9,7 +9,7 @@ struct BerandaView: View {
     @State private var errorMsg: String?
     @State private var showTambahPembelian = false
     @State private var showTambahPenjualan = false
-    @State private var showQRScanner = false
+    @State private var showScanJual = false
     @State private var alertDisplayCount = 4
 
     private var greeting: String {
@@ -59,11 +59,10 @@ struct BerandaView: View {
                 TambahPembelianSheet(preselectedMaterial: nil)
             }
             .sheet(isPresented: $showTambahPenjualan) {
-                TambahPenjualanSheet()
+                TambahPenjualanSheet(autoStartScan: false)
             }
-            .sheet(isPresented: $showQRScanner) {
-                QRScannerSheet(mode: .sellOnly)
-                    .environmentObject(api)
+            .sheet(isPresented: $showScanJual) {
+                TambahPenjualanSheet(autoStartScan: true)
             }
         }
         .task { await loadDashboard() }
@@ -416,9 +415,9 @@ struct BerandaView: View {
                 }
                 .buttonStyle(.plain)
                 
-                // Scan & Jual (QR Scanner)
+                // Scan & Jual (QR Scanner) — buka Catat Penjualan dengan scanner langsung terbuka
                 Button {
-                    showQRScanner = true
+                    showScanJual = true
                 } label: {
                     VStack(spacing: 12) {
                         Image(systemName: "qrcode.viewfinder")
