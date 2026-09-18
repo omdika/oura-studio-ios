@@ -81,6 +81,18 @@ struct ProdukListView: View {
         allSizes.filter { !$0.isArchived && $0.currentStockQty == 0 }.count
     }
 
+    // iOS 16 workaround: mengubah visibility nav bar di tengah push-transition
+    // (search focus berubah saat tap row) bikin deadlock UINavigationBar -> freeze.
+    // iOS 17+ sudah rewrite layout nav bar jadi aman. Double kondisi:
+    // iOS 16 selalu .visible, iOS 17+ ikut isSearchFocused seperti semula.
+    private var navBarVisibility: Visibility {
+        if #available(iOS 17, *) {
+            return isSearchFocused ? .hidden : .visible
+        } else {
+            return .visible
+        }
+    }
+
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
             VStack(spacing: 0) {
@@ -112,7 +124,7 @@ struct ProdukListView: View {
         }
         .navigationTitle("Produk")
         .navigationBarTitleDisplayMode(.large)
-        .toolbar(isSearchFocused ? .hidden : .visible, for: .navigationBar)
+        .toolbar(navBarVisibility, for: .navigationBar)
         .onChange(of: isFilterActive) { _ in
             requestReload(force: true)
         }

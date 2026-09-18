@@ -79,6 +79,18 @@ struct ProdukDetailView: View {
 
     private var sizeGroups: [ProdukSizeGroup] { makeSizeGroups(from: sizes) }
 
+    // iOS 16 workaround: push large -> large (list .large ke detail .large)
+    // dengan ScrollView content hang di UINavigationBar large-title layout.
+    // Semua detail lain sudah .inline. Double kondisi: iOS 16 paksa .inline,
+    // iOS 17+ pertahankan .large seperti desain semula.
+    private var detailTitleDisplayMode: NavigationBarItem.TitleDisplayMode {
+        if #available(iOS 17, *) {
+            return .large
+        } else {
+            return .inline
+        }
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: OuraTheme.Spacing.sectionGap) {
@@ -99,7 +111,7 @@ struct ProdukDetailView: View {
         }
         .background(OuraTheme.Colors.background)
         .navigationTitle((currentProduct ?? product).name)
-        .navigationBarTitleDisplayMode(.large)
+        .navigationBarTitleDisplayMode(detailTitleDisplayMode)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Menu {
