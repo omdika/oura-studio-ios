@@ -81,6 +81,32 @@ struct ProdukListView: View {
         allSizes.filter { !$0.isArchived && $0.currentStockQty == 0 }.count
     }
 
+    // v3.60: varian yang tampil (ikut search + filter tanggal) untuk valuasi stok.
+    private var visibleSizesForValuation: [ProductSizeDetail] {
+        let ids = Set(filteredProductsToDisplay.map(\.id))
+        return allSizes.filter { s in
+            !s.isArchived && ids.contains(s.productId)
+            && (!isFilterActive || additionsByVariant[s.id] != nil)
+        }
+    }
+
+    // v3.60: (modal, omset, fallbackModal, unpriced).
+    // unitModal = HPP efektif (batch -> manual) fallback harga jual; unitOmset = harga jual.
+    private var stockValuation: (modal: Double, omset: Double, fallbackModal: Int, unpriced: Int) {
+        visibleSizesForValuation.reduce((0, 0, 0, 0)) { acc, s in
+            let qty = Double(s.currentStockQty)
+            guard qty > 0 else { return acc }
+            let hpp = s.effectiveHppBreakdown?.total
+            let price = s.sellingPrice
+            let unitModal = hpp ?? price ?? 0
+            let unitOmset = price ?? 0
+            return (acc.0 + qty * unitModal,
+                    acc.1 + qty * unitOmset,
+                    acc.2 + ((hpp == nil && price != nil) ? 1 : 0),
+                    acc.3 + ((hpp == nil && price == nil) ? 1 : 0))
+        }
+    }
+
     // iOS 16 workaround: mengubah visibility nav bar di tengah push-transition
     // (search focus berubah saat tap row) bikin deadlock UINavigationBar -> freeze.
     // iOS 17+ sudah rewrite layout nav bar jadi aman. Double kondisi:
@@ -319,6 +345,71 @@ struct ProdukListView: View {
         .ouraCard()
     }
 
+    // v3.60: banner full-width Nilai Modal + Potensi Omset (frontend-only).
+    private var stockValueBanner: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                stockValueColumn(
+                    icon: "banknote.fill",
+                    title: "Nilai Modal",
+                    value: stockValuation.modal.rupiahFormatted,
+                    color: OuraTheme.Colors.accent,
+                    bg: OuraTheme.Colors.accentLight
+                )
+                stockValueColumn(
+                    icon: "tag.fill",
+                    title: "Potensi Omset",
+                    value: stockValuation.omset.rupiahFormatted,
+                    color: OuraTheme.Colors.blueAccent,
+                    bg: OuraTheme.Colors.blueBg
+                )
+            }
+            if stockValuation.fallbackModal > 0 || stockValuation.unpriced > 0 {
+                footnoteText
+            }
+        }
+        .padding(OuraTheme.Spacing.cardPad)
+        .ouraCard()
+    }
+
+    private func stockValueColumn(icon: String, title: String, value: String, color: Color, bg: Color) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 4) {
+                Image(systemName: icon)
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(color)
+                    .frame(width: 20, height: 20)
+                    .background(bg)
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                Text(title)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(OuraTheme.Colors.textSecondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+            }
+            Text(value)
+                .font(.system(size: 15, weight: .bold))
+                .foregroundStyle(OuraTheme.Colors.textPrimary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var footnoteText: some View {
+        var parts: [String] = []
+        if stockValuation.fallbackModal > 0 {
+            parts.append("*\(stockValuation.fallbackModal) varian pakai harga jual sbg modal")
+        }
+        if stockValuation.unpriced > 0 {
+            parts.append("\(stockValuation.unpriced) varian tanpa harga tak terhitung")
+        }
+        return Text(parts.joined(separator: "; "))
+            .font(.system(size: 10))
+            .foregroundStyle(OuraTheme.Colors.textTertiary)
+            .lineLimit(2)
+    }
+
     private var dateFilterSection: some View {
         VStack(spacing: 10) {
             Toggle(isOn: $isFilterActive.animation()) {
@@ -362,6 +453,10 @@ struct ProdukListView: View {
 
                 summaryHeaderView
                     .padding(.bottom, 4)
+
+                if !filteredProductsToDisplay.isEmpty {
+                    stockValueBanner
+                }
 
                 dateFilterSection
 
