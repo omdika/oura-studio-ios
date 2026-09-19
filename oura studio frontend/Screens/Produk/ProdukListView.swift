@@ -81,6 +81,10 @@ struct ProdukListView: View {
         allSizes.filter { !$0.isArchived && $0.currentStockQty == 0 }.count
     }
 
+    private var totalVarianCount: Int {
+        allSizes.filter { !$0.isArchived }.count
+    }
+
     // v3.60: varian yang tampil (ikut search + filter tanggal) untuk valuasi stok.
     private var visibleSizesForValuation: [ProductSizeDetail] {
         let ids = Set(filteredProductsToDisplay.map(\.id))
@@ -289,30 +293,42 @@ struct ProdukListView: View {
     }
 
     private var summaryHeaderView: some View {
-        HStack(spacing: 8) {
-            statCard(
-                icon: "tag.fill",
-                title: "Total Produk",
-                value: "\(totalProductsCount)",
-                color: OuraTheme.Colors.blueAccent,
-                bg: OuraTheme.Colors.blueBg
-            )
+        VStack(spacing: 8) {
+            HStack(spacing: 8) {
+                statCard(
+                    icon: "tag.fill",
+                    title: "Total Produk",
+                    value: "\(totalProductsCount)",
+                    color: OuraTheme.Colors.blueAccent,
+                    bg: OuraTheme.Colors.blueBg
+                )
 
-            statCard(
-                icon: "shippingbox.fill",
-                title: "Total Stok",
-                value: "\(totalStockQty) pcs",
-                color: OuraTheme.Colors.accent,
-                bg: OuraTheme.Colors.accentLight
-            )
+                statCard(
+                    icon: "square.grid.2x2.fill",
+                    title: "Total Varian",
+                    value: "\(totalVarianCount) var",
+                    color: OuraTheme.Colors.purple,
+                    bg: OuraTheme.Colors.purpleBg
+                )
+            }
 
-            statCard(
-                icon: "slash.circle.fill",
-                title: "Stok Kosong",
-                value: "\(outOfStockCount) var",
-                color: OuraTheme.Colors.dangerText,
-                bg: OuraTheme.Colors.dangerBg
-            )
+            HStack(spacing: 8) {
+                statCard(
+                    icon: "shippingbox.fill",
+                    title: "Total Stok",
+                    value: "\(totalStockQty) pcs",
+                    color: OuraTheme.Colors.accent,
+                    bg: OuraTheme.Colors.accentLight
+                )
+
+                statCard(
+                    icon: "slash.circle.fill",
+                    title: "Stok Kosong",
+                    value: "\(outOfStockCount) var",
+                    color: OuraTheme.Colors.dangerText,
+                    bg: OuraTheme.Colors.dangerBg
+                )
+            }
         }
     }
 
