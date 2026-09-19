@@ -145,6 +145,13 @@ struct ProdukListView: View {
                         productList
                     }
                 }
+                // Tap di luar search field (list area, empty area) untuk hide keyboard
+                .contentShape(Rectangle())
+                .simultaneousGesture(
+                    TapGesture().onEnded {
+                        if isSearchFocused { isSearchFocused = false }
+                    }
+                )
             }
             .background(OuraTheme.Colors.background)
 
@@ -524,7 +531,13 @@ struct ProdukListView: View {
             .padding(.top, 12)
             .padding(.bottom, 100)
         }
+        .scrollDismissesKeyboard(.immediately)
         .background(OuraTheme.Colors.background)
+        .simultaneousGesture(
+            TapGesture().onEnded {
+                if isSearchFocused { isSearchFocused = false }
+            }
+        )
     }
 
     private var emptyView: some View {
@@ -575,6 +588,36 @@ struct ProdukListView: View {
         }
         currentPage = 1
 
+        // v3.57 fix: date filter was invisible for products beyond page 1
+        // (SCRSATARMPIN at 45/67, size 239/441) because we only fetched page 1
+        // (20 products / 60 sizes) then filtered locally against additionsByVariant.
+        // When isFilterActive, fetch ledger first then load ALL pages so every
+        // product with stock additions is present for filtering.
+        if isFilterActive {
+            var ledgerAdditions: [UUID: Int] = [:]
+            do {
+                let entries = try await api.getStockLedger(from: filterFrom, to: filterTo)
+                ledgerAdditions = Dictionary(grouping: entries, by: { $0.productSizeId })
+                    .mapValues { entries in entries.reduce(0) { $0 + $1.changeQty } }
+                    .filter { $0.value > 0 }
+            } catch {
+                print("⚠️ [v3.57] Gagal memuat stock ledger dari backend: \(error)")
+            }
+            if Task.isCancelled { return }
+            additionsByVariant = ledgerAdditions
+
+            // Load full dataset so filter can find products beyond page 1.
+            // 67 products / 441 sizes → ~3 + 8 requests, acceptable vs missing results.
+            let allProds = await fetchAllProducts()
+            let allSz = await fetchAllProductSizes()
+            if Task.isCancelled { return }
+            if !allProds.isEmpty { products = allProds }
+            if !allSz.isEmpty { allSizes = allSz }
+            totalPages = 1
+            hasMorePages = false
+            return
+        }
+
         async let p = api.getProducts(page: 1, limit: limit)
         async let s = api.getAllProductSizes(page: 1, limit: limit * 3)
 
@@ -591,22 +634,42 @@ struct ProdukListView: View {
             hasMorePages = (resP.nextPage != nil)
         }
 
-        var ledgerAdditions: [UUID: Int] = [:]
-        if isFilterActive {
-            do {
-                let entries = try await api.getStockLedger(from: filterFrom, to: filterTo)
-                ledgerAdditions = Dictionary(grouping: entries, by: { $0.productSizeId })
-                    .mapValues { entries in entries.reduce(0) { $0 + $1.changeQty } }
-                    .filter { $0.value > 0 }
-            } catch {
-                print("⚠️ [v3.56] Gagal memuat stock ledger dari backend: \(error)")
-            }
-        }
+        additionsByVariant = [:]
+    }
 
-        additionsByVariant = ledgerAdditions
+    // v3.57 helper: fetch all pages sequentially (used only when date filter active)
+    private func fetchAllProducts() async -> [Product] {
+        var result: [Product] = []
+        var page = 1
+        while true {
+            if Task.isCancelled { break }
+            guard let res = try? await api.getProducts(page: page, limit: limit) else { break }
+            result.append(contentsOf: res.data)
+            if res.nextPage == nil { break }
+            page += 1
+            if page > 50 { break } // safety guard
+        }
+        return result
+    }
+
+    private func fetchAllProductSizes() async -> [ProductSizeDetail] {
+        var result: [ProductSizeDetail] = []
+        var page = 1
+        let sizeLimit = limit * 3
+        while true {
+            if Task.isCancelled { break }
+            guard let res = try? await api.getAllProductSizes(page: page, limit: sizeLimit) else { break }
+            result.append(contentsOf: res.data)
+            if res.nextPage == nil { break }
+            page += 1
+            if page > 50 { break }
+        }
+        return result
     }
 
     private func loadMoreProducts() async {
+        // v3.57: when date filter active we already loaded full dataset, no pagination needed
+        guard !isFilterActive else { return }
         guard !isLoadingMore && hasMorePages else { return }
         isLoadingMore = true
         let nextPage = currentPage + 1
