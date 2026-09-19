@@ -1757,8 +1757,17 @@ struct ProdukSizeDetailView: View {
     private func saveEdits() async {
         isSaving = true; errorMsg = nil; successMsg = nil; defer { isSaving = false }
         let includeManualHpp = editHppTotal > 0 && size.latestHppBreakdown == nil
+        // v3.57b: single PATCH with optional stock adjustment to avoid 3-call waterfall
+        // (PATCH + POST /stock/adjustments + GET detail = ~700ms). Backend now handles
+        // adjust_stock_by in same transaction and returns updated ProductSizeOut with
+        // fresh stock aggregates, so no second round-trip is needed.
+        let diff: Int? = {
+            guard let newStock = editStockQty else { return nil }
+            let d = Int(newStock) - size.currentStockQty
+            return d != 0 ? d : nil
+        }()
         do {
-            var updated = try await api.patchProductSize(sku: size.productSku, sizeId: size.id,
+            let updated = try await api.patchProductSize(sku: size.productSku, sizeId: size.id,
                 PatchProductSizeRequest(
                     sellingPrice: editSellingPrice,
                     reorderMinQty: editReorderMin,
@@ -1766,16 +1775,10 @@ struct ProdukSizeDetailView: View {
                     manualHppPooled:   includeManualHpp ? (editHppPooled   ?? 0) : nil,
                     manualHppHardware: includeManualHpp ? (editHppHardware ?? 0) : nil,
                     manualHppLabor:    includeManualHpp ? (editHppLabor    ?? 0) : nil,
-                    manualHppOverhead: includeManualHpp ? (editHppOverhead ?? 0) : nil),
+                    manualHppOverhead: includeManualHpp ? (editHppOverhead ?? 0) : nil,
+                    adjustStockBy: diff,
+                    adjustStockReason: diff != nil ? "adjustment" : nil),
                 productName: size.productName)
-            // Stock adjustment in Edit mode — plain adjustment, no bahan deduction.
-            // Calculates difference between new and old stock, then calls adjustStock.
-            if let newStock = editStockQty {
-                let diff = Int(newStock) - size.currentStockQty
-                if diff != 0 {
-                    updated = try await api.adjustStock(sku: size.productSku, sizeId: size.id, qty: diff, reason: "adjustment")
-                }
-            }
             size = updated
             editStockQty = nil
             successMsg = "Perubahan berhasil disimpan"

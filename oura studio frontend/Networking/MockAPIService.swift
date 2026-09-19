@@ -671,13 +671,20 @@ class MockAPIService {
         let price = req.sellingPrice ?? old.sellingPrice
         let hpp = old.latestHppBreakdown?.total
         let margin: Double? = (price != nil && hpp != nil && price! > 0) ? (price! - hpp!) / price! : old.marginPct
+        var newStock = old.currentStockQty
+        var newProd = old.productionStockQty
+        var newManual = old.manualStockQty
+        if let diff = req.adjustStockBy, diff != 0 {
+            newStock += diff
+            newManual += diff
+        }
         let updated = ProductSizeDetail(id: old.id, productId: old.productId, productSku: sku,
                                         productName: old.productName, sizeLabel: old.sizeLabel,
                                         fabricVariantName: old.fabricVariantName,
                                         reorderMinQty: req.reorderMinQty ?? old.reorderMinQty,
                                         isArchived: old.isArchived,
-                                        currentStockQty: old.currentStockQty,
-                                        productionStockQty: old.productionStockQty, manualStockQty: old.manualStockQty,
+                                        currentStockQty: newStock,
+                                        productionStockQty: newProd, manualStockQty: newManual,
                                         latestHppBreakdown: old.latestHppBreakdown,
                                         sellingPrice: price,
                                         marginPct: margin)

@@ -269,11 +269,15 @@ struct PatchProductSizeRequest: Codable {
     let manualHppHardware: Double?
     let manualHppLabor: Double?
     let manualHppOverhead: Double?
+    let adjustStockBy: Int?
+    let adjustStockReason: String?
+    let adjustStockNote: String?
 
     init(sellingPrice: Double? = nil, reorderMinQty: Double? = nil, isArchived: Bool? = nil,
          manualHppFabric: Double? = nil, manualHppPooled: Double? = nil,
          manualHppHardware: Double? = nil, manualHppLabor: Double? = nil,
-         manualHppOverhead: Double? = nil) {
+         manualHppOverhead: Double? = nil,
+         adjustStockBy: Int? = nil, adjustStockReason: String? = nil, adjustStockNote: String? = nil) {
         self.sellingPrice = sellingPrice
         self.reorderMinQty = reorderMinQty
         self.isArchived = isArchived
@@ -282,6 +286,9 @@ struct PatchProductSizeRequest: Codable {
         self.manualHppHardware = manualHppHardware
         self.manualHppLabor    = manualHppLabor
         self.manualHppOverhead = manualHppOverhead
+        self.adjustStockBy     = adjustStockBy
+        self.adjustStockReason = adjustStockReason
+        self.adjustStockNote   = adjustStockNote
     }
 
     enum CodingKeys: String, CodingKey {
@@ -293,6 +300,9 @@ struct PatchProductSizeRequest: Codable {
         case manualHppHardware = "manual_hpp_hardware"
         case manualHppLabor    = "manual_hpp_labor"
         case manualHppOverhead = "manual_hpp_overhead"
+        case adjustStockBy     = "adjust_stock_by"
+        case adjustStockReason = "adjust_stock_reason"
+        case adjustStockNote   = "adjust_stock_note"
     }
 }
 
