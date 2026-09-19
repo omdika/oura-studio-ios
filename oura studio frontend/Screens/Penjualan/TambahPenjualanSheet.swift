@@ -119,26 +119,13 @@ struct TambahPenjualanSheet: View {
                     itemCard(item: $item)
                 }
 
-                // MARK: - QR Scan button added here
-                HStack {
-                    Button { showProductPicker = true } label: {
-                        Label("Tambah Produk", systemImage: "plus.circle.fill")
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundStyle(OuraTheme.Colors.accent)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                    .buttonStyle(.plain)
-
-                    Button { showQRScanner = true } label: {
-                        Image(systemName: "qrcode.viewfinder")
-                            .font(.system(size: 20))
-                            .foregroundStyle(OuraTheme.Colors.accent)
-                            .padding(8)
-                            .background(OuraTheme.Colors.accentLight)
-                            .clipShape(Circle())
-                    }
-                    .buttonStyle(.plain)
+                Button { showProductPicker = true } label: {
+                    Label("Tambah Produk", systemImage: "plus.circle.fill")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(OuraTheme.Colors.accent)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
+                .buttonStyle(.plain)
                 .listRowBackground(OuraTheme.Colors.surfaceCard)
                 .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
             } header: { OuraSectionHeader(title: "Produk Dijual") }
@@ -168,6 +155,16 @@ struct TambahPenjualanSheet: View {
                         .listRowBackground(OuraTheme.Colors.dangerBg)
                 }
             }
+
+            // Spacer kecil — safeAreaInset sudah menangani ruang floating button,
+            // ini hanya memberi napas ekstra agar last item tidak mepet
+            Section {
+                Color.clear
+                    .frame(height: 8)
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+            }
+            .listSectionSeparator(.hidden)
         }
         .scrollContentBackground(.hidden)
         .background(OuraTheme.Colors.background)
@@ -205,7 +202,7 @@ struct TambahPenjualanSheet: View {
         }
 
         NavigationStack {
-            ZStack(alignment: .top) { // ZStack for toast overlay
+            ZStack {
                 content
                     .navigationTitle("Catat Penjualan")
                     .navigationBarTitleDisplayMode(.inline)
@@ -224,14 +221,42 @@ struct TambahPenjualanSheet: View {
                         }
                     }
                     .scrollDismissesKeyboard(.interactively)
+                    .safeAreaInset(edge: .bottom, spacing: 0) {
+                        // Floating Scan QR — center bottom, lebih besar, kontras, auto naik di atas keyboard
+                        Button { showQRScanner = true } label: {
+                            HStack(spacing: 10) {
+                                Image(systemName: "qrcode.viewfinder")
+                                    .font(.system(size: 22, weight: .semibold))
+                                Text("Scan QR")
+                                    .font(.system(size: 16, weight: .bold))
+                            }
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 28)
+                            .padding(.vertical, 16)
+                            .background(OuraTheme.Colors.accentGradient)
+                            .clipShape(Capsule())
+                            .shadow(color: .black.opacity(0.22), radius: 12, x: 0, y: 6)
+                            .shadow(color: OuraTheme.Colors.accent.opacity(0.35), radius: 10, x: 0, y: 4)
+                            .overlay(
+                                Capsule()
+                                    .stroke(Color.white.opacity(0.18), lineWidth: 1)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Scan QR produk")
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 12)
+                        .padding(.bottom, 12)
+                        .background(.ultraThinMaterial)
+                    }
 
-                // MARK: - Scan Toast Overlay
+                // MARK: - Scan Toast Overlay (top)
                 VStack {
                     if let toast = scanToast {
                         HStack(spacing: 8) {
-                            Image(systemName: toast.iconName) // Dynamic icon
+                            Image(systemName: toast.iconName)
                                 .font(.system(size: 14))
-                                .foregroundStyle(toast.iconColor) // Dynamic color
+                                .foregroundStyle(toast.iconColor)
                             Text(toast.text)
                                 .font(.system(size: 14, weight: .medium))
                                 .foregroundStyle(.white)
@@ -390,11 +415,12 @@ struct TambahPenjualanSheet: View {
 
     // MARK: - Handle Scanned Product
     private func handleScannedProduct(_ size: ProductSizeDetail) {
-        // Check stock availability
+        // Check stock availability — beep error jika stok kosong
         guard size.currentStockQty > 0 else {
+            ScanFeedback.error()
             scanToast = ToastMessage(
                 text: "Stok habis untuk \(size.displayLabel)",
-                iconName: "xmark.circle.fill", // Red cross for stock out
+                iconName: "xmark.circle.fill",
                 iconColor: OuraTheme.Colors.dangerText
             )
             scheduleToastDismiss()
@@ -406,15 +432,17 @@ struct TambahPenjualanSheet: View {
             let currentQty = Int(items[index].qty ?? 0)
             if currentQty < size.currentStockQty {
                 items[index].qty = Double(currentQty + 1)
+                ScanFeedback.success()
                 scanToast = ToastMessage(
                     text: "Kuantitas \(size.displayLabel) bertambah (\(currentQty + 1)×)",
-                    iconName: "checkmark.circle.fill", // Green checkmark for success
+                    iconName: "checkmark.circle.fill",
                     iconColor: OuraTheme.Colors.greenAccent
                 )
             } else {
+                ScanFeedback.error()
                 scanToast = ToastMessage(
                     text: "Stok penuh untuk \(size.displayLabel) (\(size.currentStockQty) pcs)",
-                    iconName: "xmark.circle.fill", // Red cross for stock full
+                    iconName: "xmark.circle.fill",
                     iconColor: OuraTheme.Colors.dangerText
                 )
             }
@@ -431,9 +459,10 @@ struct TambahPenjualanSheet: View {
                 unitPrice: size.sellingPrice != nil ? finalPrice : nil,
                 discount: nil
             ))
+            ScanFeedback.success()
             scanToast = ToastMessage(
                 text: "\(size.productName) · \(size.displayLabel) ditambahkan",
-                iconName: "checkmark.circle.fill", // Green checkmark for success
+                iconName: "checkmark.circle.fill",
                 iconColor: OuraTheme.Colors.greenAccent
             )
         }

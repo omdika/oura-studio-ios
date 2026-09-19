@@ -497,22 +497,27 @@ struct QRScannerSheet: View {
             let size = try await api.getProductSizeById(id: id)
             if mode == .sellOnly {
                 addToCart(size)
-            } else if mode == .addToExistingSale { // NEW: Call callback and reset to scanning
+            } else if mode == .addToExistingSale {
+                // Beep ditangani oleh TambahPenjualanSheet.handleScannedProduct
+                // (beda nada success vs stok habis), jadi di sini tidak bunyi ganda.
                 onProductScanned?(size)
-                dismiss() // Dismiss the sheet after scanning and processing
+                dismiss()
             } else {
+                ScanFeedback.success()
                 scanState = .resolved(size)
             }
         } catch {
+            ScanFeedback.error()
             scanState = .error("Produk tidak ditemukan. QR mungkin sudah tidak aktif.")
         }
     }
 
     private func addToCart(_ size: ProductSizeDetail) {
         guard size.currentStockQty >= 1 else {
+            ScanFeedback.error()
             cartToast = ToastMessage(
                 text: "Stok habis — \(size.productName) belum diisi stok",
-                iconName: "xmark.circle.fill", // Red cross for stock out
+                iconName: "xmark.circle.fill",
                 iconColor: OuraTheme.Colors.dangerText
             )
             scanState = .scanning
@@ -522,9 +527,10 @@ struct QRScannerSheet: View {
         if let idx = cartItems.firstIndex(where: { $0.size.id == size.id }) {
             let newQty = cartItems[idx].qty + 1
             guard newQty <= size.currentStockQty else {
+                ScanFeedback.error()
                 cartToast = ToastMessage(
                     text: "Stok \(size.displayLabel) sudah penuh (\(size.currentStockQty) pcs)",
-                    iconName: "xmark.circle.fill", // Red cross for stock full
+                    iconName: "xmark.circle.fill",
                     iconColor: OuraTheme.Colors.dangerText
                 )
                 scanState = .scanning
@@ -532,20 +538,21 @@ struct QRScannerSheet: View {
                 return
             }
             cartItems[idx].qty = newQty
+            ScanFeedback.success()
             cartToast = ToastMessage(
                 text: "\(size.productName) · \(size.displayLabel) (\(newQty)×)",
-                iconName: "checkmark.circle.fill", // Green checkmark for success
+                iconName: "checkmark.circle.fill",
                 iconColor: OuraTheme.Colors.greenAccent
             )
         } else {
             cartItems.append(CartItem(size: size))
+            ScanFeedback.success()
             cartToast = ToastMessage(
                 text: "\(size.productName) · \(size.displayLabel) ditambahkan",
-                iconName: "checkmark.circle.fill", // Green checkmark for success
+                iconName: "checkmark.circle.fill",
                 iconColor: OuraTheme.Colors.greenAccent
             )
         }
-        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         scanState = .scanning
         scheduleToastDismiss()
     }
