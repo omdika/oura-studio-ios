@@ -76,6 +76,7 @@ struct ProdukDetailView: View {
     @State private var showAddSize = false
     @State private var showArchiveAlert = false
     @State private var errorMsg: String?
+    @State private var isSavingProduct = false
 
     private var sizeGroups: [ProdukSizeGroup] { makeSizeGroups(from: sizes) }
 
@@ -118,7 +119,7 @@ struct ProdukDetailView: View {
                     Button {
                         let activeProduct = currentProduct ?? product
                         editName = activeProduct.name
-                        editCategory = activeProduct.name
+                        editCategory = activeProduct.category
                         isEditingProduct = true
                     } label: {
                         Label("Ubah Detail Produk", systemImage: "pencil")
@@ -145,52 +146,94 @@ struct ProdukDetailView: View {
         }
         .sheet(isPresented: $isEditingProduct) {
             NavigationStack {
-                VStack(alignment: .leading, spacing: 20) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Nama Produk")
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(OuraTheme.Colors.textTertiary)
-                            .textCase(.uppercase)
-                            .tracking(0.5)
-                        
-                        TextField("Nama produk", text: $editName)
-                            .font(.system(size: 15))
-                            .foregroundStyle(OuraTheme.Colors.textPrimary)
-                            .autocorrectionDisabled()
-                            .fieldStyle()
+                ZStack {
+                    VStack(alignment: .leading, spacing: 20) {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Nama Produk")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundStyle(OuraTheme.Colors.textTertiary)
+                                .textCase(.uppercase)
+                                .tracking(0.5)
+
+                            TextField("Nama produk", text: $editName)
+                                .font(.system(size: 15))
+                                .foregroundStyle(OuraTheme.Colors.textPrimary)
+                                .autocorrectionDisabled()
+                                .fieldStyle()
+                                .disabled(isSavingProduct)
+                            Text("Nama akan tampil di daftar produk dan label QR.")
+                                .font(.system(size: 12))
+                                .foregroundStyle(OuraTheme.Colors.textTertiary)
+                        }
+
+                        VStack(alignment: .leading, spacing: 8) {
+                            ChipSingleSelect(
+                                label: "Kategori Produk (Shopee Mass Upload)",
+                                selected: $editCategory,
+                                options: [
+                                    ("scrunchie", "Scrunchie (100146)"),
+                                    ("pouch", "Pouch (101650)")
+                                ]
+                            )
+                        }
+                        .disabled(isSavingProduct)
+
+                        if let err = errorMsg {
+                            Text(err)
+                                .font(.system(size: 13))
+                                .foregroundStyle(OuraTheme.Colors.dangerText)
+                                .padding(10)
+                                .background(OuraTheme.Colors.dangerBg)
+                                .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.medium))
+                        }
+
+                        Spacer()
                     }
-                    
-                    VStack(alignment: .leading, spacing: 8) {
-                        ChipSingleSelect(
-                            label: "Kategori Produk (Shopee Mass Upload)",
-                            selected: $editCategory,
-                            options: [
-                                ("scrunchie", "Scrunchie (100146)"),
-                                ("pouch", "Pouch (101650)")
-                            ]
-                        )
+                    .padding(24)
+                    .background(OuraTheme.Colors.background)
+
+                    if isSavingProduct {
+                        ZStack {
+                            Color.black.opacity(0.25).ignoresSafeArea()
+                            VStack(spacing: 12) {
+                                ProgressView().tint(OuraTheme.Colors.accent)
+                                Text("Menyimpan...")
+                                    .font(.system(size: 13, weight: .medium))
+                                    .foregroundStyle(OuraTheme.Colors.textSecondary)
+                            }
+                            .padding(20)
+                            .background(OuraTheme.Colors.surfaceCard)
+                            .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.medium))
+                            .shadow(radius: 12)
+                        }
                     }
-                    
-                    Spacer()
                 }
-                .padding(24)
-                .background(OuraTheme.Colors.background)
                 .navigationTitle("Ubah Detail Produk")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
-                        Button("Batal") { isEditingProduct = false }
+                        Button("Batal") { if !isSavingProduct { isEditingProduct = false } }
                             .foregroundStyle(OuraTheme.Colors.accent)
+                            .disabled(isSavingProduct)
                     }
                     ToolbarItem(placement: .confirmationAction) {
-                        Button("Simpan") {
-                            isEditingProduct = false
+                        Button {
                             Task { await saveProductChanges() }
+                        } label: {
+                            if isSavingProduct {
+                                HStack(spacing: 6) {
+                                    ProgressView().scaleEffect(0.8).tint(OuraTheme.Colors.accent)
+                                    Text("Menyimpan...")
+                                }
+                            } else {
+                                Text("Simpan")
+                            }
                         }
-                        .disabled(editName.trimmingCharacters(in: .whitespaces).isEmpty)
+                        .disabled(editName.trimmingCharacters(in: .whitespaces).isEmpty || isSavingProduct)
                         .foregroundStyle(OuraTheme.Colors.accent)
                     }
                 }
+                .interactiveDismissDisabled(isSavingProduct)
             }
             .presentationDetents([.medium])
         }
@@ -332,6 +375,8 @@ struct ProdukDetailView: View {
 
     private func saveProductChanges() async {
         guard !editName.trimmingCharacters(in: .whitespaces).isEmpty else { return }
+        isSavingProduct = true; errorMsg = nil
+        defer { isSavingProduct = false }
         do {
             let updated = try await api.patchProduct(
                 sku: product.sku,
@@ -340,6 +385,7 @@ struct ProdukDetailView: View {
             )
             currentProduct = updated
             onProductChanged?()
+            isEditingProduct = false
         } catch let e as APIError { errorMsg = e.errorDescription }
         catch { errorMsg = error.localizedDescription }
     }
@@ -1061,6 +1107,7 @@ struct ProdukSizeDetailView: View {
     @State private var isSaving = false
     @State private var showAddStock = false
     @State private var errorMsg: String?
+    @State private var successMsg: String?
 
     @State private var selectedItems: [PhotosPickerItem] = []
     @State private var isUploading = false
@@ -1084,31 +1131,94 @@ struct ProdukSizeDetailView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: OuraTheme.Spacing.sectionGap) {
-                infoCard
-                photosSection
-                hppSection
-                priceAdvisorSection
-                if let err = errorMsg {
-                    Text(err).font(.system(size: 13)).foregroundStyle(OuraTheme.Colors.dangerText).padding(.horizontal)
+        ZStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: OuraTheme.Spacing.sectionGap) {
+                    infoCard
+                    photosSection
+                    hppSection
+                    priceAdvisorSection
+                    if let err = errorMsg {
+                        HStack(spacing: 8) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .font(.system(size: 13))
+                            Text(err).font(.system(size: 13))
+                        }
+                        .foregroundStyle(OuraTheme.Colors.dangerText)
+                        .padding(12)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(OuraTheme.Colors.dangerBg)
+                        .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.medium))
+                    }
+                    if let msg = successMsg {
+                        HStack(spacing: 8) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.system(size: 13))
+                            Text(msg).font(.system(size: 13))
+                        }
+                        .foregroundStyle(OuraTheme.Colors.greenAccent)
+                        .padding(12)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(OuraTheme.Colors.greenBg)
+                        .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.medium))
+                    }
+                }
+                .padding(.horizontal, OuraTheme.Spacing.horizontal)
+                .padding(.top, 12)
+                .padding(.bottom, 32)
+            }
+            .background(OuraTheme.Colors.background)
+            .disabled(isSaving)
+
+            if isSaving {
+                ZStack {
+                    Color.black.opacity(0.28).ignoresSafeArea()
+                    VStack(spacing: 12) {
+                        ProgressView().tint(OuraTheme.Colors.accent).scaleEffect(1.2)
+                        Text("Menyimpan perubahan...")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(OuraTheme.Colors.textSecondary)
+                        Text("Mohon tunggu sebentar")
+                            .font(.system(size: 11))
+                            .foregroundStyle(OuraTheme.Colors.textTertiary)
+                    }
+                    .padding(24)
+                    .background(OuraTheme.Colors.surfaceCard)
+                    .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.medium))
+                    .shadow(color: .black.opacity(0.15), radius: 16, y: 8)
                 }
             }
-            .padding(.horizontal, OuraTheme.Spacing.horizontal)
-            .padding(.top, 12)
-            .padding(.bottom, 32)
         }
         .background(OuraTheme.Colors.background)
         .navigationTitle(size.displayLabel)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                Button(isEditing ? "Simpan" : "Edit") {
+                Button {
                     if isEditing { Task { await saveEdits() } }
                     else { startEdit() }
+                } label: {
+                    if isSaving {
+                        HStack(spacing: 6) {
+                            ProgressView().scaleEffect(0.8).tint(OuraTheme.Colors.accent)
+                            Text("Menyimpan...")
+                                .font(.system(size: 14, weight: .medium))
+                        }
+                    } else {
+                        Text(isEditing ? "Simpan" : "Edit")
+                    }
                 }
                 .foregroundStyle(isSaving ? OuraTheme.Colors.textDisabled : OuraTheme.Colors.accent)
                 .disabled(isSaving)
+            }
+            if isEditing && !isSaving {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Batal") {
+                        errorMsg = nil; successMsg = nil
+                        withAnimation { isEditing = false }
+                    }
+                    .foregroundStyle(OuraTheme.Colors.textSecondary)
+                }
             }
         }
         .task {
@@ -1351,9 +1461,24 @@ struct ProdukSizeDetailView: View {
             stockRow
             if isEditing {
                 Divider().overlay(OuraTheme.Colors.separator)
-                NumericInputField(label: "Stok (pcs)", value: $editStockQty, unit: "pcs")
-                CurrencyInputField(label: "Harga Jual", value: $editSellingPrice)
-                NumericInputField(label: "Reorder Min (pcs)", value: $editReorderMin, unit: "pcs")
+                VStack(alignment: .leading, spacing: 4) {
+                    NumericInputField(label: "Stok (pcs)", value: $editStockQty, unit: "pcs")
+                    Text("Atur total stok saat ini. Selisih akan dicatat sebagai penyesuaian manual.")
+                        .font(.system(size: 11))
+                        .foregroundStyle(OuraTheme.Colors.textTertiary)
+                }
+                VStack(alignment: .leading, spacing: 4) {
+                    CurrencyInputField(label: "Harga Jual", value: $editSellingPrice)
+                    Text("Harga yang tampil di katalog dan penjualan.")
+                        .font(.system(size: 11))
+                        .foregroundStyle(OuraTheme.Colors.textTertiary)
+                }
+                VStack(alignment: .leading, spacing: 4) {
+                    NumericInputField(label: "Reorder Min (pcs)", value: $editReorderMin, unit: "pcs")
+                    Text("Jika stok di bawah angka ini, varian akan ditandai Menipis.")
+                        .font(.system(size: 11))
+                        .foregroundStyle(OuraTheme.Colors.textTertiary)
+                }
             } else {
                 if let fabric = size.fabricVariantName { infoRow("Jenis Kain", value: fabric) }
                 if let price = size.sellingPrice {
@@ -1630,7 +1755,7 @@ struct ProdukSizeDetailView: View {
     }
 
     private func saveEdits() async {
-        isSaving = true; errorMsg = nil; defer { isSaving = false }
+        isSaving = true; errorMsg = nil; successMsg = nil; defer { isSaving = false }
         let includeManualHpp = editHppTotal > 0 && size.latestHppBreakdown == nil
         do {
             var updated = try await api.patchProductSize(sku: size.productSku, sizeId: size.id,
@@ -1653,7 +1778,13 @@ struct ProdukSizeDetailView: View {
             }
             size = updated
             editStockQty = nil
+            successMsg = "Perubahan berhasil disimpan"
             withAnimation { isEditing = false }
+            // Hilangkan banner sukses otomatis setelah 2.5 detik
+            try? await Task.sleep(nanoseconds: 2_500_000_000)
+            if successMsg == "Perubahan berhasil disimpan" { successMsg = nil }
+        } catch is CancellationError {
+            // Abaikan pembatalan task (mis: user pindah halaman)
         } catch let e as APIError { errorMsg = e.errorDescription }
         catch { errorMsg = error.localizedDescription }
     }
@@ -1706,67 +1837,115 @@ struct TambahStokSheet: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section {
-                    NumericInputField(label: "Jumlah", value: $qty, unit: "pcs")
-                        .listRowBackground(OuraTheme.Colors.surfaceCard)
-                } header: { OuraSectionHeader(title: "Jumlah") }
-
-                if hasFabricVariant {
+            ZStack {
+                Form {
                     Section {
-                        Toggle("Gunakan stok bahan", isOn: $deductBahan)
+                        NumericInputField(label: "Jumlah", value: $qty, unit: "pcs")
                             .listRowBackground(OuraTheme.Colors.surfaceCard)
-                    } header: { OuraSectionHeader(title: "Bahan") }
+                    } header: { OuraSectionHeader(title: "Jumlah") }
                       footer: {
-                          if deductBahan {
-                              if isLoadingSpec {
-                                  Text("Mengecek resep...")
-                              } else if let spec = relatedSpec {
-                                  let fabric = spec.fabrics.first
-                                  let dims = fabric.map { "\(Int($0.cutLengthCm)) × \(Int($0.cutWidthCm)) cm" } ?? "-"
-                                  Text("Resep ditemukan (\(dims)). Stok \(size.fabricVariantName ?? "bahan") akan dikurangi otomatis.")
-                              } else {
-                                  Text("Resep belum ada untuk varian ini. Masukkan ukuran kain yang dipakai.")
-                              }
+                          if (qty ?? 0) <= 0 {
+                              Text("Masukkan jumlah pcs yang ingin ditambahkan.")
                           } else {
-                              Text("Jika dicentang, stok \(size.fabricVariantName ?? "bahan") akan dikurangi sesuai resep.")
+                              Text("Akan menambah \((qty ?? 0).formatted()) pcs ke stok saat ini (\(size.currentStockQty) pcs).")
                           }
                       }
 
-                    if deductBahan && !isLoadingSpec && relatedSpec == nil {
+                    if hasFabricVariant {
                         Section {
-                            NumericInputField(label: "Panjang (cm)", value: $manualCutLength, unit: "cm")
+                            Toggle("Gunakan stok bahan", isOn: $deductBahan)
                                 .listRowBackground(OuraTheme.Colors.surfaceCard)
-                            NumericInputField(label: "Lebar (cm)", value: $manualCutWidth, unit: "cm")
-                                .listRowBackground(OuraTheme.Colors.surfaceCard)
-                        } header: { OuraSectionHeader(title: "Ukuran Kain") }
+                                .disabled(isSaving)
+                        } header: { OuraSectionHeader(title: "Bahan") }
+                          footer: {
+                              if deductBahan {
+                                  if isLoadingSpec {
+                                      Text("Mengecek resep...")
+                                  } else if let spec = relatedSpec {
+                                      let fabric = spec.fabrics.first
+                                      let dims = fabric.map { "\(Int($0.cutLengthCm)) × \(Int($0.cutWidthCm)) cm" } ?? "-"
+                                      Text("Resep ditemukan (\(dims)). Stok \(size.fabricVariantName ?? "bahan") akan dikurangi otomatis.")
+                                  } else {
+                                      Text("Resep belum ada untuk varian ini. Masukkan ukuran kain yang dipakai di bawah.")
+                                  }
+                              } else {
+                                  Text("Jika dicentang, stok \(size.fabricVariantName ?? "bahan") akan dikurangi sesuai resep. Nonaktifkan untuk tambah stok tanpa mengurangi bahan.")
+                              }
+                          }
+
+                        if deductBahan && !isLoadingSpec && relatedSpec == nil {
+                            Section {
+                                NumericInputField(label: "Panjang (cm)", value: $manualCutLength, unit: "cm")
+                                    .listRowBackground(OuraTheme.Colors.surfaceCard)
+                                NumericInputField(label: "Lebar (cm)", value: $manualCutWidth, unit: "cm")
+                                    .listRowBackground(OuraTheme.Colors.surfaceCard)
+                            } header: { OuraSectionHeader(title: "Ukuran Kain per Pcs") }
+                              footer: { Text("Ukuran potongan untuk menghitung pengurangan stok bahan.") }
+                        }
+                    }
+
+                    Section {
+                        TextField("Catatan (opsional)", text: $note)
+                            .listRowBackground(OuraTheme.Colors.surfaceCard)
+                            .disabled(isSaving)
+                    } header: { OuraSectionHeader(title: "Catatan") }
+                      footer: { Text("Catatan akan tersimpan di riwayat stok.") }
+
+                    if let err = errorMsg {
+                        Section {
+                            HStack(spacing: 8) {
+                                Image(systemName: "exclamationmark.triangle.fill").font(.system(size: 12))
+                                Text(err).font(.system(size: 13))
+                            }
+                            .foregroundStyle(OuraTheme.Colors.dangerText)
+                            .listRowBackground(OuraTheme.Colors.dangerBg)
+                        }
                     }
                 }
+                .scrollContentBackground(.hidden)
+                .background(OuraTheme.Colors.background)
+                .disabled(isSaving)
 
-                Section {
-                    TextField("Catatan (opsional)", text: $note)
-                        .listRowBackground(OuraTheme.Colors.surfaceCard)
-                } header: { OuraSectionHeader(title: "Catatan") }
-
-                if let err = errorMsg {
-                    Section {
-                        Text(err).foregroundStyle(OuraTheme.Colors.dangerText)
-                            .listRowBackground(OuraTheme.Colors.dangerBg)
+                if isSaving {
+                    ZStack {
+                        Color.black.opacity(0.28).ignoresSafeArea()
+                        VStack(spacing: 12) {
+                            ProgressView().tint(OuraTheme.Colors.accent).scaleEffect(1.2)
+                            Text("Menyimpan stok...")
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundStyle(OuraTheme.Colors.textSecondary)
+                            Text("Mohon tunggu sebentar")
+                                .font(.system(size: 11))
+                                .foregroundStyle(OuraTheme.Colors.textTertiary)
+                        }
+                        .padding(24)
+                        .background(OuraTheme.Colors.surfaceCard)
+                        .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.medium))
+                        .shadow(color: .black.opacity(0.15), radius: 16, y: 8)
                     }
                 }
             }
-            .scrollContentBackground(.hidden)
-            .background(OuraTheme.Colors.background)
             .navigationTitle("Tambah Stok Manual")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Batal") { dismiss() }.foregroundStyle(OuraTheme.Colors.accent)
+                    Button("Batal") { if !isSaving { dismiss() } }
+                        .foregroundStyle(OuraTheme.Colors.accent)
+                        .disabled(isSaving)
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Simpan") { Task { await save() } }
-                        .foregroundStyle(canSave ? OuraTheme.Colors.accent : OuraTheme.Colors.textDisabled)
-                        .disabled(!canSave || isSaving)
+                    Button { Task { await save() } } label: {
+                        if isSaving {
+                            HStack(spacing: 6) {
+                                ProgressView().scaleEffect(0.8).tint(OuraTheme.Colors.accent)
+                                Text("Menyimpan...")
+                            }
+                        } else {
+                            Text("Simpan")
+                        }
+                    }
+                    .foregroundStyle(canSave && !isSaving ? OuraTheme.Colors.accent : OuraTheme.Colors.textDisabled)
+                    .disabled(!canSave || isSaving)
                 }
             }
             .task {
@@ -1780,6 +1959,7 @@ struct TambahStokSheet: View {
                     relatedMaterial = materials.first(where: { $0.name == size.fabricVariantName })
                 } catch {}
             }
+            .interactiveDismissDisabled(isSaving)
         }
         .presentationDetents([.medium, .large])
     }
