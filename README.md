@@ -2,6 +2,10 @@
 
 Oura Studio is a custom, high-performance, native iOS inventory and production management application designed specifically for a self-production handmade accessories business (scrunchies, headbands, etc.). 
 
+<div align="center">
+<img width="320"  alt="image" src="https://github.com/user-attachments/assets/f34ef79b-3cae-48b9-b738-38f9287a0968" />
+</div>
+
 The core mission of this application is to solve the complex problem of **accurate HPP (COGS) calculation** when raw fabric roll material is nested and cut into multiple finished goods with different size dimensions, alongside managing stock ledger tracking, pricing optimization, and sales recording.
 
 ---
