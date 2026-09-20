@@ -87,7 +87,7 @@ Native **BLE thermal printing** for 57mm receipts and 33×15mm QR labels, built 
 1.  Open `oura studio frontend.xcodeproj` in **Xcode** (Xcode 15+ recommended).
 2.  Make sure `APIService.swift` points to the active backend server address:
     ```swift
-    var baseURL: String = "https://ourastudiobackendseoul-763614853578.asia-northeast3.run.app/api/v1"
+    var baseURL: String = "backend-api -url"
     ```
 3.  Select an iOS simulator (e.g., iPhone 15) or connect your physical iPhone device.
 4.  Press **Run** (`⌘ + R`) to build and launch the app.
