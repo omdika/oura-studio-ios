@@ -23,5 +23,7 @@
 	<array>
 		<string>bluetooth-central</string>
 	</array>
+	<key>API_BASE_URL</key>
+	<string>$(API_BASE_URL)</string>
 </dict>
 </plist>

@@ -76,7 +76,7 @@ Native **BLE thermal printing** for 57mm receipts and 33×15mm QR labels, built 
 
 *   **Platform:** iOS 16.0+ (SwiftUI, Swift Concurrency `async/await`)
 *   **Token Security:** Google SSO authentication stored securely locally via **iOS Keychain Manager**.
-*   **Networking:** `APIService.swift` (communicates with the backend REST API, supports local mock mode via `MockAPIService.swift`).
+*   **Networking:** `APIService.swift` + `AppConfig.swift` (base URL injected from `Config/*.xcconfig` → `Info.plist` `API_BASE_URL`; supports local mock mode via `MockAPIService.swift`).
 *   **Printing & Sharing:** `CoreBluetooth` + TSPL/ESC-POS (`TSPLPrinterService.swift`), `PDFKit` for receipt PDF, `UIActivityViewController` for XLSX/PDF sharing; backend `openpyxl` for Shopee template cloning.
 *   **UI/UX Standard:** Custom design system `OuraTheme.swift` — elegant, consistent, responsive, and dark-mode friendly.
 
@@ -84,13 +84,26 @@ Native **BLE thermal printing** for 57mm receipts and 33×15mm QR labels, built 
 
 ## 💻 How to Run the App
 
-1.  Open `oura studio frontend.xcodeproj` in **Xcode** (Xcode 15+ recommended).
-2.  Make sure `APIService.swift` points to the active backend server address:
-    ```swift
-    var baseURL: String = "backend-api -url"
+1.  Open `oura studio frontend.xcodeproj` in **Xcode** (Xcode 15+ recommended, iOS 16.5+).
+2.  Backend URL is **no longer hardcoded** — it is injected via `XCConfig` → `Info.plist` → `AppConfig.apiBaseURL`:
+    *   `Config/Debug.xcconfig` (default: production `https://ourastudiobackendseoul-763614853578.asia-northeast3.run.app/api/v1`) — used for **Run (Debug)**.
+    *   `Config/Release.xcconfig` (production) — used for **Archive / TestFlight / App Store (Release)**.
+    *   No code change needed to switch environments; just select the Build Configuration (Debug vs Release).
+3.  **(Optional) Local development override:** to point Debug to `localhost` or staging without touching committed files:
+    ```bash
+    cp Config/Local.xcconfig.example Config/Local.xcconfig
+    # edit Config/Local.xcconfig, e.g.:
+    # SLASH = /
+    # API_BASE_HOST = localhost:8000/api/v1
+    # API_BASE_URL = http:/$(SLASH)$(API_BASE_HOST)
     ```
-3.  Select an iOS simulator (e.g., iPhone 15) or connect your physical iPhone device.
-4.  Press **Run** (`⌘ + R`) to build and launch the app.
+    `Config/Local.xcconfig` is gitignored and auto-included only in Debug via `#include? "Local.xcconfig"`. Leave it absent for production default. Note: `//` must be built via `SLASH` variable because `.xcconfig` treats `//` as a comment.
+4.  Select an iOS simulator (e.g., iPhone 15) or connect your physical iPhone device. For physical device, ensure your Apple Developer Team is selected under **Signing & Capabilities**.
+5.  Press **Run** (`⌘ + R`) to build and launch. Verify the injected URL in the built app's `Info.plist` (`API_BASE_URL`) if needed:
+    ```bash
+    # after a Debug build
+    plutil -p ~/Library/Developer/Xcode/DerivedData/oura_studio_frontend-*/Build/Products/Debug-iphoneos/"oura studio frontend.app"/Info.plist | grep API_BASE_URL
+    ```
 
 ---
 
@@ -98,9 +111,10 @@ Native **BLE thermal printing** for 57mm receipts and 33×15mm QR labels, built 
 
 ```text
 oura studio frontend/
+├── Config/                     # XCConfig per environment (Debug/Release + Local.xcconfig.example)
 ├── Components/                 # Shared UI components (DateRangeField, Input, etc.)
 ├── Core/                       # AppState, Keychain, OuraTheme (Core Configuration)
-├── Networking/                 # API Client handlers & Pydantic-mapped Models
+├── Networking/                 # API client (APIService + AppConfig) & Pydantic-mapped Models
 ├── Screens/                    # UI screens per feature (Auth, Home, Production, Products, etc.)
 └── doc/                        # Handoff docs, revision specs & version history
 ```

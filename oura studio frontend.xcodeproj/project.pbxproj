@@ -30,11 +30,14 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		143DA0F5A385480AB742B102 /* Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Debug.xcconfig; sourceTree = "<group>"; };
 		262AB412301A072A0064A438 /* oura studio frontend.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "oura studio frontend.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		262AB41F301A072C0064A438 /* oura studio frontendTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "oura studio frontendTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		262AB429301A072C0064A438 /* oura studio frontendUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "oura studio frontendUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		262AB44E301A07A10064A438 /* .claude */ = {isa = PBXFileReference; lastKnownFileType = folder; path = .claude; sourceTree = "<group>"; };
 		262AB450301A07A90064A438 /* doc */ = {isa = PBXFileReference; lastKnownFileType = folder; path = doc; sourceTree = "<group>"; };
+		A153D8B8BBC84115A99903DE /* Local.xcconfig.example */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Local.xcconfig.example; sourceTree = "<group>"; };
+		B9753CD279584C96AC74A1BA /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Release.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -97,6 +100,7 @@
 		262AB409301A072A0064A438 = {
 			isa = PBXGroup;
 			children = (
+				38168EC8C2144FCE83CC7CD8 /* Config */,
 				262AB450301A07A90064A438 /* doc */,
 				262AB44E301A07A10064A438 /* .claude */,
 				262AB414301A072A0064A438 /* oura studio frontend */,
@@ -114,6 +118,16 @@
 				262AB429301A072C0064A438 /* oura studio frontendUITests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		38168EC8C2144FCE83CC7CD8 /* Config */ = {
+			isa = PBXGroup;
+			children = (
+				143DA0F5A385480AB742B102 /* Debug.xcconfig */,
+				B9753CD279584C96AC74A1BA /* Release.xcconfig */,
+				A153D8B8BBC84115A99903DE /* Local.xcconfig.example */,
+			);
+			path = Config;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -301,6 +315,7 @@
 /* Begin XCBuildConfiguration section */
 		262AB431301A072C0064A438 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 143DA0F5A385480AB742B102 /* Debug.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
@@ -365,6 +380,7 @@
 		};
 		262AB432301A072C0064A438 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = B9753CD279584C96AC74A1BA /* Release.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
@@ -422,6 +438,7 @@
 		};
 		262AB434301A072C0064A438 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 143DA0F5A385480AB742B102 /* Debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -431,6 +448,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "oura-studio-frontend-Info.plist";
+				INFOPLIST_KEY_API_BASE_URL = "$(API_BASE_URL)";
 				INFOPLIST_KEY_CFBundleDisplayName = "Oura Studio";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Kamera digunakan untuk scan QR code produk Oura Studio.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -458,6 +476,7 @@
 		};
 		262AB435301A072C0064A438 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = B9753CD279584C96AC74A1BA /* Release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -467,6 +486,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "oura-studio-frontend-Info.plist";
+				INFOPLIST_KEY_API_BASE_URL = "$(API_BASE_URL)";
 				INFOPLIST_KEY_CFBundleDisplayName = "Oura Studio";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Kamera digunakan untuk scan QR code produk Oura Studio.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;

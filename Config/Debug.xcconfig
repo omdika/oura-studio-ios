@@ -1,0 +1,14 @@
+#include? "Local.xcconfig"
+//
+// Debug.xcconfig - Development configuration
+// Included only in Debug builds. Override API_BASE_URL locally by creating Local.xcconfig
+// Example Local.xcconfig content (use SLASH trick to avoid // being parsed as comment):
+//   SLASH = /
+//   API_BASE_HOST = localhost:8000/api/v1
+//   API_BASE_URL = http:/$(SLASH)$(API_BASE_HOST)
+//
+
+// Workaround: xcconfig treats // as comment, so we build https:// via SLASH variable
+SLASH = /
+API_BASE_HOST = ourastudiobackendseoul-763614853578.asia-northeast3.run.app/api/v1
+API_BASE_URL = https:/$(SLASH)$(API_BASE_HOST)

@@ -1,0 +1,16 @@
+# Xcode
+*.xcodeproj/xcuserdata/
+*.xcworkspace/xcuserdata/
+DerivedData/
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# Config - local overrides (never commit)
+Config/Local.xcconfig
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride

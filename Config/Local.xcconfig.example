@@ -1,0 +1,14 @@
+//
+// Local.xcconfig.example - Copy to Local.xcconfig to override Debug backend locally
+// This file is gitignored. Never commit Local.xcconfig
+//
+// IMPORTANT: xcconfig treats // as comment, so you must use SLASH trick:
+//   SLASH = /
+//   API_BASE_HOST = localhost:8000/api/v1
+//   API_BASE_URL = http:/$(SLASH)$(API_BASE_HOST)
+//
+// For staging:
+//   SLASH = /
+//   API_BASE_HOST = staging-your-backend.run.app/api/v1
+//   API_BASE_URL = https:/$(SLASH)$(API_BASE_HOST)
+//
