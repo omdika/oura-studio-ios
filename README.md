@@ -1,6 +1,5 @@
 [![View All Projects](https://img.shields.io/badge/View_All_Projects-omdika.github.io-blue?style=flat-square&logo=github)](https://omdika.github.io/)
 
-[← View All Projects](https://omdika.github.io/) 
 
 # Oura Studio — iOS Frontend Application
 
