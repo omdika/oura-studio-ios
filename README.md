@@ -1,3 +1,7 @@
+[![View All Projects](https://img.shields.io/badge/View_All_Projects-omdika.github.io-blue?style=flat-square&logo=github)](https://omdika.github.io/)
+
+[← View All Projects](https://omdika.github.io/) 
+
 # Oura Studio — iOS Frontend Application
 
 Oura Studio is a custom, high-performance, native iOS inventory and production management application designed specifically for a self-production handmade accessories business (scrunchies, headbands, etc.). 
