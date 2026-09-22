@@ -25,6 +25,8 @@ struct ProdukListView: View {
     // Set right after "Simpan Tanpa Resep" creates a product with no price/stock/HPP yet — drives
     // an auto-navigation into ProdukDetailView so the user can pick which size(s) to fill in.
     @State private var newlyCreatedProduct: Product?
+    // Holds the variant resolved from QR scan to push ProdukSizeDetailView in the main NavigationStack
+    @State private var scannedDetail: ProductSizeDetail? = nil
 
     @FocusState private var isSearchFocused: Bool
 
@@ -220,8 +222,19 @@ struct ProdukListView: View {
             }
         }
         .sheet(isPresented: $showQRScanner) {
-            QRScannerSheet(mode: .stockInOnly)
+            QRScannerSheet(mode: .stockInOnly, onProductScanned: { size in
+                scannedDetail = size
+            })
                 .environmentObject(api)
+        }
+        .navigationDestination(isPresented: Binding(
+            get: { scannedDetail != nil },
+            set: { if !$0 { scannedDetail = nil } }
+        )) {
+            if let detail = scannedDetail {
+                ProdukSizeDetailView(productSize: detail)
+                    .environmentObject(api)
+            }
         }
         .sheet(isPresented: $showQRGenerator) {
             QRGeneratorView(initialIsFilterActive: isFilterActive,

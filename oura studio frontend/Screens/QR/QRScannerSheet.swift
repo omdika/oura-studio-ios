@@ -357,6 +357,61 @@ struct QRScannerSheet: View {
                     .foregroundStyle(OuraTheme.Colors.textTertiary)
                 }
 
+                // Direct link to variant detail.
+                // If parent provides onProductScanned (ProdukListView), tapping dismisses scanner
+                // and pushes detail in the main NavigationStack. Otherwise fallback to inline
+                // NavigationLink inside the scanner sheet's NavigationStack.
+                Group {
+                    if onProductScanned != nil {
+                        Button {
+                            let captured = size
+                            dismiss()
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                                onProductScanned?(captured)
+                            }
+                        } label: {
+                            HStack(spacing: 8) {
+                                Image(systemName: "eye.fill")
+                                    .font(.system(size: 12))
+                                Text("Lihat Detail Varian")
+                                    .font(.system(size: 13, weight: .semibold))
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 11, weight: .semibold))
+                            }
+                            .foregroundStyle(OuraTheme.Colors.accent)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 10)
+                            .background(OuraTheme.Colors.accentLight)
+                            .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.medium))
+                            .overlay(RoundedRectangle(cornerRadius: OuraTheme.Radius.medium)
+                                .stroke(OuraTheme.Colors.accent.opacity(0.18), lineWidth: 1))
+                        }
+                        .buttonStyle(.plain)
+                    } else {
+                        NavigationLink(destination: ProdukSizeDetailView(productSize: size).environmentObject(api)) {
+                            HStack(spacing: 8) {
+                                Image(systemName: "eye.fill")
+                                    .font(.system(size: 12))
+                                Text("Lihat Detail Varian")
+                                    .font(.system(size: 13, weight: .semibold))
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 11, weight: .semibold))
+                            }
+                            .foregroundStyle(OuraTheme.Colors.accent)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 10)
+                            .background(OuraTheme.Colors.accentLight)
+                            .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.medium))
+                            .overlay(RoundedRectangle(cornerRadius: OuraTheme.Radius.medium)
+                                .stroke(OuraTheme.Colors.accent.opacity(0.18), lineWidth: 1))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .accessibilityLabel("Lihat Detail Varian")
+
                 if size.isArchived {
                     Text("Varian ini sudah dinonaktifkan.")
                         .font(.system(size: 13))
