@@ -715,15 +715,26 @@ struct OptimasiView: View {
         allMaterials = mats
         patternSpecs = specs
         settings     = fetched
-        let fabricMats = mats.filter { $0.category == .fabric }
+        // Hanya fetch purchases untuk kain yang benar-benar dipakai di resep aktif
+        // (sebelumnya: 28 material × sequential 400ms = ~4-6s; screenshot 08.05 spinner).
+        // Parallel TaskGroup + filter neededIds = 2-3 request paralel ~400ms total.
+        let neededIds = Set(specs.flatMap { $0.fabrics.map { $0.materialId } })
+        let fabricMats = mats.filter { $0.category == .fabric && neededIds.contains($0.id) }
         var pairs: [(material: Material, purchase: MaterialPurchase)] = []
-        for mat in fabricMats {
-            let purchases = (try? await api.getPurchases(materialId: mat.id)) ?? []
-            let available = purchases.filter { p in
-                if let rem = p.remainingLengthCm { return rem > 0 }
-                return p.lengthCm != nil
+        await withTaskGroup(of: [(Material, MaterialPurchase)].self) { group in
+            for mat in fabricMats {
+                group.addTask {
+                    let purchases = (try? await self.api.getPurchases(materialId: mat.id)) ?? []
+                    let available = purchases.filter { p in
+                        if let rem = p.remainingLengthCm { return rem > 0 }
+                        return p.lengthCm != nil
+                    }
+                    return available.map { (material: mat, purchase: $0) }
+                }
             }
-            pairs.append(contentsOf: available.map { (material: mat, purchase: $0) })
+            for await result in group {
+                pairs.append(contentsOf: result)
+            }
         }
         fabricPurchases = pairs
         isLoading = false
