@@ -631,23 +631,47 @@ struct ProdukListView: View {
             return
         }
 
-        async let p = api.getProducts(page: 1, limit: limit)
-        async let s = api.getAllProductSizes(page: 1, limit: limit * 3)
-
-        let resP = try? await p
-        let resS = try? await s
+        // Fetch products page 1; then fetch sizes per-SKU so every visible product
+        // has its variants even when global /product-sizes pagination order does not
+        // align with product pagination order (e.g. sizes 1..60 belong to products
+        // beyond page 1). Global pagination caused empty cards where ProductGroupRow
+        // had groups.isEmpty.
+        guard let resP = try? await api.getProducts(page: 1, limit: limit) else {
+            // Gagal jaringan tidak boleh mengosongkan cache yang sedang tampil
+            return
+        }
         if Task.isCancelled { return }
 
-        // Hanya timpa cache kalau fetch berhasil — gagal jaringan tidak boleh
-        // mengosongkan list yang sedang tampil.
-        if let resP { products = resP.data }
-        if let resS { allSizes = resS.data }
-        if let resP {
-            totalPages = resP.totalPages
-            hasMorePages = (resP.nextPage != nil)
-        }
+        // Hanya timpa cache kalau fetch berhasil
+        products = resP.data
+        totalPages = resP.totalPages
+        hasMorePages = (resP.nextPage != nil)
+
+        let pageSizes = await fetchSizes(for: resP.data)
+        if Task.isCancelled { return }
+        allSizes = pageSizes
 
         additionsByVariant = [:]
+    }
+
+    // Fetch sizes for the given products via per-SKU endpoint so pagination is always
+    // correlated: 20 products -> 20 GET /products/{sku}/sizes executed in parallel.
+    // This fixes empty cards where global /product-sizes?page=1 ; limit=60 only covered
+    // sizes for the first ~9 products.
+    private func fetchSizes(for products: [Product]) async -> [ProductSizeDetail] {
+        guard !products.isEmpty else { return [] }
+        var result: [ProductSizeDetail] = []
+        await withTaskGroup(of: [ProductSizeDetail].self) { group in
+            for p in products {
+                group.addTask {
+                    (try? await self.api.getProductSizes(sku: p.sku, productName: p.name)) ?? []
+                }
+            }
+            for await batch in group {
+                result.append(contentsOf: batch)
+            }
+        }
+        return result
     }
 
     // v3.57 helper: fetch all pages sequentially (used only when date filter active)
@@ -688,17 +712,16 @@ struct ProdukListView: View {
         let nextPage = currentPage + 1
 
         do {
-            async let p = api.getProducts(page: nextPage, limit: limit)
-            async let s = api.getAllProductSizes(page: nextPage, limit: limit * 3)
-
-            let resP = try await p
-            let resS = try await s
+            let resP = try await api.getProducts(page: nextPage, limit: limit)
 
             let newProducts = resP.data.filter { newP in !products.contains(where: { $0.id == newP.id }) }
-            products.append(contentsOf: newProducts)
+            // Fetch variants only for the newly loaded products to keep correlation
+            let newSizes = await fetchSizes(for: newProducts)
+            let dedupedSizes = newSizes.filter { ns in !allSizes.contains(where: { $0.id == ns.id }) }
 
-            let newSizes = resS.data.filter { newS in !allSizes.contains(where: { $0.id == newS.id }) }
-            allSizes.append(contentsOf: newSizes)
+            if Task.isCancelled { return }
+            products.append(contentsOf: newProducts)
+            allSizes.append(contentsOf: dedupedSizes)
 
             currentPage = nextPage
             totalPages = resP.totalPages
