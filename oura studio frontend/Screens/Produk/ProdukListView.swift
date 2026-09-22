@@ -752,6 +752,11 @@ private struct ProductGroupRow: View {
     @State private var selectedPhotos: [PhotosPickerItem] = []
     @State private var isPhotoPickerPresented = false
     @State private var isUploading = false
+    @State private var showPhotoSourceDialog = false
+    @State private var showCamera = false
+    @State private var capturedCameraImage: UIImage?
+    private enum PhotoSource { case gallery, camera }
+    @State private var pendingPhotoSource: PhotoSource = .gallery
 
     private struct SizeGroup: Identifiable {
         let sizeLabel: String
@@ -924,12 +929,31 @@ private struct ProductGroupRow: View {
             }
         }
         .ouraCard()
+        .confirmationDialog("Pilih Sumber Foto", isPresented: $showPhotoSourceDialog, titleVisibility: .visible) {
+            if UIImagePickerController.isSourceTypeAvailable(.camera) {
+                Button("Ambil Foto") {
+                    pendingPhotoSource = .camera
+                    presentPhotoPickerAfterSource()
+                }
+            }
+            Button("Pilih dari Galeri") {
+                pendingPhotoSource = .gallery
+                presentPhotoPickerAfterSource()
+            }
+            Button("Batal", role: .cancel) {}
+        } message: {
+            Text("Pilih cara menambahkan foto varian")
+        }
         .confirmationDialog("Pilih Varian Kain", isPresented: $showVariantSelection, titleVisibility: .visible) {
             if let group = selectedGroupForUpload {
                 ForEach(group.variants) { variant in
                     Button(variant.fabricVariantName ?? "Default") {
                         targetSizeDetail = variant
-                        isPhotoPickerPresented = true
+                        if pendingPhotoSource == .camera {
+                            showCamera = true
+                        } else {
+                            isPhotoPickerPresented = true
+                        }
                     }
                 }
                 Button("Batal", role: .cancel) {}
@@ -938,17 +962,36 @@ private struct ProductGroupRow: View {
             Text("Pilih varian kain untuk ukuran \(selectedGroupForUpload?.sizeLabel ?? "")")
         }
         .photosPicker(isPresented: $isPhotoPickerPresented, selection: $selectedPhotos, maxSelectionCount: 5, matching: .images)
+        .sheet(isPresented: $showCamera) {
+            CameraPicker(selectedImage: $capturedCameraImage)
+                .ignoresSafeArea()
+        }
         .onChange(of: selectedPhotos) { newItems in
             Task {
                 await handlePhotoSelection(newItems)
             }
         }
+        .onChange(of: capturedCameraImage) { newImage in
+            guard let img = newImage else { return }
+            Task { await handleCameraCapture(img) }
+            capturedCameraImage = nil
+        }
     }
 
     private func triggerUpload(for group: SizeGroup) {
+        selectedGroupForUpload = group
+        showPhotoSourceDialog = true
+    }
+
+    private func presentPhotoPickerAfterSource() {
+        guard let group = selectedGroupForUpload else { return }
         if group.variants.count == 1 {
             targetSizeDetail = group.variants[0]
-            isPhotoPickerPresented = true
+            if pendingPhotoSource == .camera {
+                showCamera = true
+            } else {
+                isPhotoPickerPresented = true
+            }
         } else if group.variants.count > 1 {
             showVariantSelection = true
         }
@@ -977,6 +1020,25 @@ private struct ProductGroupRow: View {
             }
         }
         
+        onProductChanged()
+    }
+
+    private func handleCameraCapture(_ image: UIImage) async {
+        guard let variant = targetSizeDetail else { return }
+        isUploading = true
+        defer {
+            isUploading = false
+            targetSizeDetail = nil
+        }
+        guard let compressedData = ImageCompressor.compressToJPEG(image: image) else {
+            print("⚠️ Gagal mengompresi gambar kamera")
+            return
+        }
+        do {
+            _ = try await api.uploadProductSizeImage(sku: variant.productSku, sizeId: variant.id, imageData: compressedData)
+        } catch {
+            print("⚠️ Gagal mengunggah foto kamera: \(error)")
+        }
         onProductChanged()
     }
 }

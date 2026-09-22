@@ -450,7 +450,8 @@
 				INFOPLIST_FILE = "oura-studio-frontend-Info.plist";
 				INFOPLIST_KEY_API_BASE_URL = "$(API_BASE_URL)";
 				INFOPLIST_KEY_CFBundleDisplayName = "Oura Studio";
-				INFOPLIST_KEY_NSCameraUsageDescription = "Kamera digunakan untuk scan QR code produk Oura Studio.";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Kamera digunakan untuk scan QR code dan mengambil foto produk Oura Studio.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Galeri digunakan untuk memilih foto produk.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -488,7 +489,8 @@
 				INFOPLIST_FILE = "oura-studio-frontend-Info.plist";
 				INFOPLIST_KEY_API_BASE_URL = "$(API_BASE_URL)";
 				INFOPLIST_KEY_CFBundleDisplayName = "Oura Studio";
-				INFOPLIST_KEY_NSCameraUsageDescription = "Kamera digunakan untuk scan QR code produk Oura Studio.";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Kamera digunakan untuk scan QR code dan mengambil foto produk Oura Studio.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Galeri digunakan untuk memilih foto produk.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;

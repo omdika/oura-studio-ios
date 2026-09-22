@@ -1140,6 +1140,10 @@ struct ProdukSizeDetailView: View {
     @State private var isUploading = false
     @State private var imageToDelete: ProductSizeImage? = nil
     @State private var showDeleteConfirmation = false
+    @State private var showPhotoSourceDialog = false
+    @State private var showGalleryPicker = false
+    @State private var showCamera = false
+    @State private var capturedCameraImage: UIImage?
 
     // Spec-based HPP estimate (loaded on appear; used when no batch/manual HPP exists)
     @State private var relatedSpec: PatternSpec? = nil
@@ -1317,8 +1321,10 @@ struct ProdukSizeDetailView: View {
                         .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.small))
                     }
                     
-                    // 3. PhotosPicker Trigger Button
-                    PhotosPicker(selection: $selectedItems, maxSelectionCount: 5, matching: .images) {
+                    // 3. Add Photo Button — opens source chooser (Kamera / Galeri)
+                    Button {
+                        showPhotoSourceDialog = true
+                    } label: {
                         VStack(spacing: 4) {
                             Image(systemName: "camera.fill")
                                 .font(.system(size: 18))
@@ -1334,12 +1340,9 @@ struct ProdukSizeDetailView: View {
                                 .stroke(isUploading ? OuraTheme.Colors.textDisabled : OuraTheme.Colors.accent, style: StrokeStyle(lineWidth: 1, dash: [4]))
                         )
                     }
+                    .buttonStyle(.plain)
                     .disabled(isUploading)
-                    .onChange(of: selectedItems) { newItems in
-                        Task {
-                            await handlePhotoSelection(newItems)
-                        }
-                    }
+                    .accessibilityLabel("Tambah Foto")
                 }
                 .padding(.top, 4)
                 .padding(.horizontal, 4)
@@ -1359,6 +1362,43 @@ struct ProdukSizeDetailView: View {
         }
         .padding(OuraTheme.Spacing.cardPad)
         .ouraCard()
+        .confirmationDialog("Tambah Foto", isPresented: $showPhotoSourceDialog, titleVisibility: .visible) {
+            if UIImagePickerController.isSourceTypeAvailable(.camera) {
+                Button("Ambil Foto") { showCamera = true }
+            }
+            Button("Pilih dari Galeri") { showGalleryPicker = true }
+            Button("Batal", role: .cancel) {}
+        } message: {
+            Text("Pilih sumber foto produk")
+        }
+        .photosPicker(isPresented: $showGalleryPicker, selection: $selectedItems, maxSelectionCount: 5, matching: .images)
+        .sheet(isPresented: $showCamera) {
+            CameraPicker(selectedImage: $capturedCameraImage)
+                .ignoresSafeArea()
+        }
+        .onChange(of: selectedItems) { newItems in
+            Task { await handlePhotoSelection(newItems) }
+        }
+        .onChange(of: capturedCameraImage) { newImage in
+            guard let img = newImage else { return }
+            Task { await handleCameraCapture(img) }
+            capturedCameraImage = nil
+        }
+    }
+
+    private func handleCameraCapture(_ image: UIImage) async {
+        isUploading = true
+        defer { isUploading = false }
+        guard let compressedData = ImageCompressor.compressToJPEG(image: image) else {
+            errorMsg = "Gagal mengompresi gambar."
+            return
+        }
+        do {
+            _ = try await api.uploadProductSizeImage(sku: size.productSku, sizeId: size.id, imageData: compressedData)
+            await refreshSize()
+        } catch {
+            errorMsg = "Gagal mengunggah foto: \(error.localizedDescription)"
+        }
     }
 
     private func handlePhotoSelection(_ newItems: [PhotosPickerItem]) async {
