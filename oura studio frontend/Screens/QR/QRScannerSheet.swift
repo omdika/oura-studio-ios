@@ -344,9 +344,25 @@ struct QRScannerSheet: View {
                     Text(size.productName)
                         .font(.system(size: 17, weight: .semibold))
                         .foregroundStyle(OuraTheme.Colors.textPrimary)
-                    Text(size.displayLabel)
-                        .font(.system(size: 14))
-                        .foregroundStyle(OuraTheme.Colors.textSecondary)
+                    HStack(spacing: 6) {
+                        Text(size.displayLabel)
+                            .font(.system(size: 14))
+                            .foregroundStyle(OuraTheme.Colors.textSecondary)
+                        if let images = size.images, !images.isEmpty {
+                            HStack(spacing: 3) {
+                                Image(systemName: "camera.fill")
+                                    .font(.system(size: 8))
+                                Text("\(images.count)")
+                                    .font(.system(size: 8, weight: .bold))
+                            }
+                            .foregroundStyle(OuraTheme.Colors.accent)
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 2)
+                            .background(OuraTheme.Colors.accentLight.opacity(0.4))
+                            .clipShape(RoundedRectangle(cornerRadius: 4))
+                            .accessibilityLabel("\(images.count) foto tersedia")
+                        }
+                    }
                     HStack(spacing: 16) {
                         Label("Stok: \(size.currentStockQty) pcs", systemImage: "cube.box")
                         if let price = size.sellingPrice {
