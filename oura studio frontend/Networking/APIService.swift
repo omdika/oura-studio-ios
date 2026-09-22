@@ -610,19 +610,45 @@ class APIService: ObservableObject {
     }
 
     // Joins raw backend specs with products/sizes to produce fully-enriched PatternSpec objects.
-    // Backend /products/{sku}/sizes returns a flat format (ProductSizeBasic), not the full ProductSizeDetail.
+    // v2.4+: backend PatternSpecOut already JOINs Product/ProductSize so product_sku/name/size_label
+    // come inline — no N+1. Legacy fetchSizeToProductMap (69 parallel GET /products/{sku}/sizes,
+    // ~400ms each, pool exhaustion, 2.95 KiB x 69) is kept only as fallback when enrichment is missing.
     // v2.15+: material names come embedded in each BackendPatternFabric; separate materials fetch only needed for components.
     private func enrichPatternSpecs(_ raw: [BackendPatternSpec]) async throws -> [PatternSpec] {
         guard !raw.isEmpty else { return [] }
 
-        async let sizeMapTask = fetchSizeToProductMap()
+        let needsLegacy = raw.contains { $0.productSku == nil || $0.productName == nil || $0.sizeLabel == nil }
+        var legacyMap: [UUID: (product: Product, size: ProductSizeBasic)] = [:]
+        if needsLegacy {
+            legacyMap = (try? await fetchSizeToProductMap()) ?? [:]
+        }
+        // Fetch materials (for component names) and non-archived product SKUs in parallel.
+        // product SKUs are used to hide archived-product recipes when backend hasn't yet
+        // filtered them (backend fix in pattern_specs.py adds Product.is_archived filter,
+        // but until deployed the remote still returns 15 rows where 13 are on archived products).
         async let materialsTask: [Material] = get(path: "/materials")
-        let (sizeToProduct, materials) = try await (sizeMapTask, materialsTask)
+        async let productsTask: PaginatedResponse<Product> = get(path: "/products?page=1&limit=500")
+        let (materialsResult, productsResult) = await (try? materialsTask, try? productsTask)
+        let materials: [Material] = materialsResult ?? []
+        let allowedSkus: Set<String>? = productsResult.map { Set($0.data.map { $0.sku }) }
 
         let matNames = Dictionary(uniqueKeysWithValues: materials.map { ($0.id, $0.name) })
 
         return raw.compactMap { spec in
-            guard let entry = sizeToProduct[spec.productSizeId] else { return nil }
+            let sku: String
+            let name: String
+            let label: String
+            if let s = spec.productSku, let n = spec.productName, let l = spec.sizeLabel {
+                // Hide archived-product recipes (backend still returns them until deployed filter ships).
+                if let allowed = allowedSkus, !allowed.contains(s) { return nil }
+                sku = s; name = n; label = l
+            } else {
+                guard let entry = legacyMap[spec.productSizeId] else {
+                    print("⚠️ [enrichPatternSpecs] drop \(spec.id) — no enrichment and legacy map miss for \(spec.productSizeId)")
+                    return nil
+                }
+                sku = entry.product.sku; name = entry.product.name; label = entry.size.sizeLabel
+            }
 
             let fabrics = spec.fabrics.map { f in
                 PatternFabric(
@@ -649,9 +675,9 @@ class APIService: ObservableObject {
             return PatternSpec(
                 id: spec.id,
                 productSizeId: spec.productSizeId,
-                productName: entry.product.name,
-                productSku: entry.product.sku,
-                sizeLabel: entry.size.sizeLabel,
+                productName: name,
+                productSku: sku,
+                sizeLabel: label,
                 fabrics: fabrics,
                 estLaborMinutes: spec.estLaborMinutes,
                 isActive: spec.isActive,

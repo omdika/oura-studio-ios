@@ -166,6 +166,10 @@ struct BackendPatternSpec: Codable, Identifiable {
     let effectiveTo: Date?
     let components: [BackendPatternComponent]
     let usedInBatchCount: Int
+    // Enrichment from backend JOIN (app/schemas/pattern.py PatternSpecOut). Present since v2.4.
+    let productSku: String?
+    let productName: String?
+    let sizeLabel: String?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -177,6 +181,9 @@ struct BackendPatternSpec: Codable, Identifiable {
         case effectiveTo      = "effective_to"
         case components
         case usedInBatchCount = "used_in_batch_count"
+        case productSku       = "product_sku"
+        case productName      = "product_name"
+        case sizeLabel        = "size_label"
     }
 }
 
