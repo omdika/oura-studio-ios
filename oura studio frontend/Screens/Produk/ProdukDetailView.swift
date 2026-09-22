@@ -1755,7 +1755,7 @@ struct ProdukSizeDetailView: View {
     }
 
     private func saveEdits() async {
-        isSaving = true; errorMsg = nil; successMsg = nil; defer { isSaving = false }
+        isSaving = true; errorMsg = nil; successMsg = nil
         let includeManualHpp = editHppTotal > 0 && size.latestHppBreakdown == nil
         // v3.57b: single PATCH with optional stock adjustment to avoid 3-call waterfall
         // (PATCH + POST /stock/adjustments + GET detail = ~700ms). Backend now handles
@@ -1781,15 +1781,26 @@ struct ProdukSizeDetailView: View {
                 productName: size.productName)
             size = updated
             editStockQty = nil
+            isSaving = false
             successMsg = "Perubahan berhasil disimpan"
             withAnimation { isEditing = false }
-            // Hilangkan banner sukses otomatis setelah 2.5 detik
-            try? await Task.sleep(nanoseconds: 2_500_000_000)
-            if successMsg == "Perubahan berhasil disimpan" { successMsg = nil }
+            // Hilangkan banner sukses otomatis setelah 2.5 detik tanpa menahan spinner
+            Task {
+                try? await Task.sleep(nanoseconds: 2_500_000_000)
+                await MainActor.run {
+                    if successMsg == "Perubahan berhasil disimpan" { successMsg = nil }
+                }
+            }
         } catch is CancellationError {
+            isSaving = false
             // Abaikan pembatalan task (mis: user pindah halaman)
-        } catch let e as APIError { errorMsg = e.errorDescription }
-        catch { errorMsg = error.localizedDescription }
+        } catch let e as APIError {
+            isSaving = false
+            errorMsg = e.errorDescription
+        } catch {
+            isSaving = false
+            errorMsg = error.localizedDescription
+        }
     }
 
     private func applyPrice(_ price: Double) async {
