@@ -2,6 +2,7 @@ import SwiftUI
 
 struct OptimasiView: View {
     @EnvironmentObject private var api: APIService
+    @EnvironmentObject private var cache: ProduksiCache
 
     var onLayoutSaved: (() -> Void)? = nil
 
@@ -77,6 +78,7 @@ struct OptimasiView: View {
     @State private var allMaterials: [Material] = []
     @State private var settings: [SettingItem] = []
     @State private var isLoading = false
+    @State private var isRefreshing = false
     @State private var isCalculating = false
     @State private var errorMsg: String?
     @State private var isSaving = false
@@ -152,10 +154,12 @@ struct OptimasiView: View {
                 .padding(.top, 4)
                 .padding(.bottom, 32)
             }
+            .refreshable { await loadData(silent: true, force: true) }
         }
         .background(OuraTheme.Colors.background)
         .toolbar(.hidden, for: .navigationBar)
-        .onAppear { if !isLoading { Task { await loadData() } } }
+        .task { await loadDataWithCache() }
+        .onAppear { Task { await softReloadIfNeeded() } }
     }
 
     // MARK: - Step header
@@ -265,6 +269,14 @@ struct OptimasiView: View {
                         .ouraCard()
                     }
                 }
+            }
+            if isRefreshing && !isLoading {
+                HStack(spacing: 6) {
+                    ProgressView().scaleEffect(0.7)
+                    Text("Memperbarui…").font(.system(size: 12)).foregroundStyle(OuraTheme.Colors.textTertiary)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.top, 4)
             }
         }
     }
@@ -702,19 +714,40 @@ struct OptimasiView: View {
         }
     }
 
-    // MARK: - Data
+    // MARK: - Data + Cache + Soft Reload
 
-    private func loadData() async {
-        isLoading = true
+    private func loadDataWithCache() async {
+        if let cached = cache.optimasi.value {
+            allMaterials = cached.materials
+            patternSpecs = cached.specs
+            settings = cached.settings
+            fabricPurchases = cached.fabricPurchases
+            isLoading = false
+            await loadData(silent: true)
+        } else {
+            await loadData(silent: false)
+        }
+    }
+    private func softReloadIfNeeded() async {
+        guard !isLoading, cache.optimasi.value != nil else { return }
+        await loadData(silent: true)
+    }
+
+    private func loadData(silent: Bool = false, force: Bool = false) async {
+        let hasCache = cache.optimasi.value != nil && !force
+        if hasCache && silent {
+            isRefreshing = true
+        } else if !silent {
+            isLoading = true
+        } else if force {
+            isRefreshing = true
+        }
         async let matsTask    = api.getMaterials()
         async let specsTask   = api.getPatternSpecs()
         async let settingsTask = api.getSettings()
         let mats     = (try? await matsTask)     ?? []
         let specs    = (try? await specsTask)    ?? []
         let fetched  = (try? await settingsTask) ?? []
-        allMaterials = mats
-        patternSpecs = specs
-        settings     = fetched
         // Hanya fetch purchases untuk kain yang benar-benar dipakai di resep aktif
         // (sebelumnya: 28 material × sequential 400ms = ~4-6s; screenshot 08.05 spinner).
         // Parallel TaskGroup + filter neededIds = 2-3 request paralel ~400ms total.
@@ -736,8 +769,13 @@ struct OptimasiView: View {
                 pairs.append(contentsOf: result)
             }
         }
+        allMaterials = mats
+        patternSpecs = specs
+        settings     = fetched
         fabricPurchases = pairs
+        cache.setOptimasi(materials: mats, specs: specs, settings: fetched, fabricPurchases: pairs)
         isLoading = false
+        isRefreshing = false
     }
 
     private func calculateLayouts() async {

@@ -2,9 +2,11 @@ import SwiftUI
 
 struct BahanListView: View {
     @EnvironmentObject private var api: APIService
+    @EnvironmentObject private var cache: ProduksiCache
 
     @State private var materials: [Material] = []
     @State private var isLoading = true
+    @State private var isRefreshing = false
     @State private var errorMsg: String?
     @State private var searchText: String = ""
     @State private var showTambah = false
@@ -74,6 +76,14 @@ struct BahanListView: View {
                         materialList
                     }
                 }
+                if isRefreshing && !isLoading {
+                    HStack(spacing: 6) {
+                        ProgressView().scaleEffect(0.7)
+                        Text("Memperbarui…").font(.system(size: 12)).foregroundStyle(OuraTheme.Colors.textTertiary)
+                    }
+                    .padding(.vertical, 6)
+                    .frame(maxWidth: .infinity)
+                }
             }
             .background(OuraTheme.Colors.background)
 
@@ -85,7 +95,7 @@ struct BahanListView: View {
         }
         .toolbar(.hidden, for: .navigationBar)
         .task {
-            await load()
+            await loadWithCache()
             hasLoadedOnce = true
         }
         .onAppear {
@@ -96,7 +106,10 @@ struct BahanListView: View {
             TambahPembelianSheet(preselectedMaterial: nil)
         }
         .onChange(of: showTambah) { showing in
-            if !showing { Task { await load(silent: true) } }
+            if !showing {
+                cache.invalidateBahan()
+                Task { await load(silent: true) }
+            }
         }
         .onChange(of: searchText) { _ in displayCount = pageSize }
         .onChange(of: selectedCategory) { _ in displayCount = pageSize }
@@ -324,7 +337,7 @@ struct BahanListView: View {
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
         .background(OuraTheme.Colors.background)
-        .refreshable { await load() }
+        .refreshable { await load(silent: true, force: true) }
     }
 
     // MARK: - Empty / Error
@@ -371,12 +384,37 @@ struct BahanListView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    private func load(silent: Bool = false) async {
-        if !silent { isLoading = true }
+    // MARK: - Cache + Soft Reload
+    private func loadWithCache() async {
+        if let cached = cache.bahan.value, !cached.isEmpty {
+            materials = cached
+            isLoading = false
+            // soft reload di background tanpa spinner penuh
+            await load(silent: true)
+        } else {
+            await load(silent: false)
+        }
+    }
+
+    private func load(silent: Bool = false, force: Bool = false) async {
+        let hasCache = cache.bahan.value != nil && !force
+        if hasCache && silent {
+            isRefreshing = true
+        } else if !silent {
+            isLoading = true
+        } else if force {
+            isRefreshing = true
+        }
         errorMsg = nil
-        do { materials = try await api.getMaterials() }
-        catch { if !silent { errorMsg = error.localizedDescription } }
+        do {
+            let fresh = try await api.getMaterials()
+            materials = fresh
+            cache.setBahan(fresh)
+        } catch {
+            if !silent || !hasCache { errorMsg = error.localizedDescription }
+        }
         isLoading = false
+        isRefreshing = false
     }
 }
 

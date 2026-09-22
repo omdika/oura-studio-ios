@@ -2,12 +2,14 @@ import SwiftUI
 
 struct ProduksiBatchView: View {
     @EnvironmentObject private var api: APIService
+    @EnvironmentObject private var cache: ProduksiCache
 
     @State private var batches: [ProductionBatch] = []
     @State private var allMaterials: [Material] = []
     @State private var settings: [SettingItem] = []
     @State private var patternSpecs: [PatternSpec] = []
     @State private var isLoading = true
+    @State private var isRefreshing = false
     @State private var errorMsg: String?
     @State private var expandedBatchId: UUID? = nil
 
@@ -28,6 +30,13 @@ struct ProduksiBatchView: View {
                         batchList
                     }
                 }
+                if isRefreshing && !isLoading {
+                    HStack(spacing: 6) {
+                        ProgressView().scaleEffect(0.7)
+                        Text("Memperbarui…").font(.system(size: 12)).foregroundStyle(OuraTheme.Colors.textTertiary)
+                    }
+                    .padding(.vertical, 6)
+                }
             }
             .background(OuraTheme.Colors.background)
 
@@ -38,8 +47,9 @@ struct ProduksiBatchView: View {
             .padding(.bottom, 20)
         }
         .toolbar(.hidden, for: .navigationBar)
-        .task { await load() }
-        .refreshable { await load() }
+        .task { await loadWithCache() }
+        .onAppear { Task { await softReloadIfNeeded() } }
+        .refreshable { await load(silent: true, force: true) }
         .alert("Terjadi Kesalahan", isPresented: Binding(
             get: { errorMsg != nil },
             set: { if !$0 { errorMsg = nil } }
@@ -113,19 +123,48 @@ struct ProduksiBatchView: View {
 
     // MARK: - Actions
 
-    private func load() async {
-        isLoading = true
+    // MARK: - Cache + Soft Reload
+    private func loadWithCache() async {
+        if let cached = cache.produksi.value {
+            batches = cached.batches
+            allMaterials = cached.materials
+            patternSpecs = cached.specs
+            settings = cached.settings
+            isLoading = false
+            await load(silent: true)
+        } else {
+            await load(silent: false)
+        }
+    }
+    private func softReloadIfNeeded() async {
+        guard !isLoading, cache.produksi.value != nil else { return }
+        await load(silent: true)
+    }
+    private func load(silent: Bool = false, force: Bool = false) async {
+        let hasCache = cache.produksi.value != nil && !force
+        if hasCache && silent {
+            isRefreshing = true
+        } else if !silent {
+            isLoading = true
+        } else if force {
+            isRefreshing = true
+        }
         async let batchesTask  = api.getProductionBatches()
         async let matsTask     = api.getMaterials()
         async let specsTask    = api.getPatternSpecs()
         async let settingsTask = api.getSettings()
         var loaded  = (try? await batchesTask)  ?? []
-        allMaterials = (try? await matsTask)    ?? []
-        patternSpecs = (try? await specsTask)   ?? []
-        settings     = (try? await settingsTask) ?? []
+        let mats    = (try? await matsTask)    ?? []
+        let specs   = (try? await specsTask)   ?? []
+        let sets    = (try? await settingsTask) ?? []
+        allMaterials = mats
+        patternSpecs = specs
+        settings     = sets
         enrichDraftHpp(&loaded)
         batches = loaded
+        cache.setProduksi(batches: loaded, materials: mats, specs: specs, settings: sets)
         isLoading = false
+        isRefreshing = false
     }
 
     private func enrichDraftHpp(_ batches: inout [ProductionBatch]) {
@@ -159,6 +198,7 @@ struct ProduksiBatchView: View {
     private func confirm(_ batch: ProductionBatch) async {
         do {
             try await api.confirmBatch(id: batch.id)
+            cache.invalidateProduksi()
             // Auto-apply suggested price (40% margin) for every item that has HPP
             await withTaskGroup(of: Void.self) { group in
                 for item in batch.items {
@@ -169,7 +209,7 @@ struct ProduksiBatchView: View {
                     group.addTask { await self.applyPrice(item: item, price: price) }
                 }
             }
-            await load()
+            await load(silent: true, force: true)
         } catch {
             errorMsg = error.localizedDescription
         }
@@ -179,6 +219,7 @@ struct ProduksiBatchView: View {
         do {
             try await api.deleteProductionBatch(id: batch.id)
             batches.removeAll { $0.id == batch.id }
+            cache.invalidateProduksi()
         } catch {
             errorMsg = error.localizedDescription
         }

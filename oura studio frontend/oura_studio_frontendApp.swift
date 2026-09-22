@@ -5,6 +5,7 @@ import GoogleSignIn
 struct OuraStudioApp: App {
     @StateObject private var appState = AppState()
     @StateObject private var api = APIService.shared
+    @StateObject private var produksiCache = ProduksiCache()
 
     var body: some Scene {
         WindowGroup {
@@ -17,6 +18,7 @@ struct OuraStudioApp: App {
                         .environmentObject(appState)
                         .environmentObject(api)
                         .environmentObject(appState.tsplPrinterService)
+                        .environmentObject(produksiCache)
                 } else {
                     LoginView()
                         .environmentObject(appState)

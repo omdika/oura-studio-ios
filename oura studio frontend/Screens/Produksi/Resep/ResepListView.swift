@@ -41,9 +41,11 @@ private struct EditSheetItem: Identifiable {
 
 struct ResepListView: View {
     @EnvironmentObject private var api: APIService
+    @EnvironmentObject private var cache: ProduksiCache
 
     @State private var specs: [PatternSpec] = []
     @State private var isLoading = true
+    @State private var isRefreshing = false
     @State private var errorMsg: String?
     @State private var searchText: String = ""
     @State private var showTambah = false
@@ -86,6 +88,14 @@ struct ResepListView: View {
                         specList
                     }
                 }
+                if isRefreshing && !isLoading {
+                    HStack(spacing: 6) {
+                        ProgressView().scaleEffect(0.7)
+                        Text("Memperbarui…").font(.system(size: 12)).foregroundStyle(OuraTheme.Colors.textTertiary)
+                    }
+                    .padding(.vertical, 6)
+                    .frame(maxWidth: .infinity)
+                }
             }
             .background(OuraTheme.Colors.background)
 
@@ -96,11 +106,18 @@ struct ResepListView: View {
             .padding(.bottom, 20)
         }
         .toolbar(.hidden, for: .navigationBar)
-        .task { await load() }
-        .sheet(isPresented: $showTambah, onDismiss: { Task { await load() } }) {
+        .task { await loadWithCache() }
+        .onAppear { Task { await softReloadIfNeeded() } }
+        .sheet(isPresented: $showTambah, onDismiss: {
+            cache.invalidateResep()
+            Task { await load(silent: true, force: true) }
+        }) {
             TambahResepSheet()
         }
-        .sheet(item: $editSheetItem, onDismiss: { Task { await load() } }) { item in
+        .sheet(item: $editSheetItem, onDismiss: {
+            cache.invalidateResep()
+            Task { await load(silent: true, force: true) }
+        }) { item in
             EditResepSheet(specGroups: item.specGroups, onUpdate: {})
         }
     }
@@ -141,7 +158,7 @@ struct ResepListView: View {
                     ForEach(group.groups) { specGroup in
                         NavigationLink(destination: ResepEditorView(
                             specs: specGroup.specs,
-                            onUpdate: { Task { await load() } }
+                            onUpdate: { cache.invalidateResep(); Task { await load(silent: true, force: true) } }
                         )) {
                             ResepRow(group: specGroup)
                         }
@@ -176,7 +193,7 @@ struct ResepListView: View {
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
         .background(OuraTheme.Colors.background)
-        .refreshable { await load() }
+        .refreshable { await load(silent: true, force: true) }
     }
 
     private var emptyView: some View {
@@ -218,16 +235,41 @@ struct ResepListView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    private func load() async {
-        isLoading = true
+    // MARK: - Cache + Soft Reload
+    private func loadWithCache() async {
+        if let cached = cache.resep.value, !cached.isEmpty {
+            specs = cached
+            isLoading = false
+            await load(silent: true)
+        } else {
+            await load(silent: false)
+        }
+    }
+    private func softReloadIfNeeded() async {
+        // Dipanggil onAppear saat kembali dari tab lain — tampilkan cache dulu, refresh tipis
+        guard !isLoading, cache.resep.value != nil else { return }
+        await load(silent: true)
+    }
+    private func load(silent: Bool = false, force: Bool = false) async {
+        let hasCache = cache.resep.value != nil && !force
+        if hasCache && silent {
+            isRefreshing = true
+        } else if !silent {
+            isLoading = true
+        } else if force {
+            isRefreshing = true
+        }
         errorMsg = nil
         do {
-            specs = try await api.getPatternSpecs()
+            let fresh = try await api.getPatternSpecs()
+            specs = fresh
+            cache.setResep(fresh)
+            errorMsg = nil
         } catch {
-            errorMsg = error.localizedDescription
-            specs = []
+            if !silent || !hasCache { errorMsg = error.localizedDescription; specs = [] }
         }
         isLoading = false
+        isRefreshing = false
     }
 }
 
