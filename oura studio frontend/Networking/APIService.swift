@@ -694,15 +694,31 @@ class APIService: ObservableObject {
     func suggestLayouts(_ req: SuggestOptimizerRequest) async throws -> [OptimizerLayout] {
         if useMock { return try await MockAPIService.shared.suggestLayouts(req) }
         let resp: BackendSuggestOptimizerResponse = try await post(path: "/cutting-optimizer/suggest", body: req)
-        let sizeMap = try await fetchSizeToProductMap()
+        // Sebelumnya: fetchSizeToProductMap() = GET /products?page=1 + 69× GET /products/{sku}/sizes
+        // (≈ 70 request, pool exhaustion → Hitung tombol spinner sampai 5-10s)
+        // Sekarang: hanya fetch ProductSize yang benar-benar ada di response (biasanya 1-2 id)
+        // via GET /product-sizes/{id} (1 req per id, paralel). Untuk Optimasi single-spec = 1 req.
+        let uniqueIds = Set(resp.layouts.flatMap { $0.items.map { $0.productSizeId } })
+        var nameMap: [UUID: (String, String)] = [:] // productSizeId -> (productName, sizeLabel)
+        if !uniqueIds.isEmpty {
+            await withTaskGroup(of: (UUID, ProductSizeDetail?).self) { group in
+                for id in uniqueIds {
+                    group.addTask { (id, try? await self.getProductSizeById(id: id)) }
+                }
+                for await (id, detail) in group {
+                    if let d = detail { nameMap[id] = (d.productName, d.sizeLabel) }
+                }
+            }
+        }
         return resp.layouts.map { raw in
             let items = raw.items.map { item in
-                let entry = sizeMap[item.productSizeId]
+                let name = nameMap[item.productSizeId]?.0 ?? "Produk"
+                let label = nameMap[item.productSizeId]?.1 ?? "-"
                 return OptimizerLayoutItem(
                     id: UUID(),
                     productSizeId: item.productSizeId,
-                    productName: entry?.product.name ?? "Produk",
-                    sizeLabel: entry?.size.sizeLabel ?? "-",
+                    productName: name,
+                    sizeLabel: label,
                     patternSpecId: item.patternSpecId,
                     orientation: item.orientation,
                     qtySuggested: item.qtySuggested,

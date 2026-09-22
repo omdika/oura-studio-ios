@@ -753,18 +753,34 @@ struct OptimasiView: View {
         )
 
         do {
+            // Multi-kain sebelumnya sequential (1 POST + 1 GET per kain). Untuk 2 kain = ~1.5s.
+            // Paralel ThrowingTaskGroup: 2 POST + 2 GET paralel ~400-500ms total (lihat APIService.suggestLayouts).
+            let fabricList = spec.fabrics
             var results: [FabricLayoutResult] = []
-            for fabric in spec.fabrics {
-                guard let purchase = rollSelections[fabric.materialId] else { continue }
-                let layouts = try await api.suggestLayouts(
-                    SuggestOptimizerRequest(materialPurchaseId: purchase.id, candidates: [candidate])
-                )
-                results.append(FabricLayoutResult(
-                    materialId: fabric.materialId,
-                    materialName: fabric.materialName,
-                    purchaseId: purchase.id,
-                    layouts: layouts
-                ))
+            try await withThrowingTaskGroup(of: FabricLayoutResult.self) { group in
+                for fabric in fabricList {
+                    guard let purchase = rollSelections[fabric.materialId] else { continue }
+                    group.addTask {
+                        let layouts = try await self.api.suggestLayouts(
+                            SuggestOptimizerRequest(materialPurchaseId: purchase.id, candidates: [candidate])
+                        )
+                        return FabricLayoutResult(
+                            materialId: fabric.materialId,
+                            materialName: fabric.materialName,
+                            purchaseId: purchase.id,
+                            layouts: layouts
+                        )
+                    }
+                }
+                for try await res in group {
+                    results.append(res)
+                }
+            }
+            // Pertahankan urutan kain sesuai spec
+            results.sort { a, b in
+                guard let ai = spec.fabrics.firstIndex(where: { $0.materialId == a.materialId }),
+                      let bi = spec.fabrics.firstIndex(where: { $0.materialId == b.materialId }) else { return false }
+                return ai < bi
             }
             fabricLayoutResults = results
             withAnimation { step = .showResults }
