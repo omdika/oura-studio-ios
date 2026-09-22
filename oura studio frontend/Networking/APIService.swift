@@ -771,16 +771,20 @@ class APIService: ObservableObject {
     func updateBatchItem(batchId: UUID, itemId: UUID, qtyActual: Int) async throws -> ProductionBatchItem {
         if useMock { return try await MockAPIService.shared.updateBatchItem(batchId: batchId, itemId: itemId, qtyActual: qtyActual) }
         let raw: BackendProductionBatchItem = try await patch(path: "/production-batches/\(batchId)/items/\(itemId)", body: UpdateBatchItemRequest(qtyActual: qtyActual))
-        let sizeMap = try await fetchSizeToProductMap()
-        let entry = raw.productSizeId.flatMap { sizeMap[$0] }
+        // Sebelumnya fetchSizeToProductMap (70 req) untuk 1 id — bikin edit qty di Produksi lambat.
+        // Sekarang 1 GET /product-sizes/{id} saja.
+        var name: String?; var label: String?; var hpp: HPPBreakdown?
+        if let pid = raw.productSizeId, let detail = try? await getProductSizeById(id: pid) {
+            name = detail.productName; label = detail.sizeLabel; hpp = detail.latestHppBreakdown
+        }
         let hppFabricRaw = raw.hppFabric ?? 0
         let effectiveHppFabric = hppFabricRaw > 0 ? hppFabricRaw : (raw.fabricCostPerPiece ?? 0)
         return ProductionBatchItem(
             id: raw.id,
             productionBatchId: batchId,
             productSizeId: raw.productSizeId,
-            productName: entry?.product.name ?? "Produk",
-            sizeLabel: entry?.size.sizeLabel ?? "-",
+            productName: name ?? "Produk",
+            sizeLabel: label ?? "-",
             patternSpecId: raw.patternSpecId,
             qtyActual: raw.qtyActual,
             qtySuggested: raw.qtySuggested,
@@ -790,7 +794,7 @@ class APIService: ObservableObject {
             hppLabor: raw.hppLabor ?? 0,
             hppOverhead: raw.hppOverhead ?? 0,
             hppTotal: raw.hppTotal ?? 0,
-            latestHppBreakdown: entry?.size.latestHppBreakdown
+            latestHppBreakdown: hpp
         )
     }
 
@@ -813,12 +817,23 @@ class APIService: ObservableObject {
     }
 
     // Maps raw backend batch items to enriched ProductionBatch objects with product/size names.
+    // Sebelumnya fetchSizeToProductMap (70 req) untuk tiap create/get batch → "Gunakan Layout Ini" 08.32→08.33 (60s)
+    // Sekarang hanya fetch ProductSize yang ada di batch (biasanya 1) via GET /product-sizes/{id} paralel.
     private func enrichProductionBatches(_ raw: [BackendProductionBatch]) async throws -> [ProductionBatch] {
         guard !raw.isEmpty else { return [] }
-        let sizeMap = raw.flatMap { $0.items }.isEmpty ? [:] : try await fetchSizeToProductMap()
+        let ids = Set(raw.flatMap { $0.items.compactMap { $0.productSizeId } })
+        var nameMap: [UUID: (String, String, HPPBreakdown?)] = [:]
+        if !ids.isEmpty {
+            await withTaskGroup(of: (UUID, ProductSizeDetail?).self) { group in
+                for id in ids { group.addTask { (id, try? await self.getProductSizeById(id: id)) } }
+                for await (id, detail) in group {
+                    if let d = detail { nameMap[id] = (d.productName, d.sizeLabel, d.latestHppBreakdown) }
+                }
+            }
+        }
         return raw.map { batch in
             let items = batch.items.map { item in
-                let entry = item.productSizeId.flatMap { sizeMap[$0] }
+                let entry = item.productSizeId.flatMap { nameMap[$0] }
                 // hpp_* fields are 0 in draft — use fabric_cost_per_piece as hppFabric estimate
                 let hppFabricRaw = item.hppFabric ?? 0
                 let fabricCost   = item.fabricCostPerPiece ?? 0
@@ -827,8 +842,8 @@ class APIService: ObservableObject {
                     id: item.id,
                     productionBatchId: batch.id,
                     productSizeId: item.productSizeId,
-                    productName: entry?.product.name ?? "Produk",
-                    sizeLabel: entry?.size.sizeLabel ?? "-",
+                    productName: entry?.0 ?? "Produk",
+                    sizeLabel: entry?.1 ?? "-",
                     patternSpecId: item.patternSpecId,
                     qtyActual: item.qtyActual,
                     qtySuggested: item.qtySuggested,
@@ -838,7 +853,7 @@ class APIService: ObservableObject {
                     hppLabor: item.hppLabor ?? 0,
                     hppOverhead: item.hppOverhead ?? 0,
                     hppTotal: item.hppTotal ?? 0,
-                    latestHppBreakdown: entry?.size.latestHppBreakdown
+                    latestHppBreakdown: entry?.2
                 )
             }
             return ProductionBatch(
