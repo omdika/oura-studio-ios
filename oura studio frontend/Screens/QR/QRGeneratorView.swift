@@ -538,7 +538,7 @@ struct QRGeneratorView: View {
                     f.groupingSeparator = "."
                     f.maximumFractionDigits = 0
                     let s = f.string(from: NSNumber(value: price)) ?? "\(Int(price))"
-                    return "Rp.\(s)"
+                    return s
                 }()
                 let label: String
                 if let fabric = size.fabricVariantName {

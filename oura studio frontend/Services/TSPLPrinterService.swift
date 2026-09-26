@@ -423,7 +423,7 @@ class TSPLPrinterService: NSObject, ObservableObject {
         }
     }
 
-    /// Format Rupiah tanpa desimal: 22000 -> "Rp.22.000" (pepet, tanpa spasi, v3.61 patch)
+    /// Format harga label tanpa prefix Rp: 22000 -> "22.000" (v3.61 patch: hilangin Rp)
     nonisolated static func formatRupiah(_ value: Double) -> String {
         let f = NumberFormatter()
         f.numberStyle = .decimal
@@ -433,8 +433,10 @@ class TSPLPrinterService: NSObject, ObservableObject {
         f.maximumFractionDigits = 0
         f.minimumFractionDigits = 0
         let s = f.string(from: NSNumber(value: value)) ?? "\(Int(value))"
-        return "Rp.\(s)"
+        return s
     }
+    /// Legacy helper bila butuh dengan Rp (tidak dipakai di label v3.61)
+    nonisolated static func formatRupiahWithPrefix(_ value: Double) -> String { "Rp.\(formatRupiah(value))" }
 
     /// Bersihkan teks agar aman untuk perintah TSPL TEXT (ASCII, tanpa kutip/baris baru).
     nonisolated static func sanitizeForTSPL(_ text: String) -> String {
