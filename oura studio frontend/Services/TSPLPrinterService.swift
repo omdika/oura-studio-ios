@@ -423,7 +423,7 @@ class TSPLPrinterService: NSObject, ObservableObject {
         }
     }
 
-    /// Format Rupiah tanpa desimal: 22000 -> "Rp 22.000"
+    /// Format Rupiah tanpa desimal: 22000 -> "Rp.22.000" (pepet, tanpa spasi, v3.61 patch)
     nonisolated static func formatRupiah(_ value: Double) -> String {
         let f = NumberFormatter()
         f.numberStyle = .decimal
@@ -433,7 +433,7 @@ class TSPLPrinterService: NSObject, ObservableObject {
         f.maximumFractionDigits = 0
         f.minimumFractionDigits = 0
         let s = f.string(from: NSNumber(value: value)) ?? "\(Int(value))"
-        return "Rp \(s)"
+        return "Rp.\(s)"
     }
 
     /// Bersihkan teks agar aman untuk perintah TSPL TEXT (ASCII, tanpa kutip/baris baru).
@@ -525,14 +525,16 @@ class TSPLPrinterService: NSObject, ObservableObject {
         }
 
         // Harga — font "1", 1 baris di atas size, hanya bila sellingPrice ada.
+        // v3.61 patch: turun 1mm (≈8 dots @203dpi) agar lebih dekat ke size, pepet tanpa spasi (formatRupiah Rp.xxx)
         // Di-skip jika tidak ada ruang sebelum sizeY agar size yang dipin tidak tertimpa.
         if let price = content.sellingPrice, price > 0 {
             let priceRaw = formatRupiah(price)
             let priceClean = sanitizeForTSPL(priceRaw)
-            if !priceClean.isEmpty, y + 20 <= sizeY {
+            let priceY = y + 8 // turun 1mm
+            if !priceClean.isEmpty, priceY + 20 <= sizeY {
                 let t = priceClean.count > nameMax ? String(priceClean.prefix(max(0, nameMax - 3))) + "..." : priceClean
-                out += "TEXT \(textX),\(y),\"1\",0,1,1,\"\(t)\"\r\n"
-                y += 20
+                out += "TEXT \(textX),\(priceY),\"1\",0,1,1,\"\(t)\"\r\n"
+                y = priceY + 20
             }
         }
 
