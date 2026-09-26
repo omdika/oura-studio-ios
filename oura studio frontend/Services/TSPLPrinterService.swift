@@ -406,12 +406,34 @@ class TSPLPrinterService: NSObject, ObservableObject {
     }
 
     /// Isi caption label thermal — per field agar layout terstruktur per baris
-    /// (SKU besar, nama/varian kecil, size jelas), bukan satu string di-wrap.
+    /// (SKU besar, nama/varian kecil, harga opsional, size jelas), bukan satu string di-wrap.
     struct ThermalLabelContent {
         let sku: String
         let productName: String
         let fabricVariantName: String?
         let sizeLabel: String
+        let sellingPrice: Double? // v3.61: opsional, ditampilkan di atas size bila ada
+
+        init(sku: String, productName: String, fabricVariantName: String?, sizeLabel: String, sellingPrice: Double? = nil) {
+            self.sku = sku
+            self.productName = productName
+            self.fabricVariantName = fabricVariantName
+            self.sizeLabel = sizeLabel
+            self.sellingPrice = sellingPrice
+        }
+    }
+
+    /// Format Rupiah tanpa desimal: 22000 -> "Rp 22.000"
+    nonisolated static func formatRupiah(_ value: Double) -> String {
+        let f = NumberFormatter()
+        f.numberStyle = .decimal
+        f.locale = Locale(identifier: "id_ID")
+        f.groupingSeparator = "."
+        f.decimalSeparator = ","
+        f.maximumFractionDigits = 0
+        f.minimumFractionDigits = 0
+        let s = f.string(from: NSNumber(value: value)) ?? "\(Int(value))"
+        return "Rp \(s)"
     }
 
     /// Bersihkan teks agar aman untuk perintah TSPL TEXT (ASCII, tanpa kutip/baris baru).
@@ -500,6 +522,18 @@ class TSPLPrinterService: NSObject, ObservableObject {
             let t = fabric.count > nameMax ? String(fabric.prefix(max(0, nameMax - 3))) + "..." : fabric
             out += "TEXT \(textX),\(y),\"1\",0,1,1,\"\(t)\"\r\n"
             y += 20
+        }
+
+        // Harga — font "1", 1 baris di atas size, hanya bila sellingPrice ada.
+        // Di-skip jika tidak ada ruang sebelum sizeY agar size yang dipin tidak tertimpa.
+        if let price = content.sellingPrice, price > 0 {
+            let priceRaw = formatRupiah(price)
+            let priceClean = sanitizeForTSPL(priceRaw)
+            if !priceClean.isEmpty, y + 20 <= sizeY {
+                let t = priceClean.count > nameMax ? String(priceClean.prefix(max(0, nameMax - 3))) + "..." : priceClean
+                out += "TEXT \(textX),\(y),\"1\",0,1,1,\"\(t)\"\r\n"
+                y += 20
+            }
         }
 
         // Size saja tanpa prefix ("XXL") — font "2", selalu di posisi sizeY.

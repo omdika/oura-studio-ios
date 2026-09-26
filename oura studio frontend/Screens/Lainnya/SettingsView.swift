@@ -19,6 +19,7 @@ struct SettingsView: View {
     @AppStorage("labelGap") private var labelGap: Double = 2.0
     @AppStorage("printerUUIDString") private var printerUUIDString: String = ""
     @AppStorage("printerName") private var printerName: String = ""
+    @AppStorage("labelIncludePrice") private var labelIncludePrice: Bool = false
 
     private var grouped: [(category: String, defs: [SettingDef])] {
         let dict = Dictionary(grouping: knownSettings, by: { $0.category })
@@ -106,6 +107,8 @@ struct SettingsView: View {
                             onChange: { labelGap = $0 },
                             onSave: { }
                         )
+                        Divider().padding(.leading, 16).overlay(OuraTheme.Colors.separator)
+                        LabelPriceRadioGroup(isOn: $labelIncludePrice)
                         Divider().padding(.leading, 16).overlay(OuraTheme.Colors.separator)
 
                         Button {
@@ -399,5 +402,48 @@ private struct SettingRow: View {
 
     private func formatValue(_ v: Double) -> String {
         v.truncatingRemainder(dividingBy: 1) == 0 ? String(Int(v)) : String(v)
+    }
+}
+
+// MARK: - Label Price Radio Group (v3.61: Sertakan Harga)
+struct LabelPriceRadioGroup: View {
+    @Binding var isOn: Bool
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text("Sertakan Harga di Label")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(OuraTheme.Colors.textPrimary)
+            }
+            Text("Jika aktif, harga jual akan dicetak di atas ukuran pada label thermal & PDF.")
+                .font(.system(size: 11))
+                .foregroundStyle(OuraTheme.Colors.textTertiary)
+            HStack(spacing: 16) {
+                RadioOptionButton(title: "Ya", selected: isOn) { isOn = true }
+                RadioOptionButton(title: "Tidak", selected: !isOn) { isOn = false }
+            }
+            .padding(.top, 2)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+    }
+}
+
+struct RadioOptionButton: View {
+    let title: String
+    let selected: Bool
+    let action: () -> Void
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                Image(systemName: selected ? "largecircle.fill.circle" : "circle")
+                    .font(.system(size: 18))
+                    .foregroundStyle(selected ? OuraTheme.Colors.accent : OuraTheme.Colors.border)
+                Text(title)
+                    .font(.system(size: 13, weight: selected ? .semibold : .regular))
+                    .foregroundStyle(selected ? OuraTheme.Colors.textPrimary : OuraTheme.Colors.textSecondary)
+            }
+        }
+        .buttonStyle(.plain)
     }
 }

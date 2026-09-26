@@ -13,6 +13,7 @@ struct PrintPreviewSheet: View {
     @AppStorage("labelHeight") private var labelHeight: Double = 15.0
     @AppStorage("labelGap") private var labelGap: Double = 2.0
     @AppStorage("printerName") private var printerName: String = ""
+    @AppStorage("labelIncludePrice") private var labelIncludePrice: Bool = false
 
     @State private var selectedSizeId: UUID?
     @State private var quantity: Int = 1
@@ -165,13 +166,15 @@ struct PrintPreviewSheet: View {
             return
         }
 
+        let priceForLabel: Double? = labelIncludePrice ? size.sellingPrice : nil
         tsplPrinterService.printLabel(
             qrData: "oura:\(size.id.uuidString)",
             content: TSPLPrinterService.ThermalLabelContent(
                 sku: size.productSku,
                 productName: size.productName,
                 fabricVariantName: size.fabricVariantName,
-                sizeLabel: size.sizeLabel
+                sizeLabel: size.sizeLabel,
+                sellingPrice: priceForLabel
             ),
             width: labelWidth,
             height: labelHeight,
@@ -186,6 +189,7 @@ struct PrintPreviewSheet: View {
 struct ThermalLabelPreviewCard: View {
     let size: ProductSizeDetail
     let qrImage: UIImage?
+    @AppStorage("labelIncludePrice") private var labelIncludePrice: Bool = false
 
     var body: some View {
         HStack(spacing: 12) {
@@ -204,7 +208,7 @@ struct ThermalLabelPreviewCard: View {
             }
 
             // Right: Caption TERSTRUKTUR seperti hasil cetak thermal —
-            // SKU besar, nama/varian sekecil mungkin, Size jelas.
+            // SKU besar, nama/varian sekecil mungkin, Harga (opsional) di atas Size, Size jelas.
             VStack(alignment: .leading, spacing: 1) {
                 Text(size.productSku)
                     .font(.system(size: 11, weight: .bold))
@@ -218,6 +222,12 @@ struct ThermalLabelPreviewCard: View {
                     Text(fabric)
                         .font(.system(size: 8))
                         .foregroundStyle(OuraTheme.Colors.textTertiary)
+                        .lineLimit(1)
+                }
+                if labelIncludePrice, let price = size.sellingPrice, price > 0 {
+                    Text(TSPLPrinterService.formatRupiah(price))
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundStyle(OuraTheme.Colors.textPrimary)
                         .lineLimit(1)
                 }
                 Text(size.sizeLabel)

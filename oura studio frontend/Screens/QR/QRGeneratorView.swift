@@ -15,6 +15,7 @@ struct QRGeneratorView: View {
     @State private var isLoading = true
     @State private var searchText = ""
 
+    @AppStorage("labelIncludePrice") private var labelIncludePrice: Bool = false
     @State private var isFilterActive = false
     @State private var filterFrom = Date()
     @State private var filterTo = Date()
@@ -167,6 +168,13 @@ struct QRGeneratorView: View {
                 }
                 .padding(.vertical, 4)
                 .listRowBackground(OuraTheme.Colors.surfaceCard)
+            }
+
+            // v3.61: Sertakan Harga toggle (sinkron dengan SettingsView via AppStorage)
+            Section {
+                LabelPriceRadioGroup(isOn: $labelIncludePrice)
+                    .listRowBackground(OuraTheme.Colors.surfaceCard)
+                    .listRowInsets(EdgeInsets(top: 10, leading: 0, bottom: 10, trailing: 0))
             }
 
             if filteredProducts.isEmpty {
@@ -450,15 +458,16 @@ struct QRGeneratorView: View {
             repeatedIds.append(contentsOf: Array(repeating: size.id, count: qty))
         }
 
+        let includePrice = labelIncludePrice
         let data = await Task.detached(priority: .userInitiated) {
-            Self.generatePDF(for: repeatedIds, sizes: Array(allSizes))
+            Self.generatePDF(for: repeatedIds, sizes: Array(allSizes), includePrice: includePrice)
         }.value
 
         pdfData = data
         showPrintPreview = true
     }
 
-    private nonisolated static func generatePDF(for sizeIds: [UUID], sizes: [ProductSizeDetail]) -> Data {
+    private nonisolated static func generatePDF(for sizeIds: [UUID], sizes: [ProductSizeDetail], includePrice: Bool) -> Data {
         let pageRect = CGRect(x: 0, y: 0, width: 595.28, height: 841.89)
         let renderer = UIGraphicsPDFRenderer(bounds: pageRect)
 
@@ -478,7 +487,7 @@ struct QRGeneratorView: View {
         let skuLineH: CGFloat = 0.0
         let captionFontSize: CGFloat = 4.5
         let captionLineH: CGFloat = 5.5
-        let maxCaptionLines = 5
+        let maxCaptionLines = includePrice ? 6 : 5
         let captionBoxH: CGFloat = CGFloat(maxCaptionLines) * captionLineH + 6
         let labelH: CGFloat = skuLineH + captionBoxH
         let cellH = qrSize + labelH + 6
@@ -519,12 +528,31 @@ struct QRGeneratorView: View {
                 let skuY = currentY + qrSize + 2
 
                 // Caption: SKU - Product Name - Size - Fabric Variant (if any) / SKU - Product Name - Size (if none).
-                // Always drawn into the same fixed-size captionBoxH.
+                // v3.61: when includePrice && sellingPrice != nil, price is inserted directly above size.
+                // Order: SKU - Product - Fabric - Rp Price - Size (fabric omitted if nil, price omitted if nil/off)
+                let priceSegment: String? = {
+                    guard includePrice, let price = size.sellingPrice, price > 0 else { return nil }
+                    let f = NumberFormatter()
+                    f.numberStyle = .decimal
+                    f.locale = Locale(identifier: "id_ID")
+                    f.groupingSeparator = "."
+                    f.maximumFractionDigits = 0
+                    let s = f.string(from: NSNumber(value: price)) ?? "\(Int(price))"
+                    return "Rp \(s)"
+                }()
                 let label: String
                 if let fabric = size.fabricVariantName {
-                    label = "\(size.productSku) - \(size.productName) - \(size.sizeLabel) - \(fabric)"
+                    if let priceStr = priceSegment {
+                        label = "\(size.productSku) - \(size.productName) - \(fabric) - \(priceStr) - \(size.sizeLabel)"
+                    } else {
+                        label = "\(size.productSku) - \(size.productName) - \(size.sizeLabel) - \(fabric)"
+                    }
                 } else {
-                    label = "\(size.productSku) - \(size.productName) - \(size.sizeLabel)"
+                    if let priceStr = priceSegment {
+                        label = "\(size.productSku) - \(size.productName) - \(priceStr) - \(size.sizeLabel)"
+                    } else {
+                        label = "\(size.productSku) - \(size.productName) - \(size.sizeLabel)"
+                    }
                 }
 
                 let ps = NSMutableParagraphStyle()
@@ -596,6 +624,7 @@ private struct QRPrintPreviewSheet: View {
     @AppStorage("labelWidth") private var labelWidth: Double = 33.0
     @AppStorage("labelHeight") private var labelHeight: Double = 15.0
     @AppStorage("labelGap") private var labelGap: Double = 2.0
+    @AppStorage("labelIncludePrice") private var labelIncludePrice: Bool = false
 
     enum PrintMode: Int, CaseIterable {
         case thermalLabel, a4Paper
@@ -714,6 +743,11 @@ private struct QRPrintPreviewSheet: View {
                                 Text("\(size.productName) · \(size.displayLabel)")
                                     .font(.system(size: 12))
                                     .foregroundStyle(OuraTheme.Colors.textSecondary)
+                                if labelIncludePrice, let price = size.sellingPrice, price > 0 {
+                                    Text(TSPLPrinterService.formatRupiah(price))
+                                        .font(.system(size: 11, weight: .medium))
+                                        .foregroundStyle(OuraTheme.Colors.textPrimary)
+                                }
                             }
                             Spacer()
                             Text("\(qty) pcs")
@@ -767,13 +801,15 @@ private struct QRPrintPreviewSheet: View {
         let selectedSizes = sizes.filter { selectedSizeIds.contains($0.id) }
         for size in selectedSizes {
             let qty = qtyPerSize[size.id] ?? 1
+            let priceForLabel: Double? = labelIncludePrice ? size.sellingPrice : nil
             tsplPrinterService.printLabel(
                 qrData: "oura:\(size.id.uuidString)",
                 content: TSPLPrinterService.ThermalLabelContent(
                     sku: size.productSku,
                     productName: size.productName,
                     fabricVariantName: size.fabricVariantName,
-                    sizeLabel: size.sizeLabel
+                    sizeLabel: size.sizeLabel,
+                    sellingPrice: priceForLabel
                 ),
                 width: labelWidth,
                 height: labelHeight,
