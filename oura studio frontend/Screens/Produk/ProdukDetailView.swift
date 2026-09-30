@@ -1144,6 +1144,8 @@ struct ProdukSizeDetailView: View {
     @State private var showGalleryPicker = false
     @State private var showCamera = false
     @State private var capturedCameraImage: UIImage?
+    @State private var showImageViewer = false
+    @State private var viewerInitialIndex = 0
 
     // Spec-based HPP estimate (loaded on appear; used when no batch/manual HPP exists)
     @State private var relatedSpec: PatternSpec? = nil
@@ -1270,6 +1272,15 @@ struct ProdukSizeDetailView: View {
         } message: { img in
             Text("Hapus foto ini dari produk?")
         }
+        .fullScreenCover(isPresented: $showImageViewer) {
+            Group {
+                if let images = size.images, !images.isEmpty {
+                    ProductImageViewer(images: images, initialIndex: min(viewerInitialIndex, images.count - 1))
+                } else {
+                    Color.black.ignoresSafeArea()
+                }
+            }
+        }
     }
 
     private var photosSection: some View {
@@ -1280,22 +1291,30 @@ struct ProdukSizeDetailView: View {
             
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 12) {
-                    // 1. Existing images
+                    // 1. Existing images — tap thumbnail to open full-screen viewer
                     if let images = size.images, !images.isEmpty {
-                        ForEach(images) { img in
+                        ForEach(Array(images.enumerated()), id: \.element.id) { idx, img in
                             ZStack(alignment: .topTrailing) {
-                                AsyncImage(url: URL(string: img.imageUrl)) { image in
-                                    image.resizable()
-                                        .aspectRatio(contentMode: .fill)
-                                } placeholder: {
-                                    ZStack {
-                                        Color.gray.opacity(0.1)
-                                        ProgressView()
+                                Button {
+                                    viewerInitialIndex = idx
+                                    showImageViewer = true
+                                } label: {
+                                    AsyncImage(url: URL(string: img.imageUrl)) { image in
+                                        image.resizable()
+                                            .aspectRatio(contentMode: .fill)
+                                    } placeholder: {
+                                        ZStack {
+                                            Color.gray.opacity(0.1)
+                                            ProgressView()
+                                        }
                                     }
+                                    .frame(width: 80, height: 80)
+                                    .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.small))
                                 }
-                                .frame(width: 80, height: 80)
-                                .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.small))
-                                
+                                .buttonStyle(.plain)
+                                .disabled(isUploading)
+                                .accessibilityLabel("Lihat foto \(idx + 1) dari \(images.count)")
+
                                 // Delete Overlay (Button)
                                 Button {
                                     imageToDelete = img
@@ -2074,6 +2093,87 @@ struct TambahStokSheet: View {
             dismiss()
         } catch let e as APIError { errorMsg = e.errorDescription }
         catch { errorMsg = error.localizedDescription }
+    }
+}
+
+// MARK: - Full-screen image viewer (swipeable TabView)
+
+private struct ProductImageViewer: View {
+    let images: [ProductSizeImage]
+    let initialIndex: Int
+    @Environment(\.dismiss) private var dismiss
+    @State private var currentIndex: Int
+
+    init(images: [ProductSizeImage], initialIndex: Int) {
+        self.images = images
+        self.initialIndex = initialIndex
+        self._currentIndex = State(initialValue: initialIndex)
+    }
+
+    var body: some View {
+        ZStack {
+            Color.black.ignoresSafeArea()
+
+            TabView(selection: $currentIndex) {
+                ForEach(Array(images.enumerated()), id: \.element.id) { idx, img in
+                    ZStack {
+                        Color.black
+                        AsyncImage(url: URL(string: img.imageUrl)) { phase in
+                            switch phase {
+                            case .success(let image):
+                                image
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            case .failure:
+                                VStack(spacing: 12) {
+                                    Image(systemName: "exclamationmark.triangle")
+                                        .font(.system(size: 32))
+                                        .foregroundStyle(.white.opacity(0.6))
+                                    Text("Gagal memuat gambar")
+                                        .font(.system(size: 14))
+                                        .foregroundStyle(.white.opacity(0.6))
+                                }
+                            case .empty:
+                                ProgressView().tint(.white)
+                            @unknown default:
+                                EmptyView()
+                            }
+                        }
+                    }
+                    .tag(idx)
+                }
+            }
+            .tabViewStyle(.page(indexDisplayMode: .automatic))
+            .indexViewStyle(.page(backgroundDisplayMode: .always))
+
+            VStack {
+                HStack {
+                    Button {
+                        dismiss()
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .frame(width: 36, height: 36)
+                            .background(.white.opacity(0.18))
+                            .clipShape(Circle())
+                    }
+                    .accessibilityLabel("Tutup")
+                    Spacer()
+                    Text("\(currentIndex + 1) / \(images.count)")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(.white.opacity(0.18))
+                        .clipShape(Capsule())
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 16)
+                Spacer()
+            }
+        }
     }
 }
 
