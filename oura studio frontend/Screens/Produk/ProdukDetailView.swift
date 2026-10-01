@@ -372,14 +372,36 @@ struct ProdukDetailView: View {
                                 }
                                 .buttonStyle(.plain)
                                 .disabled(isGalleryUploading)
-                                if img.isCover || idx == 0 {
-                                    Text("Cover")
-                                        .font(.system(size: 9, weight: .bold))
-                                        .foregroundStyle(.white)
-                                        .padding(.horizontal, 6).padding(.vertical, 2)
-                                        .background(OuraTheme.Colors.accent)
-                                        .clipShape(Capsule())
-                                        .offset(x: 4, y: 4)
+                                // v3.62: Cover + label ukuran pemakai (wakil Foto Shopee).
+                                let wakilLabels = wakilLabelsByURL[img.imageUrl] ?? []
+                                if (img.isCover || idx == 0) || !wakilLabels.isEmpty {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        if img.isCover || idx == 0 {
+                                            Text("Cover")
+                                                .font(.system(size: 9, weight: .bold))
+                                                .foregroundStyle(.white)
+                                                .padding(.horizontal, 6).padding(.vertical, 2)
+                                                .background(OuraTheme.Colors.accent)
+                                                .clipShape(Capsule())
+                                        }
+                                        ForEach(Array(wakilLabels.prefix(3)), id: \.self) { label in
+                                            Text(label)
+                                                .font(.system(size: 9, weight: .bold))
+                                                .foregroundStyle(.white)
+                                                .padding(.horizontal, 6).padding(.vertical, 2)
+                                                .background(OuraTheme.Colors.blueAccent)
+                                                .clipShape(Capsule())
+                                        }
+                                        if wakilLabels.count > 3 {
+                                            Text("+\(wakilLabels.count - 3)")
+                                                .font(.system(size: 9, weight: .bold))
+                                                .foregroundStyle(.white)
+                                                .padding(.horizontal, 6).padding(.vertical, 2)
+                                                .background(OuraTheme.Colors.blueAccent)
+                                                .clipShape(Capsule())
+                                        }
+                                    }
+                                    .offset(x: 4, y: 4)
                                 }
                                 Menu {
                                     if idx != 0 {
@@ -490,6 +512,16 @@ struct ProdukDetailView: View {
         isGalleryLoading = true
         defer { isGalleryLoading = false }
         gallery = (try? await api.getProductImages(sku: product.sku)) ?? []
+    }
+
+    // v3.62: image URL -> size labels memakai sbg Foto Shopee (wakil), terurut XS→XXL.
+    private var wakilLabelsByURL: [String: [String]] {
+        var map: [String: [String]] = [:]
+        for s in sizes {
+            guard let url = s.images?.first(where: { $0.isShopeeSelected == true })?.imageUrl else { continue }
+            map[url, default: []].append(s.sizeLabel)
+        }
+        return map.mapValues { $0.sorted { sizeLabelSortKey($0) < sizeLabelSortKey($1) } }
     }
 
     private func handleGallerySelection(_ newItems: [PhotosPickerItem]) async {
