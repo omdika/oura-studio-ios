@@ -87,6 +87,8 @@ class MockAPIService {
     private var _materialUsage: [UUID: [MaterialUsageEntry]] = [:]
     private var _products: [Product] = []
     private var _productSizes: [String: [ProductSizeDetail]] = [:]  // keyed by sku
+    // v3.62: product-level galleries keyed by sku
+    private var _productGalleries: [String: [ProductImage]] = [:]
     private var _patternSpecs: [PatternSpec] = []
     private var _cuttingLayouts: [CuttingLayout] = []
     private var _productionBatches: [ProductionBatch] = []
@@ -1333,6 +1335,132 @@ class MockAPIService {
             )
             _productSizes[sku] = list
         }
+    }
+
+    // MARK: - v3.62 mock gallery + wakil
+
+    func getProductImages(sku: String) async throws -> [ProductImage] {
+        await delay()
+        return (_productGalleries[sku] ?? []).sorted { $0.sortOrder < $1.sortOrder }
+    }
+
+    func uploadProductImage(sku: String, imageData: Data) async throws -> ProductImage {
+        await delay()
+        guard let product = _products.first(where: { $0.sku == sku }) else {
+            throw APIError.serverError(404, "Product not found")
+        }
+        var gallery = _productGalleries[sku] ?? []
+        if gallery.count >= 9 { throw APIError.serverError(409, "Galeri utama penuh (maks 9 foto)") }
+        let row = ProductImage(
+            id: UUID(), productId: product.id,
+            imageUrl: "https://storage.googleapis.com/oura-studio-prod-bucket/products/\(sku)/gallery/\(UUID().uuidString).jpg",
+            sortOrder: gallery.count, isCover: gallery.isEmpty, createdAt: Date()
+        )
+        gallery.append(row)
+        _productGalleries[sku] = gallery
+        return row
+    }
+
+    func patchProductImage(sku: String, imageId: UUID, isCover: Bool? = nil, sortOrder: Int? = nil) async throws -> ProductImage {
+        await delay()
+        guard var gallery = _productGalleries[sku],
+              let idx = gallery.firstIndex(where: { $0.id == imageId }) else {
+            throw APIError.serverError(404, "Foto tidak ditemukan.")
+        }
+        let row = gallery.remove(at: idx)
+        if isCover == true {
+            gallery.insert(row, at: 0)
+        } else if let target = sortOrder {
+            gallery.insert(row, at: max(0, min(target, gallery.count)))
+        } else {
+            gallery.insert(row, at: idx)
+        }
+        let renumbered = gallery.enumerated().map { (i, r) in
+            ProductImage(id: r.id, productId: r.productId, imageUrl: r.imageUrl,
+                         sortOrder: i, isCover: i == 0, createdAt: r.createdAt)
+        }
+        _productGalleries[sku] = renumbered
+        return renumbered.first(where: { $0.id == imageId })!
+    }
+
+    func deleteProductImage(sku: String, imageId: UUID) async throws {
+        await delay()
+        guard var gallery = _productGalleries[sku] else { return }
+        gallery.removeAll { $0.id == imageId }
+        _productGalleries[sku] = gallery.enumerated().map { (i, r) in
+            ProductImage(id: r.id, productId: r.productId, imageUrl: r.imageUrl,
+                         sortOrder: i, isCover: i == 0, createdAt: r.createdAt)
+        }
+    }
+
+    func selectSizeShopeeImage(sku: String, sizeId: UUID, imageId: UUID, selected: Bool) async throws -> SizeImageSelectResponse {
+        await delay()
+        guard var list = _productSizes[sku],
+              let idx = list.firstIndex(where: { $0.id == sizeId }),
+              let imgIdx = list[idx].images?.firstIndex(where: { $0.id == imageId }),
+              let img = list[idx].images?[imgIdx] else {
+            throw APIError.serverError(404, "Foto tidak ditemukan.")
+        }
+        let old = list[idx]
+        let currentImgs: [ProductSizeImage] = old.images ?? []
+        let updatedImgs: [ProductSizeImage] = currentImgs.map { im in
+            ProductSizeImage(id: im.id, productSizeId: im.productSizeId, imageUrl: im.imageUrl,
+                             isShopeeSelected: (im.id == imageId) ? selected : (selected ? false : (im.isShopeeSelected ?? false)),
+                             createdAt: im.createdAt)
+        }
+        list[idx] = ProductSizeDetail(
+            id: old.id, productId: old.productId, productSku: old.productSku,
+            productName: old.productName, sizeLabel: old.sizeLabel,
+            fabricVariantName: old.fabricVariantName, reorderMinQty: old.reorderMinQty,
+            isArchived: old.isArchived, currentStockQty: old.currentStockQty,
+            productionStockQty: old.productionStockQty, manualStockQty: old.manualStockQty,
+            latestHppBreakdown: old.latestHppBreakdown, sellingPrice: old.sellingPrice,
+            marginPct: old.marginPct, manualHppFabric: old.manualHppFabric,
+            manualHppPooled: old.manualHppPooled, manualHppHardware: old.manualHppHardware,
+            manualHppLabor: old.manualHppLabor, manualHppOverhead: old.manualHppOverhead,
+            images: updatedImgs
+        )
+        _productSizes[sku] = list
+        // Auto-sync wakil URL to gallery (dedupe, cap 9).
+        var synced = true
+        var reason: String? = nil
+        if selected {
+            var gallery = _productGalleries[sku] ?? []
+            if !gallery.contains(where: { $0.imageUrl == img.imageUrl }) {
+                if gallery.count >= 9 { synced = false; reason = "FULL" }
+                else if let product = _products.first(where: { $0.sku == sku }) {
+                    gallery.append(ProductImage(id: UUID(), productId: product.id, imageUrl: img.imageUrl,
+                                                sortOrder: gallery.count, isCover: gallery.isEmpty, createdAt: Date()))
+                    _productGalleries[sku] = gallery
+                }
+            }
+        }
+        return SizeImageSelectResponse(id: img.id, productSizeId: sizeId, imageUrl: img.imageUrl,
+                                       isShopeeSelected: selected, createdAt: img.createdAt,
+                                       gallerySynced: synced, galleryReason: reason)
+    }
+
+    func getShopeePayload(sku: String) async throws -> ShopeePayload {
+        await delay()
+        let order = ["XXS", "XS", "S", "M", "L", "XL", "XXL", "XXXL"]
+        func key(_ label: String) -> (Int, String) {
+            if let i = order.firstIndex(of: label.uppercased()) { return (i, "") }
+            return (order.count, label)
+        }
+        let sizes = ((_productSizes[sku] ?? []).filter { !$0.isArchived && ($0.sellingPrice ?? 0) > 0 })
+            .sorted { key($0.sizeLabel) < key($1.sizeLabel) }
+        let gallery = (_productGalleries[sku] ?? []).sorted { $0.sortOrder < $1.sortOrder }
+        var images: [String] = []
+        for g in gallery where !images.contains(g.imageUrl) { images.append(g.imageUrl) }
+        for s in sizes {
+            if let w = s.images?.first(where: { $0.isShopeeSelected == true })?.imageUrl,
+               !images.contains(w), images.count < 9 { images.append(w) }
+        }
+        let models = sizes.map { s in
+            ShopeeModel(name: s.sizeLabel, price: s.sellingPrice ?? 0, stock: s.currentStockQty,
+                        imageUrl: s.images?.first(where: { $0.isShopeeSelected == true })?.imageUrl)
+        }
+        return ShopeePayload(images: Array(images.prefix(9)), models: models)
     }
 
     // Adds product stock and deducts fabric using manually-specified cutting dimensions (no spec required)

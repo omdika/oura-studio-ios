@@ -444,6 +444,72 @@ class APIService: ObservableObject {
         try await delete(path: "/products/\(sku)/sizes/\(sizeId.uuidString)/images/\(imageId.uuidString)")
     }
 
+    // MARK: - v3.62 Galeri Utama + wakil Shopee
+
+    func getProductImages(sku: String) async throws -> [ProductImage] {
+        if useMock { return try await MockAPIService.shared.getProductImages(sku: sku) }
+        return try await get(path: "/products/\(sku)/images")
+    }
+
+    func uploadProductImage(sku: String, imageData: Data) async throws -> ProductImage {
+        if useMock { return try await MockAPIService.shared.uploadProductImage(sku: sku, imageData: imageData) }
+        let boundary = "Boundary-\(UUID().uuidString)"
+        guard let url = URL(string: baseURL + "/products/\(sku)/images") else { throw APIError.invalidURL }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        if let token = authToken {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        var body = Data()
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"file\"; filename=\"image.jpg\"\r\n".data(using: .utf8)!)
+        body.append("Content-Type: image/jpeg\r\n\r\n".data(using: .utf8)!)
+        body.append(imageData)
+        body.append("\r\n".data(using: .utf8)!)
+        body.append("--\(boundary)--\r\n".data(using: .utf8)!)
+        request.httpBody = body
+        let (data, response) = try await session.data(for: request)
+        if let http = response as? HTTPURLResponse {
+            if http.statusCode == 401 {
+                DispatchQueue.main.async { self.onUnauthorized?() }
+                throw APIError.unauthorized
+            }
+            if http.statusCode == 409 { throw APIError.serverError(http.statusCode, "Galeri utama penuh (maks 9 foto)") }
+            if http.statusCode >= 400 {
+                let msg = (try? decoder.decode([String: String].self, from: data))?["detail"] ?? "Server error"
+                throw APIError.serverError(http.statusCode, msg)
+            }
+        }
+        return try loggedDecode(ProductImage.self, from: data, path: "/products/\(sku)/images")
+    }
+
+    func patchProductImage(sku: String, imageId: UUID, isCover: Bool? = nil, sortOrder: Int? = nil) async throws -> ProductImage {
+        if useMock { return try await MockAPIService.shared.patchProductImage(sku: sku, imageId: imageId, isCover: isCover, sortOrder: sortOrder) }
+        struct Req: Encodable {
+            let isCover: Bool?
+            let sortOrder: Int?
+            enum CodingKeys: String, CodingKey { case isCover = "is_cover"; case sortOrder = "sort_order" }
+        }
+        return try await patch(path: "/products/\(sku)/images/\(imageId.uuidString)", body: Req(isCover: isCover, sortOrder: sortOrder))
+    }
+
+    func deleteProductImage(sku: String, imageId: UUID) async throws {
+        if useMock { return try await MockAPIService.shared.deleteProductImage(sku: sku, imageId: imageId) }
+        try await delete(path: "/products/\(sku)/images/\(imageId.uuidString)")
+    }
+
+    func selectSizeShopeeImage(sku: String, sizeId: UUID, imageId: UUID, selected: Bool) async throws -> SizeImageSelectResponse {
+        if useMock { return try await MockAPIService.shared.selectSizeShopeeImage(sku: sku, sizeId: sizeId, imageId: imageId, selected: selected) }
+        struct Req: Encodable { let selected: Bool }
+        return try await patch(path: "/products/\(sku)/sizes/\(sizeId.uuidString)/images/\(imageId.uuidString)/select", body: Req(selected: selected))
+    }
+
+    func getShopeePayload(sku: String) async throws -> ShopeePayload {
+        if useMock { return try await MockAPIService.shared.getShopeePayload(sku: sku) }
+        return try await get(path: "/products/\(sku)/shopee-payload")
+    }
+
     func getMaterialUsage(materialId: UUID) async throws -> [MaterialUsageEntry] {
         if useMock { return try await MockAPIService.shared.getMaterialUsage(materialId: materialId) }
         return try await get(path: "/materials/\(materialId)/usage")

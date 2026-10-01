@@ -79,6 +79,20 @@ struct ProdukDetailView: View {
     @State private var errorMsg: String?
     @State private var isSavingProduct = false
 
+    // v3.62: product-level gallery (max 9, index 0 = cover).
+    @State private var gallery: [ProductImage] = []
+    @State private var isGalleryLoading = false
+    @State private var isGalleryUploading = false
+    @State private var galleryPickerItems: [PhotosPickerItem] = []
+    @State private var isGalleryPickerPresented = false
+    @State private var galleryCameraImage: UIImage?
+    @State private var showGalleryCamera = false
+    @State private var showGallerySourceDialog = false
+    @State private var galleryImageToDelete: ProductImage? = nil
+    @State private var showGalleryDeleteConfirmation = false
+    @State private var galleryViewerIndex = 0
+    @State private var showGalleryViewer = false
+
     private var sizeGroups: [ProdukSizeGroup] { makeSizeGroups(from: sizes) }
 
     // iOS 16 workaround: push large -> large (list .large ke detail .large)
@@ -97,6 +111,7 @@ struct ProdukDetailView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: OuraTheme.Spacing.sectionGap) {
                 headerCard
+                gallerySection
                 sizesSection
                 if let err = errorMsg {
                     Text(err)
@@ -140,7 +155,9 @@ struct ProdukDetailView: View {
         }
         .task {
             currentProduct = product
-            await loadSizes()
+            async let a: Void = loadSizes()
+            async let b: Void = loadGallery()
+            _ = await (a, b)
         }
         .sheet(isPresented: $showAddSize, onDismiss: { Task { await loadSizes() } }) {
             AddSizeSheet(productSku: product.sku, existingSizes: sizes, productName: (currentProduct ?? product).name)
@@ -310,6 +327,216 @@ struct ProdukDetailView: View {
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(OuraTheme.Colors.textPrimary)
         }
+    }
+
+    // MARK: - v3.62 Galeri Utama (max 9, index 0 = cover)
+
+    private var gallerySection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("Galeri Utama")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(OuraTheme.Colors.textPrimary)
+                Text("\(gallery.count)/9")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(OuraTheme.Colors.textTertiary)
+                    .padding(.horizontal, 7).padding(.vertical, 2)
+                    .background(OuraTheme.Colors.border)
+                    .clipShape(Capsule())
+                Spacer()
+                if gallery.count >= 9 {
+                    Text("Penuh — hapus dulu")
+                        .font(.system(size: 11))
+                        .foregroundStyle(OuraTheme.Colors.warningText)
+                }
+            }
+            if isGalleryLoading {
+                HStack { Spacer(); ProgressView().tint(OuraTheme.Colors.accent); Spacer() }
+                    .padding(.vertical, 16)
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 12) {
+                        ForEach(Array(gallery.enumerated()), id: \.element.id) { idx, img in
+                            ZStack(alignment: .topLeading) {
+                                Button {
+                                    galleryViewerIndex = idx
+                                    showGalleryViewer = true
+                                } label: {
+                                    AsyncImage(url: URL(string: img.imageUrl)) { image in
+                                        image.resizable().aspectRatio(contentMode: .fill)
+                                    } placeholder: {
+                                        ZStack { Color.gray.opacity(0.1); ProgressView() }
+                                    }
+                                    .frame(width: 80, height: 80)
+                                    .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.small))
+                                }
+                                .buttonStyle(.plain)
+                                .disabled(isGalleryUploading)
+                                if img.isCover || idx == 0 {
+                                    Text("Cover")
+                                        .font(.system(size: 9, weight: .bold))
+                                        .foregroundStyle(.white)
+                                        .padding(.horizontal, 6).padding(.vertical, 2)
+                                        .background(OuraTheme.Colors.accent)
+                                        .clipShape(Capsule())
+                                        .offset(x: 4, y: 4)
+                                }
+                                Menu {
+                                    if idx != 0 {
+                                        Button { Task { await setGalleryCover(img) } } label: {
+                                            Label("Jadikan Cover", systemImage: "star.fill")
+                                        }
+                                    }
+                                    if idx > 0 {
+                                        Button { Task { await moveGallery(img, to: idx - 1) } } label: {
+                                            Label("Geser Kiri", systemImage: "arrow.left")
+                                        }
+                                    }
+                                    if idx < gallery.count - 1 {
+                                        Button { Task { await moveGallery(img, to: idx + 1) } } label: {
+                                            Label("Geser Kanan", systemImage: "arrow.right")
+                                        }
+                                    }
+                                    Button(role: .destructive) {
+                                        galleryImageToDelete = img
+                                        showGalleryDeleteConfirmation = true
+                                    } label: {
+                                        Label("Hapus", systemImage: "trash")
+                                    }
+                                } label: {
+                                    Image(systemName: "ellipsis.circle.fill")
+                                        .foregroundStyle(.white)
+                                        .background(Color.black.opacity(0.5).clipShape(Circle()))
+                                }
+                                .offset(x: -4, y: -4)
+                                .disabled(isGalleryUploading)
+                            }
+                        }
+                        if isGalleryUploading {
+                            ZStack { Color.gray.opacity(0.2); ProgressView() }
+                                .frame(width: 80, height: 80)
+                                .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.small))
+                        }
+                        Button {
+                            showGallerySourceDialog = true
+                        } label: {
+                            VStack(spacing: 4) {
+                                Image(systemName: "photo.badge.plus").font(.system(size: 18))
+                                Text(gallery.isEmpty ? "Tambah Cover" : "Tambah")
+                                    .font(.system(size: 10, weight: .medium))
+                            }
+                            .foregroundStyle(gallery.count >= 9 || isGalleryUploading ? OuraTheme.Colors.textDisabled : OuraTheme.Colors.accent)
+                            .frame(width: 80, height: 80)
+                            .background(OuraTheme.Colors.accentLight.opacity(0.3))
+                            .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.small))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: OuraTheme.Radius.small)
+                                    .stroke(gallery.count >= 9 || isGalleryUploading ? OuraTheme.Colors.textDisabled : OuraTheme.Colors.accent, style: StrokeStyle(lineWidth: 1, dash: [4]))
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(gallery.count >= 9 || isGalleryUploading)
+                        .accessibilityLabel("Tambah foto galeri utama")
+                    }
+                    .padding(.top, 4)
+                    .padding(.horizontal, 4)
+                }
+                if gallery.isEmpty && !isGalleryUploading {
+                    HStack(spacing: 8) {
+                        Image(systemName: "photo.on.rectangle")
+                            .foregroundStyle(OuraTheme.Colors.textTertiary)
+                        Text("Belum ada galeri — foto pertama jadi cover Shopee")
+                            .font(.system(size: 13))
+                            .foregroundStyle(OuraTheme.Colors.textSecondary)
+                    }
+                    .padding(.vertical, 4)
+                }
+            }
+        }
+        .padding(OuraTheme.Spacing.cardPad)
+        .ouraCard()
+        .padding(.horizontal, OuraTheme.Spacing.horizontal)
+        .confirmationDialog("Tambah Foto Galeri", isPresented: $showGallerySourceDialog, titleVisibility: .visible) {
+            if UIImagePickerController.isSourceTypeAvailable(.camera) {
+                Button("Ambil Foto") { showGalleryCamera = true }
+            }
+            Button("Pilih dari Galeri") { isGalleryPickerPresented = true }
+            Button("Batal", role: .cancel) {}
+        }
+        .photosPicker(isPresented: $isGalleryPickerPresented, selection: $galleryPickerItems, maxSelectionCount: max(1, 9 - gallery.count), matching: .images)
+        .sheet(isPresented: $showGalleryCamera) {
+            CameraPicker(selectedImage: $galleryCameraImage).ignoresSafeArea()
+        }
+        .onChange(of: galleryPickerItems) { newItems in Task { await handleGallerySelection(newItems) } }
+        .onChange(of: galleryCameraImage) { newImage in
+            guard let img = newImage else { return }
+            Task { await handleGalleryCapture(img) }
+            galleryCameraImage = nil
+        }
+        .alert("Hapus Foto Galeri", isPresented: $showGalleryDeleteConfirmation, presenting: galleryImageToDelete) { img in
+            Button("Hapus", role: .destructive) { Task { await deleteGalleryPhoto(img) } }
+            Button("Batal", role: .cancel) {}
+        } message: { _ in Text("Hapus foto ini dari galeri utama? Wakil per-size tidak ikut berubah.") }
+        .fullScreenCover(isPresented: $showGalleryViewer) {
+            if !gallery.isEmpty {
+                ProductImageViewer(images: gallery.map { ProductSizeImage(id: $0.id, productSizeId: $0.productId, imageUrl: $0.imageUrl, createdAt: $0.createdAt) }, initialIndex: min(galleryViewerIndex, gallery.count - 1))
+            } else {
+                Color.black.ignoresSafeArea()
+            }
+        }
+    }
+
+    private func loadGallery() async {
+        isGalleryLoading = true
+        defer { isGalleryLoading = false }
+        gallery = (try? await api.getProductImages(sku: product.sku)) ?? []
+    }
+
+    private func handleGallerySelection(_ newItems: [PhotosPickerItem]) async {
+        guard !newItems.isEmpty else { return }
+        isGalleryUploading = true
+        defer { isGalleryUploading = false }
+        for item in newItems {
+            guard gallery.count < 9,
+                  let data = try? await item.loadTransferable(type: Data.self),
+                  let uiImage = UIImage(data: data),
+                  let compressed = ImageCompressor.compressToJPEG(image: uiImage) else { continue }
+            do { _ = try await api.uploadProductImage(sku: product.sku, imageData: compressed) }
+            catch { errorMsg = "Gagal mengunggah galeri: \(error.localizedDescription)"; break }
+        }
+        galleryPickerItems = []
+        await loadGallery()
+    }
+
+    private func handleGalleryCapture(_ image: UIImage) async {
+        isGalleryUploading = true
+        defer { isGalleryUploading = false }
+        guard gallery.count < 9,
+              let compressed = ImageCompressor.compressToJPEG(image: image) else {
+            errorMsg = gallery.count >= 9 ? "Galeri penuh (maks 9 foto)" : "Gagal mengompresi gambar."
+            return
+        }
+        do { _ = try await api.uploadProductImage(sku: product.sku, imageData: compressed) }
+        catch { errorMsg = "Gagal mengunggah galeri: \(error.localizedDescription)" }
+        await loadGallery()
+    }
+
+    private func setGalleryCover(_ img: ProductImage) async {
+        do { _ = try await api.patchProductImage(sku: product.sku, imageId: img.id, isCover: true) }
+        catch { errorMsg = "Gagal jadikan cover: \(error.localizedDescription)" }
+        await loadGallery()
+    }
+
+    private func moveGallery(_ img: ProductImage, to target: Int) async {
+        do { _ = try await api.patchProductImage(sku: product.sku, imageId: img.id, sortOrder: target) }
+        catch { errorMsg = "Gagal mengurutkan galeri: \(error.localizedDescription)" }
+        await loadGallery()
+    }
+
+    private func deleteGalleryPhoto(_ img: ProductImage) async {
+        do { try await api.deleteProductImage(sku: product.sku, imageId: img.id) }
+        catch { errorMsg = "Gagal menghapus galeri: \(error.localizedDescription)" }
+        await loadGallery()
     }
 
     // MARK: - Sizes section (grouped by size label)
@@ -1138,6 +1365,7 @@ struct ProdukSizeDetailView: View {
 
     @State private var selectedItems: [PhotosPickerItem] = []
     @State private var isUploading = false
+    @State private var isSelectingWakil = false
     @State private var imageToDelete: ProductSizeImage? = nil
     @State private var showDeleteConfirmation = false
     @State private var showPhotoSourceDialog = false
@@ -1285,9 +1513,18 @@ struct ProdukSizeDetailView: View {
 
     private var photosSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Foto Produk Varian")
-                .font(.system(size: 14, weight: .bold))
-                .foregroundStyle(OuraTheme.Colors.textPrimary)
+            HStack {
+                Text("Foto Produk Varian")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(OuraTheme.Colors.textPrimary)
+                Spacer()
+                if isSelectingWakil {
+                    ProgressView().scaleEffect(0.7).tint(OuraTheme.Colors.accent)
+                }
+            }
+            Text("Pilih 1 foto Shopee per ukuran — otomatis masuk galeri utama")
+                .font(.system(size: 11))
+                .foregroundStyle(OuraTheme.Colors.textTertiary)
             
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 12) {
@@ -1324,8 +1561,30 @@ struct ProdukSizeDetailView: View {
                                         .foregroundStyle(.red)
                                         .background(Color.white.clipShape(Circle()))
                                 }
-                                .disabled(isUploading)
+                                .disabled(isUploading || isSelectingWakil)
                                 .offset(x: 5, y: -5)
+
+                                // v3.62: single Shopee wakil toggle (bottom-leading)
+                                Button {
+                                    Task { await selectWakil(img) }
+                                } label: {
+                                    HStack(spacing: 3) {
+                                        Image(systemName: (img.isShopeeSelected == true) ? "checkmark.circle.fill" : "circle")
+                                            .font(.system(size: 13, weight: .bold))
+                                        if img.isShopeeSelected == true {
+                                            Text("Shopee")
+                                                .font(.system(size: 8, weight: .bold))
+                                        }
+                                    }
+                                    .foregroundStyle((img.isShopeeSelected == true) ? .white : .white.opacity(0.85))
+                                    .padding(.horizontal, 5).padding(.vertical, 3)
+                                    .background((img.isShopeeSelected == true) ? OuraTheme.Colors.accent : Color.black.opacity(0.55))
+                                    .clipShape(Capsule())
+                                }
+                                .buttonStyle(.plain)
+                                .disabled(isUploading || isSelectingWakil)
+                                .offset(x: 4, y: -4)
+                                .accessibilityLabel((img.isShopeeSelected == true) ? "Foto Shopee terpilih" : "Jadikan foto Shopee")
                             }
                         }
                     }
@@ -1452,6 +1711,28 @@ struct ProdukSizeDetailView: View {
             await refreshSize()
         } catch {
             errorMsg = "Gagal menghapus foto: \(error.localizedDescription)"
+        }
+    }
+
+    // v3.62: exclusive Shopee wakil — tap active again to unselect.
+    private func selectWakil(_ img: ProductSizeImage) async {
+        let currently = img.isShopeeSelected == true
+        isSelectingWakil = true
+        defer { isSelectingWakil = false }
+        do {
+            let res = try await api.selectSizeShopeeImage(
+                sku: size.productSku, sizeId: size.id, imageId: img.id, selected: !currently
+            )
+            await refreshSize()
+            if !currently {
+                successMsg = res.gallerySynced
+                    ? "Foto Shopee dipilih + masuk galeri utama"
+                    : "Foto Shopee dipilih (galeri penuh 9/9 — kelola di Galeri Utama)"
+            } else {
+                successMsg = "Pilihan foto Shopee dibatalkan"
+            }
+        } catch {
+            errorMsg = "Gagal memilih foto Shopee: \(error.localizedDescription)"
         }
     }
 

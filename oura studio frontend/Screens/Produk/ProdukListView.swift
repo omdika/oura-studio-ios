@@ -755,6 +755,8 @@ private struct ProductGroupRow: View {
     @State private var showPhotoSourceDialog = false
     @State private var showCamera = false
     @State private var capturedCameraImage: UIImage?
+    // v3.62: product cover thumbnail (fallback: first gallery image).
+    @State private var coverURL: String? = nil
     private enum PhotoSource { case gallery, camera }
     @State private var pendingPhotoSource: PhotoSource = .gallery
 
@@ -802,6 +804,25 @@ private struct ProductGroupRow: View {
             // Header → ProdukDetailView (product management)
             NavigationLink(destination: ProdukDetailView(product: product, onProductChanged: onProductChanged)) {
                 HStack {
+                    // v3.62: cover from product gallery (not top-size photo).
+                    if let cover = coverURL, let url = URL(string: cover) {
+                        AsyncImage(url: url) { image in
+                            image.resizable().aspectRatio(contentMode: .fill)
+                        } placeholder: {
+                            ZStack { Color.gray.opacity(0.1); ProgressView().scaleEffect(0.6) }
+                        }
+                        .frame(width: 44, height: 44)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                    } else {
+                        ZStack {
+                            OuraTheme.Colors.border
+                            Image(systemName: "photo")
+                                .font(.system(size: 16))
+                                .foregroundStyle(OuraTheme.Colors.textTertiary)
+                        }
+                        .frame(width: 44, height: 44)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                    }
                     VStack(alignment: .leading, spacing: 4) {
                         Text(product.name)
                             .font(.system(size: 15, weight: .semibold))
@@ -929,6 +950,14 @@ private struct ProductGroupRow: View {
             }
         }
         .ouraCard()
+        .task {
+            // v3.62: lazy cover per product card (1 request per visible product).
+            if coverURL == nil {
+                let gallery = (try? await api.getProductImages(sku: product.sku)) ?? []
+                let sorted = gallery.sorted { $0.sortOrder < $1.sortOrder }
+                coverURL = sorted.first(where: { $0.isCover })?.imageUrl ?? sorted.first?.imageUrl
+            }
+        }
         .confirmationDialog("Pilih Sumber Foto", isPresented: $showPhotoSourceDialog, titleVisibility: .visible) {
             if UIImagePickerController.isSourceTypeAvailable(.camera) {
                 Button("Ambil Foto") {

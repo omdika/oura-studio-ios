@@ -54,13 +54,85 @@ struct ProductSizeImage: Codable, Identifiable, Hashable {
     let id: UUID
     let productSizeId: UUID
     let imageUrl: String
+    // v3.62: single Shopee representative per size (exclusive). Optional so old
+    // cached payloads without the key still decode.
+    let isShopeeSelected: Bool?
     let createdAt: Date
+
+    // Explicit init: Swift doesn't synthesize memberwise params for defaulted
+    // properties, so old 4-arg call sites + new 5-arg sites both need this.
+    init(id: UUID, productSizeId: UUID, imageUrl: String,
+         isShopeeSelected: Bool? = nil, createdAt: Date) {
+        self.id = id
+        self.productSizeId = productSizeId
+        self.imageUrl = imageUrl
+        self.isShopeeSelected = isShopeeSelected
+        self.createdAt = createdAt
+    }
 
     enum CodingKeys: String, CodingKey {
         case id
         case productSizeId = "product_size_id"
         case imageUrl      = "image_url"
+        case isShopeeSelected = "is_shopee_selected"
         case createdAt     = "created_at"
+    }
+}
+
+// v3.62: product-level gallery (sort_order 0 == cover, max 9).
+struct ProductImage: Codable, Identifiable, Hashable {
+    let id: UUID
+    let productId: UUID
+    let imageUrl: String
+    let sortOrder: Int
+    let isCover: Bool
+    let createdAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case productId = "product_id"
+        case imageUrl  = "image_url"
+        case sortOrder = "sort_order"
+        case isCover   = "is_cover"
+        case createdAt = "created_at"
+    }
+}
+
+// v3.62: Shopee payload for AI agent (GET /products/{sku}/shopee-payload).
+struct ShopeeModel: Codable, Hashable {
+    let name: String
+    let price: Double
+    let stock: Int
+    let imageUrl: String?
+
+    enum CodingKeys: String, CodingKey {
+        case name, price, stock
+        case imageUrl = "image_url"
+    }
+}
+
+struct ShopeePayload: Codable {
+    let images: [String]
+    let models: [ShopeeModel]
+}
+
+struct SizeImageSelectResponse: Codable {
+    let id: UUID
+    let productSizeId: UUID
+    let imageUrl: String
+    let isShopeeSelected: Bool
+    let createdAt: Date
+    let gallerySynced: Bool
+    let galleryReason: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case productSizeId = "product_size_id"
+        case imageUrl = "image_url"
+        case isShopeeSelected = "is_shopee_selected"
+        case createdAt = "created_at"
+        case gallerySynced = "gallery_synced"
+        case galleryReason = "gallery_reason"
     }
 }
 

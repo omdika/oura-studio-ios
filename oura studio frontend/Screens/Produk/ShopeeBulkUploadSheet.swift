@@ -114,6 +114,27 @@ struct ShopeeBulkUploadSheet: View {
                     
                     Spacer()
                     
+                    // v3.62: Shopee gallery rules info (no template change).
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "photo.on.rectangle")
+                                .font(.system(size: 12))
+                                .foregroundStyle(OuraTheme.Colors.accent)
+                            Text("Aturan gambar Shopee (v3.62)")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(OuraTheme.Colors.textPrimary)
+                        }
+                        Text("Baris variasi diurut XS→XXL. Baris pertama bawa galeri penuh (cover + 8). Baris ke-2 dst isi foto wakil size itu di kolom Sampul + Foto 1. Pilih 1 Foto Shopee per ukuran di halaman varian; foto pertama galeri jadi cover.")
+                            .font(.system(size: 12))
+                            .foregroundStyle(OuraTheme.Colors.textSecondary)
+                            .lineSpacing(3)
+                    }
+                    .padding(.all, 12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(OuraTheme.Colors.accentLight.opacity(0.35))
+                    .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.small))
+                    .padding(.horizontal, OuraTheme.Spacing.horizontal)
+                    
                     // Actions
                     VStack(spacing: 12) {
                         OuraPrimaryButton(
