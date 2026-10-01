@@ -3,21 +3,46 @@ import AVFoundation
 import Combine
 import UIKit
 
-// MARK: - CameraPicker (kamera custom 1:1 via AVFoundation)
+// MARK: - CameraPicker (kamera custom via AVFoundation, rasio 1:1 / 3:4)
 //
-// Menggantikan UIImagePickerController + overlay. Preview-nya BENAR-BENAR kotak 1:1
-// (preview layer di dalam frame persegi, aspectFill), sehingga hasil capture
-// = yang terlihat di layar. Tidak ada lagi geser akibat beda framing preview vs sensor.
+// Preview memakai frame sesuai rasio terpilih (aspectFill) sehingga hasil capture
+// = yang terlihat di layar (WYSIWYG). Tidak ada lagi geser akibat beda framing.
+
+/// Rasio bingkai kamera yang bisa dipilih langsung di layar kamera.
+enum CameraAspectRatio: String, CaseIterable, Identifiable {
+    case square = "1:1"
+    case threeFour = "3:4"
+    var id: String { rawValue }
+    var label: String { rawValue }
+    /// Rasio lebar:tinggi (portrait).
+    var whRatio: CGFloat {
+        switch self {
+        case .square: return 1
+        case .threeFour: return 3 / 4
+        }
+    }
+    /// Ukuran frame terbesar yang muat di container dengan rasio ini.
+    func fittedSize(in container: CGSize) -> CGSize {
+        // Coba lebar penuh dulu
+        let w1 = container.width
+        let h1 = w1 / whRatio
+        if h1 <= container.height { return CGSize(width: w1, height: h1) }
+        // Kalau kepanjangan, batasi ke tinggi container
+        let h2 = container.height
+        return CGSize(width: h2 * whRatio, height: h2)
+    }
+}
 
 struct CameraPicker: View {
     @Binding var selectedImage: UIImage?
-    /// Dibiarkan agar call-site lama tetap kompilasi — kamera ini selalu 1:1.
+    /// Dibiarkan agar call-site lama tetap kompilasi.
     var squareCrop: Bool = true
     @Environment(\.dismiss) private var dismiss
 
     @StateObject private var manager = SquareCameraManager()
     @State private var captured: UIImage?
     @State private var showCaptured = false
+    @State private var ratio: CameraAspectRatio = .square
 
     var body: some View {
         ZStack {
@@ -34,7 +59,7 @@ struct CameraPicker: View {
                         }
                         .foregroundStyle(.white)
                         Spacer()
-                        Text("Pratinjau 1:1")
+                        Text("Pratinjau \(ratio.label)")
                             .font(.system(size: 14, weight: .semibold))
                             .foregroundStyle(.white)
                         Spacer()
@@ -49,11 +74,11 @@ struct CameraPicker: View {
                     .padding(.vertical, 14)
 
                     GeometryReader { geo in
-                        let side = min(geo.size.width, geo.size.height)
+                        let frame = ratio.fittedSize(in: geo.size)
                         Image(uiImage: captured)
                             .resizable()
-                            .aspectRatio(1, contentMode: .fill)
-                            .frame(width: side, height: side)
+                            .aspectRatio(ratio.whRatio, contentMode: .fill)
+                            .frame(width: frame.width, height: frame.height)
                             .clipped()
                             .border(.white, width: 2)
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -95,7 +120,7 @@ struct CameraPicker: View {
                                 .padding(10)
                         }
                         Spacer()
-                        Text("Foto Produk · 1:1")
+                        Text("Foto Produk · \(ratio.label)")
                             .font(.system(size: 14, weight: .semibold))
                             .foregroundStyle(.white)
                         Spacer()
@@ -110,24 +135,45 @@ struct CameraPicker: View {
                     }
                     .padding(.horizontal, 8)
 
-                    Text("Sejajarkan produk di dalam kotak")
+                    Text("Sejajarkan produk di dalam bingkai")
                         .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(.white.opacity(0.8))
                         .padding(.bottom, 8)
 
-                    // Preview persegi — di tengah layar seperti layar review,
+                    // Pilihan rasio kiri-kanan, langsung di layar kamera
+                    HStack(spacing: 12) {
+                        ForEach(CameraAspectRatio.allCases) { r in
+                            Button {
+                                ratio = r
+                            } label: {
+                                Text(r.label)
+                                    .font(.system(size: 13, weight: .bold))
+                                    .foregroundStyle(ratio == r ? .black : .white)
+                                    .frame(minWidth: 56)
+                                    .padding(.vertical, 8)
+                                    .padding(.horizontal, 14)
+                                    .background(ratio == r ? .yellow : .white.opacity(0.18))
+                                    .clipShape(Capsule())
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Rasio \(r.label)")
+                        }
+                    }
+                    .padding(.bottom, 10)
+
+                    // Preview sesuai rasio — di tengah layar seperti layar review,
                     // agar transisi live -> hasil terasa smooth (tidak lompat).
                     GeometryReader { geo in
-                        let side = min(geo.size.width, geo.size.height)
+                        let frame = ratio.fittedSize(in: geo.size)
                         ZStack {
                             CameraPreviewView(session: manager.session)
-                                .frame(width: side, height: side)
+                                .frame(width: frame.width, height: frame.height)
                                 .clipped()
                                 .overlay(Rectangle().stroke(.white, lineWidth: 2))
                             if !manager.isReady {
                                 ProgressView()
                                     .tint(.white)
-                                    .frame(width: side, height: side)
+                                    .frame(width: frame.width, height: frame.height)
                             }
                             if let err = manager.errorMsg {
                                 Text(err)
@@ -136,16 +182,16 @@ struct CameraPicker: View {
                                     .padding(8)
                                     .background(.black.opacity(0.6))
                                     .clipShape(RoundedRectangle(cornerRadius: 8))
-                                    .frame(width: side, height: side, alignment: .bottom)
+                                    .frame(width: frame.width, height: frame.height, alignment: .bottom)
                                     .padding(.bottom, 8)
                             }
                         }
-                        .frame(width: side, height: side)
+                        .frame(width: frame.width, height: frame.height)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
 
                     Button {
-                        manager.capture { image in
+                        manager.capture(ratio: ratio) { image in
                             if let image {
                                 captured = image
                                 showCaptured = true
@@ -177,6 +223,7 @@ struct CameraPicker: View {
             }
         }
         .animation(.easeInOut(duration: 0.2), value: showCaptured)
+        .animation(.easeInOut(duration: 0.2), value: ratio)
         .onAppear { manager.start() }
         .onDisappear { manager.stop() }
     }
@@ -292,9 +339,12 @@ final class SquareCameraManager: NSObject, ObservableObject, AVCapturePhotoCaptu
         }
     }
 
-    func capture(completion: @escaping (UIImage?) -> Void) {
+    private var pendingRatio: CameraAspectRatio = .square
+
+    func capture(ratio: CameraAspectRatio, completion: @escaping (UIImage?) -> Void) {
         guard !isCapturing else { return }
         self.completion = completion
+        self.pendingRatio = ratio
         let settings = AVCapturePhotoSettings()
         if photoOutput.supportedFlashModes.contains(.auto) {
             settings.flashMode = .auto
@@ -320,29 +370,44 @@ final class SquareCameraManager: NSObject, ObservableObject, AVCapturePhotoCaptu
             completion = nil
             return
         }
-        let square = Self.centerSquareNormalized(image)
+        let cropped = Self.cropToAspect(image, ratio: pendingRatio)
         let cb = completion
         completion = nil
-        DispatchQueue.main.async { cb?(square) }
+        DispatchQueue.main.async { cb?(cropped) }
     }
 
-    /// Center-crop ke persegi + normalisasi ke orientasi .up.
-    /// Karena preview memakai .resizeAspectFill di frame 1:1 yang terpusat,
-    /// crop tengah sensor = persis yang terlihat di layar (tidak geser).
-    static func centerSquareNormalized(_ image: UIImage) -> UIImage {
-        guard let cg = image.cgImage else { return image }
+    /// Center-crop ke rasio terpilih + normalisasi ke orientasi .up.
+    /// Normalisasi dulu (agar crop dihitung di ruang tampil portrait),
+    /// karena preview memakai .resizeAspectFill di frame rasio yang terpusat —
+    /// crop tengah = persis yang terlihat di layar (tidak geser).
+    static func cropToAspect(_ image: UIImage, ratio: CameraAspectRatio) -> UIImage {
+        // 1. Normalisasi orientasi ke .up dalam piksel penuh
+        let px = CGSize(width: image.size.width * image.scale, height: image.size.height * image.scale)
+        guard px.width > 0, px.height > 0 else { return image }
+        let normFormat = UIGraphicsImageRendererFormat()
+        normFormat.scale = 1
+        let normalized = UIGraphicsImageRenderer(size: px, format: normFormat).image { _ in
+            image.draw(in: CGRect(origin: .zero, size: px))
+        }
+        guard let cg = normalized.cgImage else { return image }
         let w = CGFloat(cg.width)
         let h = CGFloat(cg.height)
-        let side = min(w, h)
-        let rect = CGRect(x: (w - side) / 2, y: (h - side) / 2, width: side, height: side)
-        guard let croppedCG = cg.cropping(to: rect) else { return image }
-        let cropped = UIImage(cgImage: croppedCG, scale: 1, orientation: image.imageOrientation)
-        // Normalisasi ke .up agar konsisten saat upload/di-cache
-        let format = UIGraphicsImageRendererFormat()
-        format.scale = 1
-        let renderer = UIGraphicsImageRenderer(size: CGSize(width: side, height: side), format: format)
-        return renderer.image { _ in
-            cropped.draw(in: CGRect(origin: .zero, size: CGSize(width: side, height: side)))
+
+        // 2. Hitung rect tengah sesuai rasio target (portrait)
+        let target = ratio.whRatio // lebar:tinggi
+        var cw = w
+        var ch = w / target
+        if ch > h {
+            ch = h
+            cw = h * target
         }
+        let rect = CGRect(x: (w - cw) / 2, y: (h - ch) / 2, width: cw, height: ch)
+        guard let croppedCG = cg.cropping(to: rect) else { return image }
+        return UIImage(cgImage: croppedCG, scale: 1, orientation: .up)
+    }
+
+    /// Kompatibilitas mundur — sama dengan cropToAspect persegi.
+    static func centerSquareNormalized(_ image: UIImage) -> UIImage {
+        cropToAspect(image, ratio: .square)
     }
 }
