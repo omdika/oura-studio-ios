@@ -510,6 +510,18 @@ class APIService: ObservableObject {
         return try await get(path: "/products/\(sku)/shopee-payload")
     }
 
+    // v3.62: copy a gallery photo into a size variant (becomes Shopee wakil).
+    func assignGalleryImageToSize(sku: String, sizeId: UUID, galleryImageId: UUID, setAsWakil: Bool = true) async throws -> SizeImageSelectResponse {
+        if useMock { return try await MockAPIService.shared.assignGalleryImageToSize(sku: sku, sizeId: sizeId, galleryImageId: galleryImageId, setAsWakil: setAsWakil) }
+        struct Req: Encodable {
+            let galleryImageId: UUID
+            let setAsWakil: Bool
+            enum CodingKeys: String, CodingKey { case galleryImageId = "gallery_image_id"; case setAsWakil = "set_as_wakil" }
+        }
+        return try await post(path: "/products/\(sku)/sizes/\(sizeId.uuidString)/images/from-gallery",
+                              body: Req(galleryImageId: galleryImageId, setAsWakil: setAsWakil))
+    }
+
     func getMaterialUsage(materialId: UUID) async throws -> [MaterialUsageEntry] {
         if useMock { return try await MockAPIService.shared.getMaterialUsage(materialId: materialId) }
         return try await get(path: "/materials/\(materialId)/usage")

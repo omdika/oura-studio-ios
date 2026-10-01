@@ -1463,6 +1463,69 @@ class MockAPIService {
         return ShopeePayload(images: Array(images.prefix(9)), models: models)
     }
 
+    // v3.62 mock: copy gallery photo into a size variant.
+    func assignGalleryImageToSize(sku: String, sizeId: UUID, galleryImageId: UUID, setAsWakil: Bool = true) async throws -> SizeImageSelectResponse {
+        await delay()
+        guard let g = _productGalleries[sku]?.first(where: { $0.id == galleryImageId }) else {
+            throw APIError.serverError(404, "Foto galeri tidak ditemukan.")
+        }
+        guard var list = _productSizes[sku],
+              let idx = list.firstIndex(where: { $0.id == sizeId }) else {
+            throw APIError.serverError(404, "Ukuran tidak ditemukan.")
+        }
+        let old = list[idx]
+        let currentImgs: [ProductSizeImage] = old.images ?? []
+        let row: ProductSizeImage
+        if let found = currentImgs.first(where: { $0.imageUrl == g.imageUrl }) {
+            row = found
+        } else {
+            row = ProductSizeImage(id: UUID(), productSizeId: sizeId, imageUrl: g.imageUrl, createdAt: Date())
+            currentImgsPlus(row, sku: sku, idx: idx, old: old, list: &list)
+        }
+        var finalImgs: [ProductSizeImage] = (list[idx].images ?? [])
+        if setAsWakil {
+            finalImgs = finalImgs.map { im in
+                ProductSizeImage(id: im.id, productSizeId: im.productSizeId, imageUrl: im.imageUrl,
+                                 isShopeeSelected: im.id == row.id, createdAt: im.createdAt)
+            }
+            let o = list[idx]
+            list[idx] = ProductSizeDetail(
+                id: o.id, productId: o.productId, productSku: o.productSku,
+                productName: o.productName, sizeLabel: o.sizeLabel,
+                fabricVariantName: o.fabricVariantName, reorderMinQty: o.reorderMinQty,
+                isArchived: o.isArchived, currentStockQty: o.currentStockQty,
+                productionStockQty: o.productionStockQty, manualStockQty: o.manualStockQty,
+                latestHppBreakdown: o.latestHppBreakdown, sellingPrice: o.sellingPrice,
+                marginPct: o.marginPct, manualHppFabric: o.manualHppFabric,
+                manualHppPooled: o.manualHppPooled, manualHppHardware: o.manualHppHardware,
+                manualHppLabor: o.manualHppLabor, manualHppOverhead: o.manualHppOverhead,
+                images: finalImgs
+            )
+            _productSizes[sku] = list
+        }
+        let saved = (list[idx].images ?? []).first(where: { $0.id == row.id })!
+        return SizeImageSelectResponse(id: saved.id, productSizeId: sizeId, imageUrl: saved.imageUrl,
+                                       isShopeeSelected: saved.isShopeeSelected ?? false, createdAt: saved.createdAt,
+                                       gallerySynced: true, galleryReason: nil)
+    }
+
+    private func currentImgsPlus(_ row: ProductSizeImage, sku: String, idx: Int, old: ProductSizeDetail, list: inout [ProductSizeDetail]) {
+        let imgs: [ProductSizeImage] = (old.images ?? []) + [row]
+        list[idx] = ProductSizeDetail(
+            id: old.id, productId: old.productId, productSku: old.productSku,
+            productName: old.productName, sizeLabel: old.sizeLabel,
+            fabricVariantName: old.fabricVariantName, reorderMinQty: old.reorderMinQty,
+            isArchived: old.isArchived, currentStockQty: old.currentStockQty,
+            productionStockQty: old.productionStockQty, manualStockQty: old.manualStockQty,
+            latestHppBreakdown: old.latestHppBreakdown, sellingPrice: old.sellingPrice,
+            marginPct: old.marginPct, manualHppFabric: old.manualHppFabric,
+            manualHppPooled: old.manualHppPooled, manualHppHardware: old.manualHppHardware,
+            manualHppLabor: old.manualHppLabor, manualHppOverhead: old.manualHppOverhead,
+            images: imgs
+        )
+        _productSizes[sku] = list
+    }
+
     // Adds product stock and deducts fabric using manually-specified cutting dimensions (no spec required)
     func addStockManual(sku: String, sizeId: UUID, qty: Int, materialId: UUID, cutWidthCm: Double, cutLengthCm: Double) async throws -> ProductSizeDetail {
         await delay()

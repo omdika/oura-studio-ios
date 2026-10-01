@@ -92,6 +92,8 @@ struct ProdukDetailView: View {
     @State private var showGalleryDeleteConfirmation = false
     @State private var galleryViewerIndex = 0
     @State private var showGalleryViewer = false
+    // v3.62: inline confirmation after gallery→variant assign.
+    @State private var galleryNotice: String? = nil
 
     private var sizeGroups: [ProdukSizeGroup] { makeSizeGroups(from: sizes) }
 
@@ -350,6 +352,11 @@ struct ProdukDetailView: View {
                         .foregroundStyle(OuraTheme.Colors.warningText)
                 }
             }
+            if let notice = galleryNotice {
+                Text(notice)
+                    .font(.system(size: 12))
+                    .foregroundStyle(OuraTheme.Colors.greenAccent)
+            }
             if isGalleryLoading {
                 HStack { Spacer(); ProgressView().tint(OuraTheme.Colors.accent); Spacer() }
                     .padding(.vertical, 16)
@@ -372,7 +379,12 @@ struct ProdukDetailView: View {
                                 }
                                 .buttonStyle(.plain)
                                 .disabled(isGalleryUploading)
-                                // v3.62: Cover + label ukuran pemakai (wakil Foto Shopee).
+                                // v3.62: (...) menu top-trailing so it never covers flags.
+                                .overlay(alignment: .topTrailing) {
+                                    galleryMenu(img: img, idx: idx)
+                                        .offset(x: 5, y: -5)
+                                        .disabled(isGalleryUploading)
+                                }
                                 let wakilLabels = wakilLabelsByURL[img.imageUrl] ?? []
                                 if (img.isCover || idx == 0) || !wakilLabels.isEmpty {
                                     VStack(alignment: .leading, spacing: 2) {
@@ -403,35 +415,6 @@ struct ProdukDetailView: View {
                                     }
                                     .offset(x: 4, y: 4)
                                 }
-                                Menu {
-                                    if idx != 0 {
-                                        Button { Task { await setGalleryCover(img) } } label: {
-                                            Label("Jadikan Cover", systemImage: "star.fill")
-                                        }
-                                    }
-                                    if idx > 0 {
-                                        Button { Task { await moveGallery(img, to: idx - 1) } } label: {
-                                            Label("Geser Kiri", systemImage: "arrow.left")
-                                        }
-                                    }
-                                    if idx < gallery.count - 1 {
-                                        Button { Task { await moveGallery(img, to: idx + 1) } } label: {
-                                            Label("Geser Kanan", systemImage: "arrow.right")
-                                        }
-                                    }
-                                    Button(role: .destructive) {
-                                        galleryImageToDelete = img
-                                        showGalleryDeleteConfirmation = true
-                                    } label: {
-                                        Label("Hapus", systemImage: "trash")
-                                    }
-                                } label: {
-                                    Image(systemName: "ellipsis.circle.fill")
-                                        .foregroundStyle(.white)
-                                        .background(Color.black.opacity(0.5).clipShape(Circle()))
-                                }
-                                .offset(x: -4, y: -4)
-                                .disabled(isGalleryUploading)
                             }
                         }
                         if isGalleryUploading {
@@ -501,7 +484,30 @@ struct ProdukDetailView: View {
         } message: { _ in Text("Hapus foto ini dari galeri utama? Wakil per-size tidak ikut berubah.") }
         .fullScreenCover(isPresented: $showGalleryViewer) {
             if !gallery.isEmpty {
-                ProductImageViewer(images: gallery.map { ProductSizeImage(id: $0.id, productSizeId: $0.productId, imageUrl: $0.imageUrl, createdAt: $0.createdAt) }, initialIndex: min(galleryViewerIndex, gallery.count - 1))
+                ProductImageViewer(
+                    images: gallery.map { ProductSizeImage(id: $0.id, productSizeId: $0.productId, imageUrl: $0.imageUrl, createdAt: $0.createdAt) },
+                    initialIndex: min(galleryViewerIndex, gallery.count - 1),
+                    allVariants: sizeGroups.flatMap { g in
+                        g.displayVariants.map { (id: $0.id, label: $0.displayLabel) }
+                    },
+                    variantImageURLs: Dictionary(
+                        uniqueKeysWithValues: sizes.map {
+                            ($0.id, Set(($0.images ?? []).map { $0.imageUrl }))
+                        }
+                    ),
+                    onToggleVariant: { sizeId, galleryImageId, shouldAssign in
+                        showGalleryViewer = false
+                        if let img = gallery.first(where: { $0.id == galleryImageId }) {
+                            Task { await setGalleryVariantMembership(img, sizeId: sizeId, assign: shouldAssign) }
+                        }
+                    },
+                    onSetCover: { galleryImageId in
+                        showGalleryViewer = false
+                        if let img = gallery.first(where: { $0.id == galleryImageId }) {
+                            Task { await setGalleryCover(img) }
+                        }
+                    }
+                )
             } else {
                 Color.black.ignoresSafeArea()
             }
@@ -571,6 +577,94 @@ struct ProdukDetailView: View {
         await loadGallery()
     }
 
+    // v3.62: (...) menu top-trailing so it never covers flags.
+    @ViewBuilder
+    private func galleryMenu(img: ProductImage, idx: Int) -> some View {
+        Menu {
+            if idx != 0 {
+                Button { Task { await setGalleryCover(img) } } label: {
+                    Label("Jadikan Cover", systemImage: "star.fill")
+                }
+            }
+            // Salin/keluarkan foto galeri ke/dari varian (checkmark = sudah ada).
+            Menu {
+                ForEach(sizeGroups) { group in
+                    if group.displayVariants.count == 1,
+                       let v = group.displayVariants.first {
+                        galleryVariantToggleRow(gallery: img, variant: v)
+                    } else {
+                        Menu(group.sizeLabel) {
+                            ForEach(group.displayVariants) { v in
+                                galleryVariantToggleRow(gallery: img, variant: v)
+                            }
+                        }
+                    }
+                }
+            } label: {
+                Label("Masukkan ke Varian", systemImage: "photo.badge.plus")
+            }
+            .disabled(sizeGroups.isEmpty)
+            if idx > 0 {
+                Button { Task { await moveGallery(img, to: idx - 1) } } label: {
+                    Label("Geser Kiri", systemImage: "arrow.left")
+                }
+            }
+            if idx < gallery.count - 1 {
+                Button { Task { await moveGallery(img, to: idx + 1) } } label: {
+                    Label("Geser Kanan", systemImage: "arrow.right")
+                }
+            }
+            Button(role: .destructive) {
+                galleryImageToDelete = img
+                showGalleryDeleteConfirmation = true
+            } label: {
+                Label("Hapus", systemImage: "trash")
+            }
+        } label: {
+            Image(systemName: "ellipsis.circle.fill")
+                .foregroundStyle(.white)
+                .background(Color.black.opacity(0.5).clipShape(Circle()))
+        }
+    }
+
+    // v3.62: salin foto galeri ke varian size + jadikan Foto Shopee,
+    // atau keluarkan lagi (tap ulang varian ber-checkmark).
+    @ViewBuilder
+    private func galleryVariantToggleRow(gallery img: ProductImage, variant v: ProductSizeDetail) -> some View {
+        let contains = (v.images ?? []).contains(where: { $0.imageUrl == img.imageUrl })
+        Button {
+            Task { await setGalleryVariantMembership(img, sizeId: v.id, assign: !contains) }
+        } label: {
+            if contains { Label(v.displayLabel, systemImage: "checkmark") }
+            else { Label(v.displayLabel, systemImage: "photo.badge.plus") }
+        }
+    }
+
+    private func setGalleryVariantMembership(_ img: ProductImage, sizeId: UUID, assign: Bool) async {
+        galleryNotice = nil
+        do {
+            if assign {
+                _ = try await api.assignGalleryImageToSize(sku: product.sku, sizeId: sizeId, galleryImageId: img.id)
+                async let a: Void = loadSizes(quiet: true)
+                async let b: Void = loadGallery()
+                _ = await (a, b)
+                galleryNotice = "Foto masuk ke varian + jadi Foto Shopee"
+            } else {
+                let target = sizes.first(where: { $0.id == sizeId })
+                let matches = (target?.images ?? []).filter { $0.imageUrl == img.imageUrl }
+                for m in matches {
+                    try await api.deleteProductSizeImage(sku: product.sku, sizeId: sizeId, imageId: m.id)
+                }
+                await loadSizes(quiet: true)
+                galleryNotice = "Foto dihapus dari varian \(target?.displayLabel ?? "tersebut")"
+            }
+        } catch {
+            errorMsg = assign
+                ? "Gagal memasukkan ke varian: \(error.localizedDescription)"
+                : "Gagal menghapus dari varian: \(error.localizedDescription)"
+        }
+    }
+
     // MARK: - Sizes section (grouped by size label)
 
     private var sizesSection: some View {
@@ -626,11 +720,11 @@ struct ProdukDetailView: View {
 
     // MARK: - Actions
 
-    private func loadSizes() async {
-        isLoading = true
+    private func loadSizes(quiet: Bool = false) async {
+        if !quiet { isLoading = true }
         // Pass known product name to skip extra GET /products?page=1&limit=500 inside APIService.
         sizes = (try? await api.getProductSizes(sku: product.sku, productName: (currentProduct ?? product).name)) ?? []
-        isLoading = false
+        if !quiet { isLoading = false }
     }
 
     private func saveProductChanges() async {
@@ -1583,6 +1677,29 @@ struct ProdukSizeDetailView: View {
                                 .buttonStyle(.plain)
                                 .disabled(isUploading)
                                 .accessibilityLabel("Lihat foto \(idx + 1) dari \(images.count)")
+                                // v3.62: single Shopee wakil toggle (bottom-leading corner).
+                                .overlay(alignment: .bottomLeading) {
+                                    Button {
+                                        Task { await selectWakil(img) }
+                                    } label: {
+                                        HStack(spacing: 3) {
+                                            Image(systemName: (img.isShopeeSelected == true) ? "checkmark.circle.fill" : "circle")
+                                                .font(.system(size: 13, weight: .bold))
+                                            if img.isShopeeSelected == true {
+                                                Text("Shopee")
+                                                    .font(.system(size: 8, weight: .bold))
+                                            }
+                                        }
+                                        .foregroundStyle((img.isShopeeSelected == true) ? .white : .white.opacity(0.85))
+                                        .padding(.horizontal, 5).padding(.vertical, 3)
+                                        .background((img.isShopeeSelected == true) ? OuraTheme.Colors.accent : Color.black.opacity(0.55))
+                                        .clipShape(Capsule())
+                                    }
+                                    .buttonStyle(.plain)
+                                    .disabled(isUploading || isSelectingWakil)
+                                    .offset(x: 4, y: -4)
+                                    .accessibilityLabel((img.isShopeeSelected == true) ? "Foto Shopee terpilih" : "Jadikan foto Shopee")
+                                }
 
                                 // Delete Overlay (Button)
                                 Button {
@@ -1595,28 +1712,6 @@ struct ProdukSizeDetailView: View {
                                 }
                                 .disabled(isUploading || isSelectingWakil)
                                 .offset(x: 5, y: -5)
-
-                                // v3.62: single Shopee wakil toggle (bottom-leading)
-                                Button {
-                                    Task { await selectWakil(img) }
-                                } label: {
-                                    HStack(spacing: 3) {
-                                        Image(systemName: (img.isShopeeSelected == true) ? "checkmark.circle.fill" : "circle")
-                                            .font(.system(size: 13, weight: .bold))
-                                        if img.isShopeeSelected == true {
-                                            Text("Shopee")
-                                                .font(.system(size: 8, weight: .bold))
-                                        }
-                                    }
-                                    .foregroundStyle((img.isShopeeSelected == true) ? .white : .white.opacity(0.85))
-                                    .padding(.horizontal, 5).padding(.vertical, 3)
-                                    .background((img.isShopeeSelected == true) ? OuraTheme.Colors.accent : Color.black.opacity(0.55))
-                                    .clipShape(Capsule())
-                                }
-                                .buttonStyle(.plain)
-                                .disabled(isUploading || isSelectingWakil)
-                                .offset(x: 4, y: -4)
-                                .accessibilityLabel((img.isShopeeSelected == true) ? "Foto Shopee terpilih" : "Jadikan foto Shopee")
                             }
                         }
                     }
@@ -2414,12 +2509,28 @@ struct TambahStokSheet: View {
 private struct ProductImageViewer: View {
     let images: [ProductSizeImage]
     let initialIndex: Int
+    // v3.62: optional gallery→variant toggle (only for product gallery viewer).
+    // allVariants: (sizeId, sizeLabel). variantImageURLs: sizeId -> image URLs it holds.
+    // Callback: (sizeId, galleryImageId, shouldAssign).
+    var allVariants: [(id: UUID, label: String)]? = nil
+    var variantImageURLs: [UUID: Set<String>]? = nil
+    var onToggleVariant: ((UUID, UUID, Bool) -> Void)? = nil
+    // v3.62: gallery cover action (only for product gallery viewer).
+    var onSetCover: ((UUID) -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
     @State private var currentIndex: Int
 
-    init(images: [ProductSizeImage], initialIndex: Int) {
+    init(images: [ProductSizeImage], initialIndex: Int,
+         allVariants: [(id: UUID, label: String)]? = nil,
+         variantImageURLs: [UUID: Set<String>]? = nil,
+         onToggleVariant: ((UUID, UUID, Bool) -> Void)? = nil,
+         onSetCover: ((UUID) -> Void)? = nil) {
         self.images = images
         self.initialIndex = initialIndex
+        self.allVariants = allVariants
+        self.variantImageURLs = variantImageURLs
+        self.onToggleVariant = onToggleVariant
+        self.onSetCover = onSetCover
         self._currentIndex = State(initialValue: initialIndex)
     }
 
@@ -2474,6 +2585,42 @@ private struct ProductImageViewer: View {
                     }
                     .accessibilityLabel("Tutup")
                     Spacer()
+                    if onSetCover != nil, images.indices.contains(currentIndex) {
+                        Button {
+                            onSetCover?(images[currentIndex].id)
+                        } label: {
+                            Image(systemName: "star.fill")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(.white)
+                                .frame(width: 36, height: 36)
+                                .background(.white.opacity(0.18))
+                                .clipShape(Circle())
+                        }
+                        .accessibilityLabel("Jadikan cover")
+                    }
+                    if let variants = allVariants, !variants.isEmpty,
+                       images.indices.contains(currentIndex) {
+                        let currentURL = images[currentIndex].imageUrl
+                        Menu {
+                            ForEach(variants, id: \.id) { v in
+                                let checked = variantImageURLs?[v.id]?.contains(currentURL) == true
+                                Button {
+                                    onToggleVariant?(v.id, images[currentIndex].id, !checked)
+                                } label: {
+                                    if checked { Label(v.label, systemImage: "checkmark") }
+                                    else { Text(v.label) }
+                                }
+                            }
+                        } label: {
+                            Image(systemName: "photo.badge.plus")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(.white)
+                                .frame(width: 36, height: 36)
+                                .background(.white.opacity(0.18))
+                                .clipShape(Circle())
+                        }
+                        .accessibilityLabel("Masukkan ke varian")
+                    }
                     Text("\(currentIndex + 1) / \(images.count)")
                         .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(.white)
