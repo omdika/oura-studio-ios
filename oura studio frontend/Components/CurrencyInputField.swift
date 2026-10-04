@@ -2,6 +2,7 @@ import SwiftUI
 
 struct CurrencyInputField: View {
     let label: String
+    var caption: String? = nil
     @Binding var value: Double?
 
     @State private var digits: String = ""
@@ -18,9 +19,16 @@ struct CurrencyInputField: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(label)
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(OuraTheme.Colors.textSecondary)
+            HStack(spacing: 4) {
+                Text(label)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(OuraTheme.Colors.textSecondary)
+                if let caption {
+                    Text(caption)
+                        .font(.system(size: 11))
+                        .foregroundStyle(OuraTheme.Colors.textTertiary)
+                }
+            }
 
             HStack(spacing: 4) {
                 Text("Rp")

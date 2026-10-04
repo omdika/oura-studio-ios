@@ -8,6 +8,8 @@ struct TambahPenjualanSheet: View {
     @AppStorage("eventPriceAdjustmentActive") private var isEventActive: Bool = false
     @AppStorage("eventPriceAdjustmentAmount") private var eventAdjustmentAmount: Double = 0.0
     @AppStorage("isAutoPrintEnabled") private var isAutoPrintEnabled: Bool = false
+    // v3.64: mode diskon global (default flat / tidak dikali qty)
+    @AppStorage("discountMultiplyByQty") private var discountMultiplyByQty: Bool = false
 
     var onSave: (() -> Void)? = nil
     /// Jika true, sheet QR scanner langsung dibuka saat sheet muncul.
@@ -45,8 +47,28 @@ struct TambahPenjualanSheet: View {
 
     private var totalRevenue: Double {
         items.reduce(0.0) { sum, item in
-            let price = (item.unitPrice ?? 0) - (item.discount ?? 0)
-            return sum + price * (item.qty ?? 1)
+            // v3.64: flat (default) = harga*qty - diskon; x qty = (harga-diskon)*qty
+            let price = item.unitPrice ?? 0
+            let disc = item.discount ?? 0
+            let qty = item.qty ?? 1
+            if discountMultiplyByQty {
+                return sum + (price - disc) * qty
+            } else {
+                return sum + price * qty - disc
+            }
+        }
+    }
+
+    private func isDiscountValid(_ item: SaleItem) -> Bool {
+        let disc = item.discount ?? 0
+        guard disc >= 0 else { return false }
+        guard disc > 0 else { return true }
+        let price = item.unitPrice ?? 0
+        let qty = item.qty ?? 1
+        if discountMultiplyByQty {
+            return disc <= price
+        } else {
+            return disc <= price * qty
         }
     }
 
@@ -54,7 +76,7 @@ struct TambahPenjualanSheet: View {
         !items.isEmpty &&
         items.allSatisfy {
             let qty = Int($0.qty ?? 0)
-            return qty > 0 && qty <= $0.maxQty && ($0.unitPrice ?? 0) > 0
+            return qty > 0 && qty <= $0.maxQty && ($0.unitPrice ?? 0) > 0 && isDiscountValid($0)
         }
     }
 
@@ -377,7 +399,7 @@ struct TambahPenjualanSheet: View {
                 .frame(maxWidth: 90)
 
                 CurrencyInputField(label: "Harga Satuan", value: item.unitPrice)
-                CurrencyInputField(label: "Diskon", value: item.discount)
+                CurrencyInputField(label: "Diskon", caption: discountMultiplyByQty ? "× qty" : nil, value: item.discount)
                     .frame(maxWidth: 100)
             }
 
@@ -482,11 +504,17 @@ struct TambahPenjualanSheet: View {
             guard let qty = item.qty, qty > 0, Int(qty) <= item.maxQty,
                   let price = item.unitPrice, price > 0
             else { return nil }
+            // v3.64: backend mengartikan discount = per-pcs.
+            // Mode flat: konversi ke per-pcs agar total backend tetap benar.
+            let disc = item.discount ?? 0
+            let discountToSend: Double? = disc > 0
+                ? (discountMultiplyByQty ? disc : disc / max(1, qty))
+                : nil
             return CreateSalesOrderRequest.ItemInput(
                 productSizeId: item.sizeId,
                 qty: Int(qty),
                 unitPrice: price,
-                discount: item.discount
+                discount: discountToSend
             )
         }
         let req = CreateSalesOrderRequest(

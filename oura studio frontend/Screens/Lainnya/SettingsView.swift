@@ -20,6 +20,8 @@ struct SettingsView: View {
     @AppStorage("printerUUIDString") private var printerUUIDString: String = ""
     @AppStorage("printerName") private var printerName: String = ""
     @AppStorage("labelIncludePrice") private var labelIncludePrice: Bool = false
+    // v3.64: Diskon dikali Qty (local device, default flat/tidak dikali)
+    @AppStorage("discountMultiplyByQty") private var discountMultiplyByQty: Bool = false
 
     private var grouped: [(category: String, defs: [SettingDef])] {
         let dict = Dictionary(grouping: knownSettings, by: { $0.category })
@@ -55,6 +57,31 @@ struct SettingsView: View {
                     }
                 } header: {
                     OuraSectionHeader(title: "Pengaturan Umum")
+                }
+                .padding(.bottom, OuraTheme.Spacing.sectionGap)
+
+                // MARK: - Pengaturan Penjualan (v3.64: Diskon x Qty)
+                Section {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(alignment: .firstTextBaseline, spacing: 6) {
+                            Text("Diskon dikali Qty")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundStyle(OuraTheme.Colors.textPrimary)
+                        }
+                        Text("Jika Ya, diskon per pcs dikali jumlah (Rp2.000 × 2 = Rp4.000). Jika Tidak (default), diskon flat per baris.")
+                            .font(.system(size: 11))
+                            .foregroundStyle(OuraTheme.Colors.textTertiary)
+                        HStack(spacing: 16) {
+                            RadioOptionButton(title: "Ya", selected: discountMultiplyByQty) { discountMultiplyByQty = true }
+                            RadioOptionButton(title: "Tidak", selected: !discountMultiplyByQty) { discountMultiplyByQty = false }
+                        }
+                        .padding(.top, 2)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+                    .ouraCard()
+                } header: {
+                    OuraSectionHeader(title: "Pengaturan Penjualan")
                 }
                 .padding(.bottom, OuraTheme.Spacing.sectionGap)
 

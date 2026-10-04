@@ -10,6 +10,8 @@ struct ScanToSellSheet: View {
     @State private var qty: Int = 1
     @State private var unitPrice: Double
     @State private var discount: Double = 0
+    // v3.64: mode diskon global (default flat / tidak dikali qty)
+    @AppStorage("discountMultiplyByQty") private var discountMultiplyByQty: Bool = false
     @State private var paymentMethod: PaymentMethod = .cash
     @State private var customerName: String = ""
     @State private var isSaving = false
@@ -23,11 +25,26 @@ struct ScanToSellSheet: View {
     }
 
     private var canSave: Bool {
-        qty >= 1 && qty <= size.currentStockQty && unitPrice > 0 && !isSaving
+        qty >= 1 && qty <= size.currentStockQty && unitPrice > 0 && !isSaving && isDiscountValid
+    }
+
+    private var isDiscountValid: Bool {
+        guard discount >= 0 else { return false }
+        guard discount > 0 else { return true }
+        if discountMultiplyByQty {
+            return discount <= unitPrice
+        } else {
+            return discount <= unitPrice * Double(qty)
+        }
     }
 
     private var totalAmount: Double {
-        max(0, (unitPrice - discount)) * Double(qty)
+        // v3.64: flat (default) = harga*qty - diskon; x qty = (harga-diskon)*qty
+        if discountMultiplyByQty {
+            return max(0, (unitPrice - discount)) * Double(qty)
+        } else {
+            return max(0, unitPrice * Double(qty) - discount)
+        }
     }
 
     var body: some View {
@@ -120,7 +137,7 @@ struct ScanToSellSheet: View {
                 .listRowBackground(OuraTheme.Colors.surfaceCard)
                 .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
 
-                CurrencyInputField(label: "Diskon", value: Binding(
+                CurrencyInputField(label: "Diskon", caption: discountMultiplyByQty ? "× qty" : nil, value: Binding(
                     get: { discount > 0 ? discount : nil },
                     set: { discount = $0 ?? 0 }
                 ))
@@ -276,6 +293,10 @@ struct ScanToSellSheet: View {
         errorMsg = nil
         defer { isSaving = false }
         do {
+            // v3.64: backend mengartikan discount = per-pcs; mode flat dikonversi.
+            let discountToSend: Double? = discount > 0
+                ? (discountMultiplyByQty ? discount : discount / Double(max(1, qty)))
+                : nil
             let req = CreateSalesOrderRequest(
                 customerName: customerName.trimmingCharacters(in: .whitespaces).isEmpty ? nil : customerName,
                 paymentMethod: paymentMethod.rawValue,
@@ -284,7 +305,7 @@ struct ScanToSellSheet: View {
                     productSizeId: size.id,
                     qty: qty,
                     unitPrice: unitPrice,
-                    discount: discount > 0 ? discount : nil
+                    discount: discountToSend
                 )]
             )
             _ = try await api.createSalesOrder(req)
