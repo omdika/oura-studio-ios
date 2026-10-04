@@ -647,19 +647,21 @@ private struct ProductPickerSheet: View {
     }
 
     private var filtered: [ProductSizeDetail] {
-        if searchText.isEmpty { return pickable }
-        let q = searchText.lowercased()
+        let trimmed = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty { return pickable }
+        let q = trimmed.lowercased()
         return pickable.filter {
             $0.productName.lowercased().contains(q) ||
+            $0.productSku.lowercased().contains(q) ||
             $0.sizeLabel.lowercased().contains(q) ||
             ($0.fabricVariantName?.lowercased().contains(q) ?? false)
         }
     }
 
-    private var groups: [(productName: String, sizes: [ProductSizeDetail])] {
+    private var groups: [(sku: String, productName: String, sizes: [ProductSizeDetail])] {
         var dict: [String: [ProductSizeDetail]] = [:]
-        for s in filtered { dict[s.productName, default: []].append(s) }
-        return dict.map { (productName: $0.key, sizes: $0.value) }
+        for s in filtered { dict[s.productSku, default: []].append(s) }
+        return dict.map { (sku: $0.key, productName: $0.value.first?.productName ?? $0.key, sizes: $0.value) }
             .sorted { $0.productName < $1.productName }
     }
 
@@ -670,9 +672,10 @@ private struct ProductPickerSheet: View {
                     Image(systemName: "magnifyingglass")
                         .font(.system(size: 14))
                         .foregroundStyle(OuraTheme.Colors.textTertiary)
-                    TextField("Cari produk...", text: $searchText)
+                    TextField("Cari produk / SKU...", text: $searchText)
                         .font(.system(size: 15))
                         .autocorrectionDisabled()
+                        .textInputAutocapitalization(.never)
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 10)
@@ -703,7 +706,7 @@ private struct ProductPickerSheet: View {
                     Spacer()
                 } else {
                     List {
-                        ForEach(groups, id: \.productName) { group in
+                        ForEach(groups, id: \.sku) { group in
                             Section {
                                 ForEach(group.sizes, id: \.id) { size in
                                     Button {
@@ -736,7 +739,7 @@ private struct ProductPickerSheet: View {
                                     .listRowBackground(OuraTheme.Colors.surfaceCard)
                                 }
                             } header: {
-                                Text(group.productName.uppercased())
+                                Text("\(group.productName) • \(group.sku)".uppercased())
                                     .font(.system(size: 11, weight: .semibold))
                                     .foregroundStyle(OuraTheme.Colors.textTertiary)
                                     .kerning(0.8)
