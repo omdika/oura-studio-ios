@@ -778,6 +778,10 @@ private struct ProductGroupRow: View {
     // bounded gallery fetch (reference 2184526 behavior) when the list has
     // no cover (old backend / product without gallery cover yet).
     @State private var coverURL: String? = nil
+    // Cover efektif: hasil fetch fallback (galeri) didahulukan, lalu cover
+    // bawaan list. WAJIB dibaca UI — baca product.coverImageURL saja akan
+    // membuat hasil fallback tidak pernah tampil (placeholder permanen).
+    private var effectiveCover: String? { coverURL ?? product.coverImageURL }
     private enum PhotoSource { case gallery, camera }
     @State private var pendingPhotoSource: PhotoSource = .gallery
 
@@ -825,9 +829,8 @@ private struct ProductGroupRow: View {
             // Header → ProdukDetailView (product management)
             NavigationLink(destination: ProdukDetailView(product: product, onProductChanged: onProductChanged)) {
                 HStack {
-                    // v3.66: cover from GET /products (backend v3.65 batched).
-                    // No per-card gallery fetch — that was a 20-parallel burst.
-                    if let cover = product.coverImageURL, let url = URL(string: cover) {
+                    // Cover list (0 req) + fallback galeri bounded (2184526).
+                    if let cover = effectiveCover, let url = URL(string: cover) {
                         AsyncImage(url: url) { image in
                             image.resizable().aspectRatio(contentMode: .fill)
                         } placeholder: {
@@ -979,12 +982,12 @@ private struct ProductGroupRow: View {
             if coverURL == nil { coverURL = product.coverImageURL }
             if coverURL == nil {
                 await CoverFetchLimiter.shared.acquire()
-                defer { Task { await CoverFetchLimiter.shared.release() } }
                 if coverURL == nil && !Task.isCancelled {
                     let gallery = (try? await api.getProductImages(sku: product.sku)) ?? []
                     let sorted = gallery.sorted { $0.sortOrder < $1.sortOrder }
                     coverURL = sorted.first(where: { $0.isCover })?.imageUrl ?? sorted.first?.imageUrl
                 }
+                await CoverFetchLimiter.shared.release()
             }
         }
         .confirmationDialog("Pilih Sumber Foto", isPresented: $showPhotoSourceDialog, titleVisibility: .visible) {
