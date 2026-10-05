@@ -25,12 +25,15 @@ struct Product: Codable, Identifiable, Hashable {
     let isArchived: Bool
     let createdAt: Date
     let category: String?
+    // v3.66: gallery cover from GET /products (nil = no photo yet / old payload).
+    let coverImageURL: String? = nil
 
     enum CodingKeys: String, CodingKey {
         case id, sku, name
         case isArchived = "is_archived"
         case createdAt = "created_at"
         case category
+        case coverImageURL = "cover_image_url"
     }
 }
 

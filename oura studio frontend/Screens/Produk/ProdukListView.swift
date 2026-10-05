@@ -647,29 +647,30 @@ struct ProdukListView: View {
         totalPages = resP.totalPages
         hasMorePages = (resP.nextPage != nil)
 
-        let pageSizes = await fetchSizes(for: resP.data)
+        let pageSizes = await fetchAllSizesBulk()
         if Task.isCancelled { return }
-        allSizes = pageSizes
+        // Correlate client-side (replaces per-SKU burst): keep sizes for the
+        // visible page so header stats/search semantics stay per-page.
+        let wanted = Set(resP.data.map(\.id))
+        allSizes = pageSizes.filter { wanted.contains($0.productId) }
 
         additionsByVariant = [:]
     }
 
-    // Fetch sizes for the given products via per-SKU endpoint so pagination is always
-    // correlated: 20 products -> 20 GET /products/{sku}/sizes executed in parallel.
-    // This fixes empty cards where global /product-sizes?page=1 ; limit=60 only covered
-    // sizes for the first ~9 products.
-    private func fetchSizes(for products: [Product]) async -> [ProductSizeDetail] {
-        guard !products.isEmpty else { return [] }
+    // v3.66: single bulk sizes fetch with sequential pages (1 connection at a
+    // time). Replaces the N-parallel per-SKU TaskGroup burst that saturated
+    // the DB pool on FastAPI Cloud (us-east-1 → Seoul RTT × 20 parallel).
+    // Callers correlate client-side by productId — same rows, no extra requests.
+    private func fetchAllSizesBulk() async -> [ProductSizeDetail] {
         var result: [ProductSizeDetail] = []
-        await withTaskGroup(of: [ProductSizeDetail].self) { group in
-            for p in products {
-                group.addTask {
-                    (try? await self.api.getProductSizes(sku: p.sku, productName: p.name)) ?? []
-                }
-            }
-            for await batch in group {
-                result.append(contentsOf: batch)
-            }
+        var page = 1
+        while true {
+            if Task.isCancelled { break }
+            guard let res = try? await api.getAllProductSizes(page: page, limit: 500) else { break }
+            result.append(contentsOf: res.data)
+            if res.nextPage == nil { break }
+            page += 1
+            if page > 10 { break } // safety guard (10×500 rows)
         }
         return result
     }
@@ -690,18 +691,8 @@ struct ProdukListView: View {
     }
 
     private func fetchAllProductSizes() async -> [ProductSizeDetail] {
-        var result: [ProductSizeDetail] = []
-        var page = 1
-        let sizeLimit = limit * 3
-        while true {
-            if Task.isCancelled { break }
-            guard let res = try? await api.getAllProductSizes(page: page, limit: sizeLimit) else { break }
-            result.append(contentsOf: res.data)
-            if res.nextPage == nil { break }
-            page += 1
-            if page > 50 { break }
-        }
-        return result
+        // v3.66: delegate to the bulk helper (fewer sequential requests, same rows).
+        await fetchAllSizesBulk()
     }
 
     private func loadMoreProducts() async {
@@ -715,13 +706,14 @@ struct ProdukListView: View {
             let resP = try await api.getProducts(page: nextPage, limit: limit)
 
             let newProducts = resP.data.filter { newP in !products.contains(where: { $0.id == newP.id }) }
-            // Fetch variants only for the newly loaded products to keep correlation
-            let newSizes = await fetchSizes(for: newProducts)
-            let dedupedSizes = newSizes.filter { ns in !allSizes.contains(where: { $0.id == ns.id }) }
-
             if Task.isCancelled { return }
             products.append(contentsOf: newProducts)
-            allSizes.append(contentsOf: dedupedSizes)
+            // v3.66: re-filter from one sequential bulk fetch instead of
+            // per-SKU burst for the new products. No manual dedupe needed.
+            let wanted = Set(products.map(\.id))
+            let bulk = await fetchAllSizesBulk()
+            if Task.isCancelled { return }
+            allSizes = bulk.filter { wanted.contains($0.productId) }
 
             currentPage = nextPage
             totalPages = resP.totalPages
@@ -755,8 +747,6 @@ private struct ProductGroupRow: View {
     @State private var showPhotoSourceDialog = false
     @State private var showCamera = false
     @State private var capturedCameraImage: UIImage?
-    // v3.62: product cover thumbnail (fallback: first gallery image).
-    @State private var coverURL: String? = nil
     private enum PhotoSource { case gallery, camera }
     @State private var pendingPhotoSource: PhotoSource = .gallery
 
@@ -804,8 +794,9 @@ private struct ProductGroupRow: View {
             // Header → ProdukDetailView (product management)
             NavigationLink(destination: ProdukDetailView(product: product, onProductChanged: onProductChanged)) {
                 HStack {
-                    // v3.62: cover from product gallery (not top-size photo).
-                    if let cover = coverURL, let url = URL(string: cover) {
+                    // v3.66: cover from GET /products (backend v3.65 batched).
+                    // No per-card gallery fetch — that was a 20-parallel burst.
+                    if let cover = product.coverImageURL, let url = URL(string: cover) {
                         AsyncImage(url: url) { image in
                             image.resizable().aspectRatio(contentMode: .fill)
                         } placeholder: {
@@ -950,14 +941,6 @@ private struct ProductGroupRow: View {
             }
         }
         .ouraCard()
-        .task {
-            // v3.62: lazy cover per product card (1 request per visible product).
-            if coverURL == nil {
-                let gallery = (try? await api.getProductImages(sku: product.sku)) ?? []
-                let sorted = gallery.sorted { $0.sortOrder < $1.sortOrder }
-                coverURL = sorted.first(where: { $0.isCover })?.imageUrl ?? sorted.first?.imageUrl
-            }
-        }
         .confirmationDialog("Pilih Sumber Foto", isPresented: $showPhotoSourceDialog, titleVisibility: .visible) {
             if UIImagePickerController.isSourceTypeAvailable(.camera) {
                 Button("Ambil Foto") {

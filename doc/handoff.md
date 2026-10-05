@@ -25,6 +25,7 @@ To keep context windows lean and token-efficient for developers and AI agents, t
 
 | Version | Date | Changed by | Summary |
 |---|---|---|---|
+| v3.66 | 2026-10-06 | Frontend | **IMPLEMENTED: Bunuh Burst Paralel Tab Produk (40 Request → 2).** Bulk sequential + cover dari list; `xcodebuild` sukses. Rincian spesifikasi: `doc/versions/v3.66.md`. |
 | v3.65 | 2026-10-04 | Frontend | **IMPLEMENTED: Search by SKU di Picker Catat Penjualan + Tampil SKU.** Filter `ProductPickerSheet` tambah `productSku` (partial, case-insensitive, nama tetap jalan); header grup jadi `NAMA • SKU`; grup key by SKU; frontend-only tanpa backend. Rincian spesifikasi: `doc/versions/v3.65.md`. |
 | v3.64 | 2026-10-04 | Frontend | **IMPLEMENTED: Opsi Diskon × Qty Global di Pengaturan (Default Flat, Local Device).** Setting global `discountMultiplyByQty` (AppStorage, default false) di section Pengaturan Penjualan; caption `× qty` di field Diskon saat ON; berlaku di TambahPenjualanSheet + ScanToSellSheet; konversi flat→per-pcs (`discount/qty`) saat kirim agar backend tetap benar. Supersede v3.63 (toggle per-item dibatalkan). Rincian spesifikasi: `doc/versions/v3.64.md`. |
 | v3.62 | 2026-10-01 | Fullstack | **IMPLEMENTED: Galeri Utama Produk + Foto Wakil Per-Size ala Shopee.** Tabel baru `product_image` (cover + max 9), wakil tunggal per-size (`is_shopee_selected`), isi kolom gambar template existing tanpa ubah struktur (baris 1 penuh, baris 2+ cover+image_1 = wakil size), sort XS→XXL, endpoint JSON `shopee-payload`. Rincian spesifikasi: `doc/versions/v3.62.md`. |
