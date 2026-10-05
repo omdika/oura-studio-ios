@@ -728,6 +728,33 @@ struct ProdukListView: View {
 
 // MARK: - Product group row
 
+/// v3.66: bounds concurrent per-card gallery fallback fetches (reference:
+/// 2184526 display behavior). The list cover (`product.coverImageURL`,
+/// backend v3.65) is primary and costs 0 requests; this limiter only guards
+/// the fallback path so it can never become an N-parallel burst again.
+private actor CoverFetchLimiter {
+    static let shared = CoverFetchLimiter()
+    private var running = 0
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+    private let maxConcurrent = 3
+
+    func acquire() async {
+        if running < maxConcurrent {
+            running += 1
+            return
+        }
+        await withCheckedContinuation { waiters.append($0) }
+    }
+
+    func release() {
+        if !waiters.isEmpty {
+            waiters.removeFirst().resume()
+        } else {
+            running = max(0, running - 1)
+        }
+    }
+}
+
 private struct ProductGroupRow: View {
     @EnvironmentObject private var api: APIService
     @AppStorage("eventPriceAdjustmentActive") private var isEventActive: Bool = false
@@ -747,6 +774,10 @@ private struct ProductGroupRow: View {
     @State private var showPhotoSourceDialog = false
     @State private var showCamera = false
     @State private var capturedCameraImage: UIImage?
+    // v3.66: seeded from GET /products cover (0 requests). Falls back to one
+    // bounded gallery fetch (reference 2184526 behavior) when the list has
+    // no cover (old backend / product without gallery cover yet).
+    @State private var coverURL: String? = nil
     private enum PhotoSource { case gallery, camera }
     @State private var pendingPhotoSource: PhotoSource = .gallery
 
@@ -941,6 +972,21 @@ private struct ProductGroupRow: View {
             }
         }
         .ouraCard()
+        .task {
+            // Primary: list cover (free). Fallback: single gallery fetch per
+            // card, concurrency-capped so visible cards can never re-create
+            // the N-parallel burst.
+            if coverURL == nil { coverURL = product.coverImageURL }
+            if coverURL == nil {
+                await CoverFetchLimiter.shared.acquire()
+                defer { Task { await CoverFetchLimiter.shared.release() } }
+                if coverURL == nil && !Task.isCancelled {
+                    let gallery = (try? await api.getProductImages(sku: product.sku)) ?? []
+                    let sorted = gallery.sorted { $0.sortOrder < $1.sortOrder }
+                    coverURL = sorted.first(where: { $0.isCover })?.imageUrl ?? sorted.first?.imageUrl
+                }
+            }
+        }
         .confirmationDialog("Pilih Sumber Foto", isPresented: $showPhotoSourceDialog, titleVisibility: .visible) {
             if UIImagePickerController.isSourceTypeAvailable(.camera) {
                 Button("Ambil Foto") {
