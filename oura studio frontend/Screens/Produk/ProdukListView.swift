@@ -524,7 +524,16 @@ struct ProdukListView: View {
                             onProductChanged: { requestReload() }
                         )
                         .onAppear {
-                            if product.id == filteredProductsToDisplay.last?.id && hasMorePages && !isLoadingMore {
+                            // v3.67: prefetch saat 5 baris terakhir tampil, bukan
+                            // hanya baris terakhir persis. onAppear baris terakhir
+                            // bersifat satu-kali: kalau terkonsumsi saat
+                            // isLoadingMore masih true (bulk lambat), pagination
+                            // macet permanen. Threshold membuat stall mustahil
+                            // tanpa scroll balik yang disengaja.
+                            let list = filteredProductsToDisplay
+                            if let idx = list.firstIndex(where: { $0.id == product.id }),
+                               idx >= max(0, list.count - 5),
+                               hasMorePages && !isLoadingMore {
                                 Task { await loadMoreProducts() }
                             }
                         }
@@ -642,17 +651,23 @@ struct ProdukListView: View {
         }
         if Task.isCancelled { return }
 
-        // Hanya timpa cache kalau fetch berhasil
+        // Hanya timpa cache kalau fetch berhasil.
+        // v3.67: assign products + sizes TOGETHER after the bulk (atomic seperti
+        // 2184526) agar kartu tidak sempat kosong dan trigger last-row tetap waras.
+        let pageSizes = await fetchAllSizesBulk()
+        if Task.isCancelled { return }
         products = resP.data
         totalPages = resP.totalPages
         hasMorePages = (resP.nextPage != nil)
 
-        let pageSizes = await fetchAllSizesBulk()
-        if Task.isCancelled { return }
         // Correlate client-side (replaces per-SKU burst): keep sizes for the
         // visible page so header stats/search semantics stay per-page.
-        let wanted = Set(resP.data.map(\.id))
-        allSizes = pageSizes.filter { wanted.contains($0.productId) }
+        // Lewati replace saat bulk gagal ([]) agar error transient tidak
+        // mengosongkan semua kartu yang sedang tampil.
+        if !pageSizes.isEmpty {
+            let wanted = Set(resP.data.map(\.id))
+            allSizes = pageSizes.filter { wanted.contains($0.productId) }
+        }
 
         additionsByVariant = [:]
     }
@@ -700,20 +715,34 @@ struct ProdukListView: View {
         guard !isFilterActive else { return }
         guard !isLoadingMore && hasMorePages else { return }
         isLoadingMore = true
+        defer { isLoadingMore = false }
         let nextPage = currentPage + 1
 
         do {
             let resP = try await api.getProducts(page: nextPage, limit: limit)
+            if Task.isCancelled { return }
 
             let newProducts = resP.data.filter { newP in !products.contains(where: { $0.id == newP.id }) }
-            if Task.isCancelled { return }
-            products.append(contentsOf: newProducts)
-            // v3.66: re-filter from one sequential bulk fetch instead of
-            // per-SKU burst for the new products. No manual dedupe needed.
-            let wanted = Set(products.map(\.id))
+            // v3.67: fetch sizes SEBELUM append (atomic seperti 2184526). Append
+            // duluan langsung menggeser `filtered.last` ke baris baru; user yang
+            // scroll cepat sampai bawah selama bulk (~detik) akan menghanguskan
+            // onAppear satu-kali baris terakhir saat isLoadingMore masih true —
+            // pagination macet permanen di 40 (tepat satu loadMore). Bulk tetap
+            // sequential/ramah-pool seperti v3.66.
+            let wanted = Set(newProducts.map(\.id))
             let bulk = await fetchAllSizesBulk()
             if Task.isCancelled { return }
-            allSizes = bulk.filter { wanted.contains($0.productId) }
+            let newSizes = bulk.filter { wanted.contains($0.productId) }
+                .filter { ns in !allSizes.contains(where: { $0.id == ns.id }) }
+
+            // Publish atomic: produk + varian + state halaman bersamaan agar
+            // onAppear baris terakhir selalu fresh setelah load selesai.
+            products.append(contentsOf: newProducts)
+            // Jangan wipe saat bulk gagal transient (bulk==[] padahal halaman
+            // punya varian): pertahankan cache lama, bukan kosongkan semua kartu.
+            if !bulk.isEmpty {
+                allSizes.append(contentsOf: newSizes)
+            }
 
             currentPage = nextPage
             totalPages = resP.totalPages
@@ -721,8 +750,6 @@ struct ProdukListView: View {
         } catch {
             print("⚠️ [v3.56] Error loadMoreProducts: \(error)")
         }
-
-        isLoadingMore = false
     }
 }
 

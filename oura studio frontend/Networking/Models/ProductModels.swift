@@ -26,7 +26,10 @@ struct Product: Codable, Identifiable, Hashable {
     let createdAt: Date
     let category: String?
     // v3.66: gallery cover from GET /products (nil = no photo yet / old payload).
-    let coverImageURL: String? = nil
+    // MUST be `var`: Swift skips `let ... = nil` in synthesized Decodable
+    // (always decodes to nil), which silently killed every list cover.
+    // `var ... = nil` decodes correctly in all 3 cases (present/null/missing).
+    var coverImageURL: String? = nil
 
     enum CodingKeys: String, CodingKey {
         case id, sku, name
