@@ -558,8 +558,10 @@ struct ScanToStockSheet: View {
             let noteStr = note.trimmingCharacters(in: .whitespaces).isEmpty ? nil : note
             if reason == .production, deductBahan, let spec = relatedSpec {
                 do {
-                    _ = try await api.addStockFromBahan(
+                    // v3.68-fix: API mengembalikan detail fresh → upsert ke cache.
+                    let updated = try await api.addStockFromBahan(
                         sku: size.productSku, sizeId: size.id, qty: qty, specId: spec.id)
+                    QRProductCache.shared.upsert(updated)
                 } catch let apiErr as APIError {
                     // 404 = endpoint not deployed; 400 multi-fabric = backend needs material_purchase_id
                     // In both cases: fall back to plain adjustStock so stock is still recorded
@@ -579,14 +581,16 @@ struct ScanToStockSheet: View {
                     guard shouldFallback else { throw apiErr }
                     bahanDeductionSkipped = true
                     bahanDeductionError = fallbackMsg
-                    _ = try await api.adjustStock(
+                    let updated = try await api.adjustStock(
                         sku: size.productSku, sizeId: size.id, qty: qty,
                         reason: reason.rawValue, note: noteStr)
+                    QRProductCache.shared.upsert(updated)
                 }
             } else {
-                _ = try await api.adjustStock(
+                let updated = try await api.adjustStock(
                     sku: size.productSku, sizeId: size.id, qty: qty,
                     reason: reason.rawValue, note: noteStr)
+                QRProductCache.shared.upsert(updated)
             }
 
             // 2. Patch HPP and/or selling price if provided (best-effort — stock already saved)
@@ -598,7 +602,9 @@ struct ScanToStockSheet: View {
                     manualHppHardware: hasManualHpp ? (editHppHardware ?? 0) : nil,
                     manualHppLabor:    hasManualHpp ? (editHppLabor    ?? 0) : nil,
                     manualHppOverhead: hasManualHpp ? (editHppOverhead ?? 0) : nil)
-                _ = try? await api.patchProductSize(sku: size.productSku, sizeId: size.id, patch)
+                if let patched = try? await api.patchProductSize(sku: size.productSku, sizeId: size.id, patch) {
+                    QRProductCache.shared.upsert(patched) // harga/HPP baru → cache ikut baru
+                }
             }
 
             didSucceed = true

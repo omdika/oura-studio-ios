@@ -34,9 +34,12 @@ private enum ScanState: Equatable {
 
 private struct CartItem: Identifiable {
     let id = UUID()
-    let size: ProductSizeDetail
+    var size: ProductSizeDetail
     var qty: Int
     var unitPrice: Double
+    // v3.68-fix: true bila kasir mengubah harga manual di baris keranjang.
+    // Harga manual TIDAK PERNAH ditimpa revalidasi server otomatis.
+    var priceEdited: Bool = false
 
     init(size: ProductSizeDetail) {
         self.size = size
@@ -72,6 +75,10 @@ struct QRScannerSheet: View {
     @State private var cartItems: [CartItem] = []
     @State private var showCheckoutSheet = false
     @State private var cartToast: ToastMessage? = nil // Changed to ToastMessage
+
+    // v3.68: instant scan cache — preload katalog sekali, lookup lokal per scan.
+    @StateObject private var cache = QRProductCache.shared
+    @State private var revalidationNotice: String? = nil
 
     private var isScanning: Bool {
         scanState == .scanning && !showCheckoutSheet
@@ -120,6 +127,8 @@ struct QRScannerSheet: View {
                         .foregroundStyle(OuraTheme.Colors.accent)
                 }
             }
+            // v3.68: preload katalog sekali (skip jika masih fresh TTL 5 mnt).
+            .task { await cache.preload(api: api) }
         }
         .sheet(isPresented: $showCheckoutSheet) {
             QRCartCheckoutSheet(
@@ -198,8 +207,52 @@ struct QRScannerSheet: View {
                 } else {
                     cartBar
                 }
+
+                // v3.68: status katalog cache (tap = force refresh) + notice revalidasi.
+                if let notice = revalidationNotice {
+                    HStack(spacing: 6) {
+                        Image(systemName: "arrow.triangle.2.circlepath")
+                            .font(.system(size: 11))
+                        Text(notice)
+                            .font(.system(size: 11, weight: .medium))
+                    }
+                    .foregroundStyle(Color.orange)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(Color.orange.opacity(0.12))
+                    .clipShape(Capsule())
+                    .padding(.bottom, 6)
+                }
+                cacheChip
             }
         }
+    }
+
+    // v3.68: chip status katalog — tidak blokir kamera, tap untuk refresh paksa.
+    private var cacheChip: some View {
+        Button {
+            Task { await cache.preload(api: api, force: true) }
+        } label: {
+            HStack(spacing: 6) {
+                if cache.isLoading {
+                    ProgressView().scaleEffect(0.7)
+                } else {
+                    Image(systemName: "bolt.fill")
+                        .font(.system(size: 10))
+                }
+                Text(cache.isLoading
+                     ? "Memuat katalog…"
+                     : "Katalog \(cache.ageText) • \(cache.count) varian")
+                    .font(.system(size: 11, weight: .medium))
+            }
+            .foregroundStyle(OuraTheme.Colors.textSecondary)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(.ultraThinMaterial)
+            .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .padding(.bottom, 8)
     }
 
     // MARK: - Cart bar
@@ -270,7 +323,10 @@ struct QRScannerSheet: View {
     private var addToExistingSaleOverlay: some View {
         switch scanState {
         case .scanning:
-            scanHintForAddToExistingSale
+            VStack(spacing: 0) {
+                scanHintForAddToExistingSale
+                cacheChip
+            }
         case .resolving:
             resolvingCard
         case .error(let msg):
@@ -555,35 +611,120 @@ struct QRScannerSheet: View {
 
     // MARK: - Logic
 
+    // v3.68: cache-first scan. Cache-hit → sinkron, tanpa `.resolving`,
+    // kamera tetap aktif (throughput <50ms). Cache-miss → fallback 1× fetch.
     private func handleRawScan(_ raw: String) {
-        guard raw.hasPrefix("oura:"),
-              let uuid = UUID(uuidString: String(raw.dropFirst(5))),
-              scanState == .scanning else { return }
-        scanState = .resolving
-        Task { await resolve(uuid) }
+        guard scanState == .scanning else { return }
+        guard let parsed = cache.parseQR(raw) else { return } // QR asing: abaikan
+        let id = parsed.id
+        if let cached = cache.lookup(id) {
+            deliverScanned(cached, embeddedPrice: parsed.embeddedPrice)
+        } else {
+            scanState = .resolving
+            Task { await resolveMiss(id, embeddedPrice: parsed.embeddedPrice) }
+        }
     }
 
-    private func resolve(_ id: UUID) async {
+    /// Jalur cepat sinkron untuk cache-hit — tidak menyentuh `.resolving`
+    /// agar `isScanning` tetap true dan kamera jalan terus.
+    private func deliverScanned(_ size: ProductSizeDetail, embeddedPrice: Double?) {
+        if mode == .sellOnly {
+            addToCart(size, priceOverride: embeddedPrice)
+            triggerBackgroundRevalidate(id: size.id)
+        } else if mode == .addToExistingSale {
+            // Beep ditangani oleh TambahPenjualanSheet.handleScannedProduct
+            // (beda nada success vs stok habis), jadi di sini tidak bunyi ganda.
+            onProductScanned?(size)
+            dismiss()
+        } else {
+            ScanFeedback.success()
+            scanState = .resolved(size)
+            triggerBackgroundRefreshSingle(id: size.id)
+        }
+    }
+
+    /// Fallback untuk cache-miss: 1× `GET /product-sizes/{id}`, lalu insert ke cache.
+    private func resolveMiss(_ id: UUID, embeddedPrice: Double?) async {
         do {
             let size = try await api.getProductSizeById(id: id)
-            if mode == .sellOnly {
-                addToCart(size)
-            } else if mode == .addToExistingSale {
-                // Beep ditangani oleh TambahPenjualanSheet.handleScannedProduct
-                // (beda nada success vs stok habis), jadi di sini tidak bunyi ganda.
-                onProductScanned?(size)
-                dismiss()
-            } else {
-                ScanFeedback.success()
-                scanState = .resolved(size)
-            }
+            cache.upsert(size)
+            cache.noteRevalidated(id)
+            deliverScannedAfterMiss(size, embeddedPrice: embeddedPrice)
         } catch {
             ScanFeedback.error()
             scanState = .error("Produk tidak ditemukan. QR mungkin sudah tidak aktif.")
         }
     }
 
-    private func addToCart(_ size: ProductSizeDetail) {
+    private func deliverScannedAfterMiss(_ size: ProductSizeDetail, embeddedPrice: Double?) {
+        if mode == .sellOnly {
+            addToCart(size, priceOverride: embeddedPrice)
+        } else if mode == .addToExistingSale {
+            onProductScanned?(size)
+            dismiss()
+        } else {
+            ScanFeedback.success()
+            scanState = .resolved(size)
+        }
+    }
+
+    /// Revalidasi senyap 1 id (debounced 60 dtk). Jika harga/stok berubah,
+    /// update baris keranjang + tampilkan notice kuning.
+    private func triggerBackgroundRevalidate(id: UUID) {
+        guard cache.shouldRevalidate(id) else { return }
+        Task {
+            let fresh = await cache.revalidate(ids: [id], api: api)
+            guard let d = fresh[id] else { return }
+            await MainActor.run { applyFreshDetail(d) }
+        }
+    }
+
+    /// Refresh senyap untuk mode single (.any/.stockInOnly): update kartu resolved.
+    private func triggerBackgroundRefreshSingle(id: UUID) {
+        guard cache.shouldRevalidate(id) else { return }
+        Task {
+            let fresh = await cache.revalidate(ids: [id], api: api)
+            guard let d = fresh[id] else { return }
+            await MainActor.run {
+                if case .resolved(let cur) = scanState, cur.id == d.id {
+                    scanState = .resolved(d)
+                }
+            }
+        }
+    }
+
+    /// Terapkan detail fresh ke baris keranjang: pertahankan qty & harga editan
+    /// user, clamp qty bila stok server menyusut.
+    private func applyFreshDetail(_ d: ProductSizeDetail) {
+        guard let idx = cartItems.firstIndex(where: { $0.size.id == d.id }) else { return }
+        let keptQty = cartItems[idx].qty
+        let keptPrice = cartItems[idx].unitPrice
+        let wasEdited = cartItems[idx].priceEdited
+        cartItems[idx].size = d
+        cartItems[idx].qty = min(keptQty, max(1, d.currentStockQty))
+        // v3.68-fix: ikuti harga server hanya bila kasir belum edit manual.
+        if !wasEdited, let freshPrice = d.sellingPrice, freshPrice > 0 {
+            cartItems[idx].unitPrice = freshPrice
+        }
+        let clamped = keptQty != cartItems[idx].qty
+        let priceChanged = cartItems[idx].unitPrice != keptPrice
+        if clamped || priceChanged {
+            revalidationNotice = "Stok/harga \(d.displayLabel) diperbarui dari server."
+            Task {
+                try? await Task.sleep(nanoseconds: 2_500_000_000)
+                await MainActor.run { revalidationNotice = nil }
+            }
+        }
+    }
+
+    private func resolve(_ id: UUID) async {
+        // Legacy path dipertahankan untuk kompatibilitas; alur baru via resolveMiss.
+        await resolveMiss(id, embeddedPrice: nil)
+    }
+
+    // v3.68: priceOverride = harga embedded dari label `oura2:` — dipakai hanya
+    // bila cache/server belum punya harga (sellingPrice nil/0).
+    private func addToCart(_ size: ProductSizeDetail, priceOverride: Double? = nil) {
         guard size.currentStockQty >= 1 else {
             ScanFeedback.error()
             cartToast = ToastMessage(
@@ -616,7 +757,11 @@ struct QRScannerSheet: View {
                 iconColor: OuraTheme.Colors.greenAccent
             )
         } else {
-            cartItems.append(CartItem(size: size))
+            var item = CartItem(size: size)
+            if (size.sellingPrice ?? 0) <= 0, let override = priceOverride, override > 0 {
+                item.unitPrice = override // prefill sementara dari label oura2, revalidasi menyusul
+            }
+            cartItems.append(item)
             ScanFeedback.success()
             cartToast = ToastMessage(
                 text: "\(size.productName) · \(size.displayLabel) ditambahkan",
@@ -649,6 +794,7 @@ private struct QRCartCheckoutSheet: View {
     @State private var selectedMethod: PaymentMethod = .cash
     @State private var customerName: String = ""
     @State private var isSaving = false
+    @State private var isRefreshing = false // v3.68: revalidasi stok pra-checkout
     @State private var errorMsg: String?
 
     private var total: Double {
@@ -656,7 +802,7 @@ private struct QRCartCheckoutSheet: View {
     }
 
     private var canCheckout: Bool {
-        !cartItems.isEmpty && !isSaving && cartItems.allSatisfy { $0.unitPrice > 0 }
+        !cartItems.isEmpty && !isSaving && !isRefreshing && cartItems.allSatisfy { $0.unitPrice > 0 }
     }
 
     var body: some View {
@@ -777,6 +923,10 @@ private struct QRCartCheckoutSheet: View {
                         Group {
                             if isSaving {
                                 ProgressView().tint(.white)
+                            } else if isRefreshing {
+                                Text("Memverifikasi stok…")
+                                    .font(.system(size: 15, weight: .semibold))
+                                    .foregroundStyle(.white)
                             } else {
                                 Text("Konfirmasi Pembayaran · \(total.rupiahFormatted)")
                                     .font(.system(size: 15, weight: .semibold))
@@ -810,6 +960,53 @@ private struct QRCartCheckoutSheet: View {
         errorMsg = nil
         defer { isSaving = false }
 
+        // v3.68: revalidasi stok server best-effort sebelum POST (cache bisa basi).
+        // Clamp qty yang melebihi stok server; minta konfirmasi ulang via tap kedua.
+        isRefreshing = true
+        let fresh = await QRProductCache.shared.revalidate(
+            ids: cartItems.map { $0.size.id }, api: api)
+        isRefreshing = false
+        if !fresh.isEmpty {
+            var clamped: [String] = []
+            var removed: [String] = []
+            var priceNotes: [String] = []
+            for idx in cartItems.indices {
+                guard let d = fresh[cartItems[idx].size.id] else { continue }
+                cartItems[idx].size = d
+                if d.currentStockQty <= 0 {
+                    removed.append(d.displayLabel)
+                } else if cartItems[idx].qty > d.currentStockQty {
+                    cartItems[idx].qty = d.currentStockQty
+                    clamped.append("\(d.displayLabel) → \(d.currentStockQty) pcs")
+                }
+                // v3.68-fix: koreksi harga server hanya bila kasir belum edit
+                // manual. Harga manual (priceEdited) tidak pernah disentuh dan
+                // tidak memblokir checkout (keputusan eksplisit kasir).
+                if !cartItems[idx].priceEdited,
+                   let fp = d.sellingPrice, fp > 0,
+                   cartItems[idx].unitPrice != fp {
+                    let old = cartItems[idx].unitPrice
+                    cartItems[idx].unitPrice = fp
+                    priceNotes.append(old > 0
+                        ? "\(d.displayLabel): \(old.rupiahFormatted) → \(fp.rupiahFormatted)"
+                        : "\(d.displayLabel): harga \(fp.rupiahFormatted)")
+                }
+            }
+            cartItems.removeAll { item in
+                guard let d = fresh[item.size.id] else { return false }
+                return d.currentStockQty <= 0
+            }
+            if !removed.isEmpty || !clamped.isEmpty || !priceNotes.isEmpty {
+                var parts: [String] = []
+                if !removed.isEmpty { parts.append("Stok habis, dihapus: \(removed.joined(separator: ", "))") }
+                if !clamped.isEmpty { parts.append("Disesuaikan: \(clamped.joined(separator: ", "))") }
+                if !priceNotes.isEmpty { parts.append("Harga diperbarui: \(priceNotes.joined(separator: "; "))") }
+                errorMsg = parts.joined(separator: ". ") + ". Tekan Konfirmasi lagi untuk lanjut."
+                if cartItems.isEmpty { return }
+                return
+            }
+        }
+
         let reqItems = cartItems.map {
             CreateSalesOrderRequest.ItemInput(
                 productSizeId: $0.size.id,
@@ -829,6 +1026,7 @@ private struct QRCartCheckoutSheet: View {
         do {
             let order = try await api.createSalesOrder(req)
             _ = try? await api.markSalesOrderPaid(id: order.id)
+            await MainActor.run { QRProductCache.shared.invalidate() } // v3.68: stok berubah → cache basi
             cartItems.removeAll()
             dismiss()
             onSuccess()
@@ -887,6 +1085,7 @@ private struct CartItemRowView: View {
                                     let raw = newVal.filter { $0.isNumber }
                                     priceDigits = raw
                                     item.unitPrice = Double(raw) ?? 0
+                                    item.priceEdited = true // v3.68-fix: edit manual menang atas server
                                 }
                             ))
                             .focused($priceFocused)

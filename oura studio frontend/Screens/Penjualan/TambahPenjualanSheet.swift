@@ -41,6 +41,9 @@ struct TambahPenjualanSheet: View {
         var qty: Double? = 1
         var unitPrice: Double? = nil
         var discount: Double? = nil
+        // v3.68-fix: true bila kasir mengubah harga manual di field.
+        // Harga manual TIDAK PERNAH ditimpa revalidasi server otomatis.
+        var priceEdited: Bool = false
     }
 
     private var selectedSizeIds: Set<UUID> { Set(items.map { $0.sizeId }) }
@@ -219,6 +222,8 @@ struct TambahPenjualanSheet: View {
                 if let idx = items.firstIndex(where: { $0.id == target.id }) {
                     items[idx].maxQty = newQty
                 }
+                // v3.68-fix: stok diubah via quick-adjust → segarkan cache.
+                Task { await QRProductCache.shared.refreshOne(id: target.sizeId, api: api) }
             }
             .environmentObject(api)
         }
@@ -398,7 +403,12 @@ struct TambahPenjualanSheet: View {
                 }
                 .frame(maxWidth: 90)
 
-                CurrencyInputField(label: "Harga Satuan", value: item.unitPrice)
+                // v3.68-fix: tandai edit manual agar revalidasi server tidak menimpa
+                // harga yang kasir sengaja ubah (mis. diskon khusus).
+                CurrencyInputField(label: "Harga Satuan", value: Binding(
+                    get: { item.wrappedValue.unitPrice },
+                    set: { item.wrappedValue.unitPrice = $0; item.wrappedValue.priceEdited = true }
+                ))
                 CurrencyInputField(label: "Diskon", caption: discountMultiplyByQty ? "× qty" : nil, value: item.discount)
                     .frame(maxWidth: 100)
             }
@@ -432,6 +442,7 @@ struct TambahPenjualanSheet: View {
 
     private func loadSizes() async {
         let all = (try? await api.getAllProductSizes()) ?? []
+        QRProductCache.shared.upsertMany(all) // v3.68-fix: pemanasan cache gratis
         availableSizes = all.filter { !$0.isArchived && $0.currentStockQty > 0 }
     }
 
@@ -489,6 +500,35 @@ struct TambahPenjualanSheet: View {
             )
         }
         scheduleToastDismiss()
+        // v3.68-fix: harga/stok dari cache bisa basi (TTL 5 mnt). Refresh 1× ke
+        // server; koreksi otomatis hanya bila kasir belum edit manual.
+        refreshScannedPrice(sizeId: size.id)
+    }
+
+    /// Refresh pasca-scan: update maxQty + harga (bila belum diedit manual).
+    /// Best-effort, tidak blokir UI.
+    private func refreshScannedPrice(sizeId: UUID) {
+        Task {
+            guard let fresh = await QRProductCache.shared.refreshOne(id: sizeId, api: api) else { return }
+            guard let idx = items.firstIndex(where: { $0.sizeId == sizeId }) else { return }
+            items[idx].maxQty = fresh.currentStockQty
+            if !items[idx].priceEdited,
+               let fp = fresh.sellingPrice, fp > 0 {
+                let finalPrice = fp + (isEventActive ? eventAdjustmentAmount : 0.0)
+                if items[idx].unitPrice != finalPrice {
+                    let old = items[idx].unitPrice ?? 0
+                    items[idx].unitPrice = finalPrice
+                    scanToast = ToastMessage(
+                        text: old > 0
+                            ? "Harga \(fresh.displayLabel) diperbarui \(old.rupiahFormatted) → \(finalPrice.rupiahFormatted)"
+                            : "Harga \(fresh.displayLabel): \(finalPrice.rupiahFormatted)",
+                        iconName: "arrow.triangle.2.circlepath",
+                        iconColor: OuraTheme.Colors.warningText
+                    )
+                    scheduleToastDismiss()
+                }
+            }
+        }
     }
 
     private func scheduleToastDismiss() {
@@ -500,6 +540,42 @@ struct TambahPenjualanSheet: View {
 
     private func save() async {
         isSaving = true; errorMsg = nil; defer { isSaving = false }
+
+        // v3.68-fix: revalidasi stok + harga server sebelum POST (cache bisa basi).
+        // Koreksi otomatis hanya untuk item yang TIDAK diedit manual; harga manual
+        // kasir tidak pernah disentuh. Bila ada koreksi → minta tap Simpan ke-2.
+        let fresh = await QRProductCache.shared.revalidate(
+            ids: items.map { $0.sizeId }, api: api)
+        if !fresh.isEmpty {
+            var notes: [String] = []
+            for idx in items.indices {
+                guard let d = fresh[items[idx].sizeId] else { continue }
+                if items[idx].maxQty != d.currentStockQty {
+                    items[idx].maxQty = d.currentStockQty
+                    if let q = items[idx].qty, Int(q) > d.currentStockQty {
+                        items[idx].qty = Double(d.currentStockQty)
+                        notes.append("\(items[idx].displayName): qty → \(d.currentStockQty) pcs (stok server)")
+                    }
+                }
+                if !items[idx].priceEdited,
+                   let fp = d.sellingPrice, fp > 0 {
+                    let finalPrice = fp + (isEventActive ? eventAdjustmentAmount : 0.0)
+                    if items[idx].unitPrice != finalPrice {
+                        let old = items[idx].unitPrice ?? 0
+                        items[idx].unitPrice = finalPrice
+                        notes.append(old > 0
+                            ? "\(items[idx].displayName): \(old.rupiahFormatted) → \(finalPrice.rupiahFormatted)"
+                            : "\(items[idx].displayName): harga \(finalPrice.rupiahFormatted)")
+                    }
+                }
+            }
+            if !notes.isEmpty {
+                errorMsg = "Diperbarui dari server — " + notes.joined(separator: "; ")
+                    + ". Periksa lagi lalu tekan Simpan."
+                return
+            }
+        }
+
         let reqItems = items.compactMap { item -> CreateSalesOrderRequest.ItemInput? in
             guard let qty = item.qty, qty > 0, Int(qty) <= item.maxQty,
                   let price = item.unitPrice, price > 0
@@ -534,6 +610,7 @@ struct TambahPenjualanSheet: View {
             if isAutoPrintEnabled {
                 appState.tsplPrinterService.printReceipt(order: finalOrder)
             }
+            QRProductCache.shared.invalidate() // v3.68-fix: stok berubah → cache basi
             onSave?()
             appState.dashboardNeedsRefresh = true
             dismiss()

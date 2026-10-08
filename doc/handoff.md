@@ -25,6 +25,8 @@ To keep context windows lean and token-efficient for developers and AI agents, t
 
 | Version | Date | Changed by | Summary |
 |---|---|---|---|
+| v3.69 | 2026-10-08 | Fullstack | **PLANNED: Slim Scan-Resolve Endpoint + QR v2 Embedded.** Follow-up v3.68: 1× batch `GET /product-sizes/scan-resolve?ids=` (slim DTO tanpa HPP/images) + label `oura2` dengan harga untuk render instan tanpa cache. Rincian spesifikasi: `doc/versions/v3.69.md`. |
+| v3.68 | 2026-10-08 | Frontend | **IMPLEMENTED: Instant Scan Cache untuk Catat Penjualan QR.** `QRProductCache` baru (preload `GET /product-sizes?limit=500`, lookup lokal, parser `oura:`/`oura2:`); `QRScannerSheet` cache-first (kamera tetap aktif di cart mode) + revalidasi background + verifikasi stok pra-checkout; `xcodebuild` sukses. Rincian spesifikasi: `doc/versions/v3.68.md`. |
 | v3.67 | 2026-10-05 | Frontend | **IMPLEMENTED: Fix List Produk Macet di 40 + Cover List Mati.** `loadMoreProducts` fetch-bulk-dulu-baru-append atomik (trigger last-row tak lagi termakan `isLoadingMore`); `Product.coverImageURL` `let`→`var` (Swift skip `let`-with-default saat decode); trigger prefetch 5 baris terakhir; `defer` reset `isLoadingMore`. Rincian spesifikasi: `doc/versions/v3.67.md`. |
 | v3.66 | 2026-10-06 | Frontend | **IMPLEMENTED: Bunuh Burst Paralel Tab Produk (40 Request → 2).** Bulk sequential + cover dari list; `xcodebuild` sukses. Rincian spesifikasi: `doc/versions/v3.66.md`. |
 | v3.65 | 2026-10-04 | Frontend | **IMPLEMENTED: Search by SKU di Picker Catat Penjualan + Tampil SKU.** Filter `ProductPickerSheet` tambah `productSku` (partial, case-insensitive, nama tetap jalan); header grup jadi `NAMA • SKU`; grup key by SKU; frontend-only tanpa backend. Rincian spesifikasi: `doc/versions/v3.65.md`. |

@@ -199,6 +199,7 @@ struct ProduksiBatchView: View {
         do {
             try await api.confirmBatch(id: batch.id)
             cache.invalidateProduksi()
+            QRProductCache.shared.invalidate() // v3.68-fix: stok/HPP berubah → cache scan basi
             // Auto-apply suggested price (40% margin) for every item that has HPP
             await withTaskGroup(of: Void.self) { group in
                 for item in batch.items {

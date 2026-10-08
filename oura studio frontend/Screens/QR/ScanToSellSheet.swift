@@ -309,6 +309,7 @@ struct ScanToSellSheet: View {
                 )]
             )
             _ = try await api.createSalesOrder(req)
+            QRProductCache.shared.invalidate() // v3.68-fix: stok berubah → cache basi
             didSucceed = true
         } catch let e as APIError {
             errorMsg = e.errorDescription

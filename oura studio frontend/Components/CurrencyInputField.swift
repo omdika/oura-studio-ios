@@ -60,5 +60,17 @@ struct CurrencyInputField: View {
         .onAppear {
             if let v = value, v > 0 { digits = String(Int(v)) }
         }
+        // v3.68-fix: sinkronkan tampilan bila binding berubah dari luar
+        // (mis. koreksi harga otomatis pasca-scan). Jangan ganggu saat
+        // pengguna sedang mengetik (fokus) agar digit tidak tertimpa.
+        .onChange(of: value) { newVal in
+            guard !isFocused else { return }
+            if let v = newVal, v > 0 {
+                let s = String(Int(v))
+                if s != digits { digits = s }
+            } else if !digits.isEmpty {
+                digits = ""
+            }
+        }
     }
 }
