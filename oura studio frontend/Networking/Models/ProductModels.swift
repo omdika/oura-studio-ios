@@ -314,6 +314,123 @@ struct ProductSizeDetail: Codable, Identifiable {
     }
 }
 
+// MARK: - v3.69 Slim scan DTOs
+
+/// Ringan untuk preload katalog + batch revalidation: tanpa HPP breakdown,
+/// margin, manual-HPP, dan images. Breakdown stok (produksi/manual) tetap
+/// dibawa agar total yang di-patch tidak bertentangan dengan rinciannya.
+struct ProductSizeSlim: Codable, Identifiable {
+    let id: UUID
+    let productSku: String
+    let productName: String
+    let sizeLabel: String
+    let fabricVariantName: String?
+    let currentStockQty: Int
+    let productionStockQty: Int
+    let manualStockQty: Int
+    let sellingPrice: Double?
+    let isArchived: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case productSku = "product_sku"
+        case productName = "product_name"
+        case sizeLabel = "size_label"
+        case fabricVariantName = "fabric_variant_name"
+        case currentStockQty = "current_stock_qty"
+        case productionStockQty = "production_stock_qty"
+        case manualStockQty = "manual_stock_qty"
+        case sellingPrice = "selling_price"
+        case isArchived = "is_archived"
+    }
+
+    init(detail d: ProductSizeDetail) {
+        id = d.id
+        productSku = d.productSku
+        productName = d.productName
+        sizeLabel = d.sizeLabel
+        fabricVariantName = d.fabricVariantName
+        currentStockQty = d.currentStockQty
+        productionStockQty = d.productionStockQty
+        manualStockQty = d.manualStockQty
+        sellingPrice = d.sellingPrice
+        isArchived = d.isArchived
+    }
+
+    var displayLabel: String {
+        guard let fabric = fabricVariantName else { return sizeLabel }
+        return "\(sizeLabel) · \(fabric)"
+    }
+}
+
+struct ScanResolveResponse: Codable {
+    let items: [ProductSizeSlim]
+    let missingIds: [UUID]
+
+    enum CodingKeys: String, CodingKey {
+        case items
+        case missingIds = "missing_ids"
+    }
+}
+
+extension ProductSizeDetail {
+    /// Terapkan field slim ke entri full cache. HPP/images/manual dipertahankan.
+    /// Margin dihitung ulang hanya bila harga berubah dan HPP efektif diketahui.
+    func patched(with s: ProductSizeSlim) -> ProductSizeDetail {
+        let priceChanged = (sellingPrice ?? -1) != (s.sellingPrice ?? -1)
+        var margin = marginPct
+        if priceChanged {
+            if let p = s.sellingPrice, p > 0,
+               let h = (latestHppBreakdown ?? manualHppBreakdown)?.total {
+                margin = (p - h) / p
+            } else {
+                margin = nil
+            }
+        }
+        return ProductSizeDetail(
+            id: s.id, productId: productId,
+            productSku: s.productSku, productName: s.productName,
+            sizeLabel: s.sizeLabel, fabricVariantName: s.fabricVariantName,
+            reorderMinQty: reorderMinQty, isArchived: s.isArchived,
+            currentStockQty: s.currentStockQty,
+            productionStockQty: s.productionStockQty,
+            manualStockQty: s.manualStockQty,
+            latestHppBreakdown: latestHppBreakdown,
+            sellingPrice: s.sellingPrice, marginPct: margin,
+            manualHppFabric: manualHppFabric, manualHppPooled: manualHppPooled,
+            manualHppHardware: manualHppHardware, manualHppLabor: manualHppLabor,
+            manualHppOverhead: manualHppOverhead, images: images
+        )
+    }
+
+    /// Salinan dengan harga jual lain (prefill harga embedded label `oura2:`).
+    func withSellingPrice(_ price: Double?) -> ProductSizeDetail {
+        var margin = marginPct
+        if (sellingPrice ?? -1) != (price ?? -1) {
+            if let p = price, p > 0,
+               let h = (latestHppBreakdown ?? manualHppBreakdown)?.total {
+                margin = (p - h) / p
+            } else {
+                margin = nil
+            }
+        }
+        return ProductSizeDetail(
+            id: id, productId: productId,
+            productSku: productSku, productName: productName,
+            sizeLabel: sizeLabel, fabricVariantName: fabricVariantName,
+            reorderMinQty: reorderMinQty, isArchived: isArchived,
+            currentStockQty: currentStockQty,
+            productionStockQty: productionStockQty,
+            manualStockQty: manualStockQty,
+            latestHppBreakdown: latestHppBreakdown,
+            sellingPrice: price, marginPct: margin,
+            manualHppFabric: manualHppFabric, manualHppPooled: manualHppPooled,
+            manualHppHardware: manualHppHardware, manualHppLabor: manualHppLabor,
+            manualHppOverhead: manualHppOverhead, images: images
+        )
+    }
+}
+
 struct PriceAdvisorRequest: Codable {
     let targetMarginPct: Double
     let marketplaceFeePct: Double?

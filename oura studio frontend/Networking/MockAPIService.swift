@@ -561,6 +561,29 @@ class MockAPIService {
         return found
     }
 
+    // v3.69: mock slim endpoints (backend sudah deploy di live).
+    func getSlimProductSizes() async throws -> [ProductSizeSlim] {
+        await delay()
+        return _productSizes.values.flatMap { $0 }
+            .filter { !$0.isArchived }
+            .map { ProductSizeSlim(detail: $0) }
+    }
+
+    func scanResolve(ids: [UUID]) async throws -> ScanResolveResponse {
+        await delay()
+        let all = _productSizes.values.flatMap { $0 }
+        var items: [ProductSizeSlim] = []
+        var missing: [UUID] = []
+        for id in ids {
+            if let f = all.first(where: { $0.id == id }) {
+                items.append(ProductSizeSlim(detail: f))
+            } else {
+                missing.append(id)
+            }
+        }
+        return ScanResolveResponse(items: items, missingIds: missing)
+    }
+
     func getStockLedger(from: Date, to: Date) async throws -> [StockAdjustmentLedgerEntry] {
         await delay()
         let cal = Calendar.current

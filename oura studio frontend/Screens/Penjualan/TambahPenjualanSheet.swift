@@ -544,7 +544,7 @@ struct TambahPenjualanSheet: View {
         // v3.68-fix: revalidasi stok + harga server sebelum POST (cache bisa basi).
         // Koreksi otomatis hanya untuk item yang TIDAK diedit manual; harga manual
         // kasir tidak pernah disentuh. Bila ada koreksi → minta tap Simpan ke-2.
-        let fresh = await QRProductCache.shared.revalidate(
+        let fresh = await QRProductCache.shared.revalidateSmart(
             ids: items.map { $0.sizeId }, api: api)
         if !fresh.isEmpty {
             var notes: [String] = []

@@ -561,6 +561,24 @@ class APIService: ObservableObject {
         return try await get(path: "/product-sizes/\(id.uuidString)")
     }
 
+    // MARK: - v3.69 Slim scan endpoints
+
+    func getSlimProductSizes() async throws -> [ProductSizeSlim] {
+        if useMock { return try await MockAPIService.shared.getSlimProductSizes() }
+        let res: PaginatedResponse<ProductSizeSlim> = try await get(path: "/product-sizes/slim?page=1&limit=500")
+        return res.data
+    }
+
+    /// Batch slim resolve. Backend lama (belum deploy v3.69) menjawab 404
+    /// (path tak dikenal) atau 422 (`scan-resolve` tertelan path `{size_id}` +
+    /// gagal validasi UUID) — caller (`revalidateSmart`) fallback ke N× full.
+    func scanResolve(ids: [UUID]) async throws -> ScanResolveResponse {
+        if useMock { return try await MockAPIService.shared.scanResolve(ids: ids) }
+        guard !ids.isEmpty else { return ScanResolveResponse(items: [], missingIds: []) }
+        let csv = ids.map { $0.uuidString }.joined(separator: ",")
+        return try await get(path: "/product-sizes/scan-resolve?ids=\(csv)")
+    }
+
     func getStockLedger(from: Date, to: Date) async throws -> [StockAdjustmentLedgerEntry] {
         if useMock { return try await MockAPIService.shared.getStockLedger(from: from, to: to) }
         

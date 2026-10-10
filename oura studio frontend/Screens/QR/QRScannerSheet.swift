@@ -628,18 +628,40 @@ struct QRScannerSheet: View {
     /// Jalur cepat sinkron untuk cache-hit — tidak menyentuh `.resolving`
     /// agar `isScanning` tetap true dan kamera jalan terus.
     private func deliverScanned(_ size: ProductSizeDetail, embeddedPrice: Double?) {
+        // v3.69: bila label v2 membawa harga tapi cache belum punya harga,
+        // pakai harga label sebagai prefill + tandai sampai terverifikasi.
+        let effective: ProductSizeDetail
+        let fromLabel: Bool
+        if let emb = embeddedPrice, emb > 0, (size.sellingPrice ?? 0) <= 0 {
+            effective = size.withSellingPrice(emb)
+            fromLabel = true
+        } else {
+            effective = size
+            fromLabel = false
+        }
         if mode == .sellOnly {
-            addToCart(size, priceOverride: embeddedPrice)
+            addToCart(effective, priceOverride: embeddedPrice)
+            if fromLabel { showEmbeddedNotice(for: effective) }
             triggerBackgroundRevalidate(id: size.id)
         } else if mode == .addToExistingSale {
             // Beep ditangani oleh TambahPenjualanSheet.handleScannedProduct
             // (beda nada success vs stok habis), jadi di sini tidak bunyi ganda.
-            onProductScanned?(size)
+            onProductScanned?(effective)
             dismiss()
         } else {
             ScanFeedback.success()
-            scanState = .resolved(size)
+            scanState = .resolved(effective)
+            if fromLabel { showEmbeddedNotice(for: effective) }
             triggerBackgroundRefreshSingle(id: size.id)
+        }
+    }
+
+    /// Badge "harga dari label" — dikoreksi/dihapus saat revalidasi selesai.
+    private func showEmbeddedNotice(for size: ProductSizeDetail) {
+        revalidationNotice = "Harga \(size.displayLabel) dari label, memverifikasi…"
+        Task {
+            try? await Task.sleep(nanoseconds: 2_500_000_000)
+            await MainActor.run { revalidationNotice = nil }
         }
     }
 
@@ -657,14 +679,21 @@ struct QRScannerSheet: View {
     }
 
     private func deliverScannedAfterMiss(_ size: ProductSizeDetail, embeddedPrice: Double?) {
+        // v3.69: prefill harga label bila server belum punya harga.
+        let effective: ProductSizeDetail
+        if let emb = embeddedPrice, emb > 0, (size.sellingPrice ?? 0) <= 0 {
+            effective = size.withSellingPrice(emb)
+        } else {
+            effective = size
+        }
         if mode == .sellOnly {
-            addToCart(size, priceOverride: embeddedPrice)
+            addToCart(effective, priceOverride: embeddedPrice)
         } else if mode == .addToExistingSale {
-            onProductScanned?(size)
+            onProductScanned?(effective)
             dismiss()
         } else {
             ScanFeedback.success()
-            scanState = .resolved(size)
+            scanState = .resolved(effective)
         }
     }
 
@@ -673,7 +702,7 @@ struct QRScannerSheet: View {
     private func triggerBackgroundRevalidate(id: UUID) {
         guard cache.shouldRevalidate(id) else { return }
         Task {
-            let fresh = await cache.revalidate(ids: [id], api: api)
+            let fresh = await cache.revalidateSmart(ids: [id], api: api)
             guard let d = fresh[id] else { return }
             await MainActor.run { applyFreshDetail(d) }
         }
@@ -683,7 +712,7 @@ struct QRScannerSheet: View {
     private func triggerBackgroundRefreshSingle(id: UUID) {
         guard cache.shouldRevalidate(id) else { return }
         Task {
-            let fresh = await cache.revalidate(ids: [id], api: api)
+            let fresh = await cache.revalidateSmart(ids: [id], api: api)
             guard let d = fresh[id] else { return }
             await MainActor.run {
                 if case .resolved(let cur) = scanState, cur.id == d.id {
@@ -963,7 +992,7 @@ private struct QRCartCheckoutSheet: View {
         // v3.68: revalidasi stok server best-effort sebelum POST (cache bisa basi).
         // Clamp qty yang melebihi stok server; minta konfirmasi ulang via tap kedua.
         isRefreshing = true
-        let fresh = await QRProductCache.shared.revalidate(
+        let fresh = await QRProductCache.shared.revalidateSmart(
             ids: cartItems.map { $0.size.id }, api: api)
         isRefreshing = false
         if !fresh.isEmpty {

@@ -36,7 +36,7 @@ struct PrintPreviewSheet: View {
             Form {
                 Section(header: Text("Preview Label (33x15mm)")) {
                     if let size = selectedSize {
-                        ThermalLabelPreviewCard(size: size, qrImage: makeQRImage(for: size.id))
+                        ThermalLabelPreviewCard(size: size, qrImage: makeQRImage(for: size))
                             .frame(maxWidth: .infinity, alignment: .center)
                             .padding(.vertical, 4)
                     } else {
@@ -144,10 +144,13 @@ struct PrintPreviewSheet: View {
         }
     }
 
-    private func makeQRImage(for sizeId: UUID) -> UIImage? {
+    private func makeQRImage(for size: ProductSizeDetail) -> UIImage? {
         let context = CIContext()
         let filter = CIFilter.qrCodeGenerator()
-        filter.message = Data("oura:\(sizeId.uuidString)".utf8)
+        // v3.69: payload label v2 (oura2 + harga) bila "Sertakan Harga" ON.
+        filter.message = Data(QRProductCache.qrPayload(
+            sizeId: size.id, sellingPrice: size.sellingPrice,
+            includePrice: labelIncludePrice).utf8)
         filter.correctionLevel = "M"
         guard let output = filter.outputImage else { return nil }
         let scaled = output.transformed(by: CGAffineTransform(scaleX: 10, y: 10))
@@ -168,7 +171,10 @@ struct PrintPreviewSheet: View {
 
         let priceForLabel: Double? = labelIncludePrice ? size.sellingPrice : nil
         tsplPrinterService.printLabel(
-            qrData: "oura:\(size.id.uuidString)",
+            // v3.69: payload label v2 (oura2 + harga) bila "Sertakan Harga" ON.
+            qrData: QRProductCache.qrPayload(
+                sizeId: size.id, sellingPrice: size.sellingPrice,
+                includePrice: labelIncludePrice),
             content: TSPLPrinterService.ThermalLabelContent(
                 sku: size.productSku,
                 productName: size.productName,

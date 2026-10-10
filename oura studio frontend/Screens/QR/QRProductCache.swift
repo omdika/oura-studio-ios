@@ -47,9 +47,9 @@ final class QRProductCache: ObservableObject {
 
     // MARK: - Preload
 
-    /// Muat seluruh katalog sekali (`GET /product-sizes?limit=500` via
-    /// `api.getAllProductSizes()`). Best-effort: gagal jaringan tidak melempar,
-    /// cache lama tetap dipakai. Skip jika masih fresh kecuali `force=true`.
+    /// Muat katalog. v3.69: coba slim dulu (payload ~10× lebih kecil); 404 =
+    /// backend lama → full; id yang belum dikenal → full fetch sekali.
+    /// Best-effort: gagal jaringan tidak melempar, cache lama tetap dipakai.
     func preload(api: APIService, force: Bool = false) async {
         if inFlight { return }
         if !force && isFresh { return }
@@ -57,8 +57,16 @@ final class QRProductCache: ObservableObject {
         isLoading = true
         defer { inFlight = false; isLoading = false }
         do {
+            if let slim = try? await api.getSlimProductSizes(), !slim.isEmpty {
+                let unknown = applySlimItems(slim)
+                if unknown.isEmpty && !byId.isEmpty {
+                    lastSyncAt = Date()
+                    return
+                }
+                // Ada id baru (produk baru pasca-cache) → lengkapi via full fetch.
+            }
             let all = try await api.getAllProductSizes()
-            for s in all { byId[s.id] = s }
+            upsertMany(all)
             lastSyncAt = Date()
         } catch {
             // Best-effort: pertahankan cache lama agar scan tetap instan offline.
@@ -114,6 +122,62 @@ final class QRProductCache: ObservableObject {
         return out
     }
 
+    /// Patch entri full dengan field slim (stok, harga, identitas, arsip).
+    /// HPP/images/manual dipertahankan. Mengembalikan id slim yang belum ada
+    /// di cache (butuh full fetch susulan). Id yang di-patch ditandai revalidated.
+    @discardableResult
+    func applySlimItems(_ slim: [ProductSizeSlim]) -> [UUID] {
+        var unknown: [UUID] = []
+        let now = Date()
+        for s in slim {
+            if let existing = byId[s.id] {
+                byId[s.id] = existing.patched(with: s)
+                lastRevalidateAt[s.id] = now
+            } else {
+                unknown.append(s.id)
+            }
+        }
+        return unknown
+    }
+
+    /// v3.69: revalidasi via batch slim (`scan-resolve`, di-chunk ≤50/chunk);
+    /// backend lama → fallback N× full (backend lama menjawab 404 bila path tak
+    /// dikenal, atau 422 karena `scan-resolve` tertelan path `{size_id}`);
+    /// error lain → [:] (panggil treat sebagai skip).
+    /// Id di `missing_ids` (dihapus server) dikeluarkan dari cache.
+    @discardableResult
+    func revalidateSmart(ids: [UUID], api: APIService) async -> [UUID: ProductSizeDetail] {
+        let unique = Array(Set(ids))
+        guard !unique.isEmpty else { return [:] }
+        do {
+            var slimItems: [ProductSizeSlim] = []
+            var idx = 0
+            while idx < unique.count {
+                let chunk = Array(unique[idx..<min(idx + 50, unique.count)])
+                let resp = try await api.scanResolve(ids: chunk)
+                for m in resp.missingIds { byId.removeValue(forKey: m) }
+                slimItems.append(contentsOf: resp.items)
+                idx += 50
+            }
+            let unknown = applySlimItems(slimItems)
+            if !unknown.isEmpty {
+                await revalidate(ids: unknown, api: api) // full untuk id baru
+            }
+            var out: [UUID: ProductSizeDetail] = [:]
+            for id in unique {
+                if let d = byId[id] { out[id] = d }
+            }
+            return out
+        } catch let e as APIError {
+            if case .serverError(let code, _) = e, code == 404 || code == 422 {
+                return await revalidate(ids: unique, api: api)
+            }
+            return [:]
+        } catch {
+            return [:]
+        }
+    }
+
     /// Refresh 1 id dari server + upsert ke cache. Titik tulis stok
     /// (stock-in, quick-adjust, dsb.) wajib memanggil ini agar scan
     /// berikutnya langsung melihat stok/harga terbaru tanpa tunggu TTL.
@@ -150,4 +214,16 @@ final class QRProductCache: ObservableObject {
     }
 
     func parseQR(_ raw: String) -> ParsedQR? { Self.parseQR(raw) }
+
+    // MARK: - v3.69 Label payload
+
+    /// Payload QR untuk label cetak. Bila `includePrice` ON (toggle "Sertakan
+    /// Harga") dan harga ada → `oura2:<uuid>:<rupiah>` (label v2: render instan
+    /// tanpa cache); selain itu `oura:<uuid>` (label lama, kompatibel mundur).
+    static func qrPayload(sizeId: UUID, sellingPrice: Double?, includePrice: Bool) -> String {
+        if includePrice, let p = sellingPrice, p > 0 {
+            return "oura2:\(sizeId.uuidString):\(Int(p))"
+        }
+        return "oura:\(sizeId.uuidString)"
+    }
 }
