@@ -13,6 +13,10 @@ struct BerandaView: View {
     @State private var showTambahPenjualan = false
     @State private var showScanJual = false
     @State private var showAllOut = false
+    // v3.71: tap stok habis → resolve GET /product-sizes/{id} → push ProdukSizeDetailView.
+    @State private var selectedStockDetail: ProductSizeDetail?
+    @State private var resolvingAlertId: UUID?
+    @State private var stockResolveError: String?
 
     /// v3.70: hanya stok HABIS (qty == 0), max 5 di dashboard.
     private var outOfStock: [LowStockAlert] {
@@ -82,7 +86,23 @@ struct BerandaView: View {
                 TambahPenjualanSheet(autoStartScan: true)
             }
             .sheet(isPresented: $showAllOut) {
-                StockOutAllSheet(alerts: outOfStock)
+                StockOutAllSheet(alerts: outOfStock) { alert in
+                    // v3.71: sheet dismiss sendiri; tunggu animasi selesai baru push.
+                    Task {
+                        try? await Task.sleep(nanoseconds: 300_000_000)
+                        await resolveStockAlert(alert)
+                    }
+                }
+            }
+            // v3.71: pola sama seperti scannedDetail di ProdukListView
+            // (isPresented binding — ProductSizeDetail bukan Hashable).
+            .navigationDestination(isPresented: Binding(
+                get: { selectedStockDetail != nil },
+                set: { if !$0 { selectedStockDetail = nil } }
+            )) {
+                if let detail = selectedStockDetail {
+                    ProdukSizeDetailView(productSize: detail)
+                }
             }
         }
         .task {
@@ -309,43 +329,92 @@ struct BerandaView: View {
                 .buttonStyle(.plain)
                 .accessibilityIdentifier("lihat-semua-habis")
             }
+
+            // v3.71: banner error resolve (404/network) — non-blocking, auto-clear saat reload sukses.
+            if let resolveErr = stockResolveError {
+                HStack(spacing: 8) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 12))
+                    Text(resolveErr)
+                        .font(.system(size: 12))
+                }
+                .foregroundStyle(OuraTheme.Colors.dangerText)
+                .padding(10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(OuraTheme.Colors.dangerBg)
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+            }
         }
     }
 
+    // v3.71: kartu tappable → resolve + push ProdukSizeDetailView.
     private func stockAlertCard(_ alert: LowStockAlert) -> some View {
         let isOut = alert.currentStockQty == 0
-        return HStack(spacing: 10) {
-            Image(systemName: "exclamationmark.circle.fill")
-                .font(.system(size: 14))
-                .foregroundStyle(isOut ? OuraTheme.Colors.dangerText : OuraTheme.Colors.warningText)
-            
-            VStack(alignment: .leading, spacing: 1) {
-                Text(alert.productName)
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(OuraTheme.Colors.textPrimary)
-                    .lineLimit(1)
-                Text("Ukuran \(alert.sizeLabel) · \(alert.currentStockQty) pcs tersisa")
-                    .font(.system(size: 9, weight: .medium))
-                    .foregroundStyle(isOut ? OuraTheme.Colors.dangerText : OuraTheme.Colors.textSecondary)
+        let isResolving = resolvingAlertId == alert.productSizeId
+        return Button {
+            Task { await resolveStockAlert(alert) }
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: "exclamationmark.circle.fill")
+                    .font(.system(size: 14))
+                    .foregroundStyle(isOut ? OuraTheme.Colors.dangerText : OuraTheme.Colors.warningText)
+
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(alert.productName)
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(OuraTheme.Colors.textPrimary)
+                        .lineLimit(1)
+                    Text("Ukuran \(alert.sizeLabel) · \(alert.currentStockQty) pcs tersisa")
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundStyle(isOut ? OuraTheme.Colors.dangerText : OuraTheme.Colors.textSecondary)
+                }
+
+                Spacer()
+
+                if isResolving {
+                    ProgressView()
+                        .scaleEffect(0.7)
+                        .tint(OuraTheme.Colors.dangerText)
+                } else {
+                    OuraTag(
+                        text: isOut ? "Habis" : "Menipis",
+                        color: isOut ? OuraTheme.Colors.dangerText : OuraTheme.Colors.warningText,
+                        bg:    isOut ? OuraTheme.Colors.dangerBg   : OuraTheme.Colors.warningBg
+                    )
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(OuraTheme.Colors.textTertiary)
+                }
             }
-            
-            Spacer()
-            
-            OuraTag(
-                text: isOut ? "Habis" : "Menipis",
-                color: isOut ? OuraTheme.Colors.dangerText : OuraTheme.Colors.warningText,
-                bg:    isOut ? OuraTheme.Colors.dangerBg   : OuraTheme.Colors.warningBg
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .frame(width: 260, height: 46) // Extended 50% horizontally (from 175 to 260)!
+            .background(OuraTheme.Colors.surfaceCard)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(OuraTheme.Colors.border, lineWidth: 0.75)
             )
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .frame(width: 260, height: 46) // Extended 50% horizontally (from 175 to 260)!
-        .background(OuraTheme.Colors.surfaceCard)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(OuraTheme.Colors.border, lineWidth: 0.75)
-        )
+        .buttonStyle(.plain)
+        .disabled(isResolving)
+        .accessibilityIdentifier("stok-habis-item-\(alert.productSizeId.uuidString)")
+        .accessibilityLabel("Buka detail \(alert.productName) ukuran \(alert.sizeLabel)")
+    }
+
+    // v3.71: resolve satu alert → push detail. Guard cegah double-tap / request ganda.
+    @MainActor
+    private func resolveStockAlert(_ alert: LowStockAlert) async {
+        guard resolvingAlertId == nil else { return }
+        resolvingAlertId = alert.productSizeId
+        stockResolveError = nil
+        defer { resolvingAlertId = nil }
+        do {
+            let detail = try await api.getProductSizeById(id: alert.productSizeId)
+            selectedStockDetail = detail
+        } catch {
+            stockResolveError = "Produk tidak ditemukan / sudah diarsip (\(alert.productName) · \(alert.sizeLabel))"
+        }
     }
 
     // MARK: - Quick actions (Simetris 2x2 Grid - Larger Robust Size)
@@ -529,6 +598,7 @@ struct BerandaView: View {
             dashboard = fresh
             DashboardCache.save(fresh)
             lastRefresh = Date()
+            stockResolveError = nil
         } catch {
             // Background gagal → pertahankan cache, jangan kosongkan layar.
             if dashboard == nil {
