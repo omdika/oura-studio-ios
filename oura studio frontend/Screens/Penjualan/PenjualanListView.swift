@@ -6,6 +6,8 @@ struct PenjualanListView: View {
 
     @State private var orders: [SalesOrder] = []
     @State private var isLoading = true
+    @State private var isRefreshing = false
+    @State private var errorMsg: String?
     @State private var showAdd = false
     @State private var editingOrder: SalesOrder? = nil
     @State private var orderToDelete: SalesOrder? = nil
@@ -19,11 +21,45 @@ struct PenjualanListView: View {
             VStack(spacing: 0) {
                 // Date Range Selector
                 DateRangeField(from: $fromDate, to: $toDate) {
-                    Task { await load() }
+                    Task { await load(silent: true) }
                 }
                 .padding(.horizontal, OuraTheme.Spacing.horizontal)
                 .padding(.top, 12)
                 .padding(.bottom, 4)
+
+                // v3.72: silent-reload indicator (ganti periode / background).
+                // Pull gesture sudah dicover spinner native .refreshable.
+                if isRefreshing {
+                    HStack(spacing: 6) {
+                        ProgressView()
+                            .scaleEffect(0.7)
+                        Text("Memuat...")
+                            .font(.system(size: 12))
+                            .foregroundStyle(OuraTheme.Colors.textTertiary)
+                    }
+                    .padding(.vertical, 4)
+                }
+
+                // v3.72: error non-blocking — data lama tetap tampil + retry.
+                if let err = errorMsg, !orders.isEmpty {
+                    HStack(spacing: 8) {
+                        Image(systemName: "wifi.exclamationmark")
+                            .font(.system(size: 13))
+                        Text(err)
+                            .font(.system(size: 12))
+                            .lineLimit(2)
+                        Spacer()
+                        Button("Coba Lagi") { Task { await load(silent: true) } }
+                            .font(.system(size: 12, weight: .semibold))
+                    }
+                    .foregroundStyle(OuraTheme.Colors.dangerText)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(OuraTheme.Colors.dangerBg)
+                    .cornerRadius(8)
+                    .padding(.horizontal, OuraTheme.Spacing.horizontal)
+                    .padding(.vertical, 4)
+                }
 
                 // Sales Summary Cards Header
                 if !orders.isEmpty {
@@ -35,24 +71,53 @@ struct PenjualanListView: View {
                 }
 
                 Group {
-                    if isLoading {
+                    if isLoading && orders.isEmpty && errorMsg == nil {
                         ProgressView()
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                     } else if orders.isEmpty {
-                        VStack(spacing: 12) {
-                            Image(systemName: "bag")
-                                .font(.system(size: 40))
-                                .foregroundStyle(OuraTheme.Colors.textTertiary)
-                            Text("Belum ada penjualan")
-                                .font(.system(size: 15, weight: .medium))
-                                .foregroundStyle(OuraTheme.Colors.textSecondary)
-                            Text("Tidak ada transaksi dalam periode ini, ketuk + untuk mencatat penjualan baru")
-                                .font(.system(size: 13))
-                                .foregroundStyle(OuraTheme.Colors.textTertiary)
-                                .multilineTextAlignment(.center)
-                                .padding(.horizontal, 32)
+                        // v3.72: ScrollView (bukan VStack statis) agar pull-to-refresh
+                        // selalu tersedia saat kosong/error — .refreshable butuh scroll-container.
+                        ScrollView {
+                            VStack(spacing: 12) {
+                                if let err = errorMsg {
+                                    Image(systemName: "wifi.exclamationmark")
+                                        .font(.system(size: 40))
+                                        .foregroundStyle(OuraTheme.Colors.dangerText)
+                                    Text("Gagal memuat penjualan")
+                                        .font(.system(size: 15, weight: .medium))
+                                        .foregroundStyle(OuraTheme.Colors.textSecondary)
+                                    Text(err)
+                                        .font(.system(size: 13))
+                                        .foregroundStyle(OuraTheme.Colors.textTertiary)
+                                        .multilineTextAlignment(.center)
+                                    Button("Coba Lagi") { Task { await load() } }
+                                        .font(.system(size: 14, weight: .semibold))
+                                        .foregroundStyle(.white)
+                                        .padding(.horizontal, 20)
+                                        .padding(.vertical, 10)
+                                        .background(OuraTheme.Colors.accent)
+                                        .clipShape(Capsule())
+                                        .padding(.top, 4)
+                                } else {
+                                    Image(systemName: "bag")
+                                        .font(.system(size: 40))
+                                        .foregroundStyle(OuraTheme.Colors.textTertiary)
+                                    Text("Belum ada penjualan")
+                                        .font(.system(size: 15, weight: .medium))
+                                        .foregroundStyle(OuraTheme.Colors.textSecondary)
+                                    Text("Tidak ada transaksi dalam periode ini, ketuk + untuk mencatat penjualan baru")
+                                        .font(.system(size: 13))
+                                        .foregroundStyle(OuraTheme.Colors.textTertiary)
+                                        .multilineTextAlignment(.center)
+                                }
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.top, 80)
+                            .padding(.horizontal, 32)
                         }
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .background(OuraTheme.Colors.background)
+                        .refreshable { await load(silent: true) }
                     } else {
                         List {
                             ForEach(groupedOrders, id: \.date) { group in
@@ -94,6 +159,7 @@ struct PenjualanListView: View {
                         .listStyle(.insetGrouped)
                         .scrollContentBackground(.hidden)
                         .background(OuraTheme.Colors.background)
+                        .refreshable { await load(silent: true) }
                     }
                 }
             }
@@ -112,9 +178,10 @@ struct PenjualanListView: View {
         }
         .background(OuraTheme.Colors.background)
         .navigationTitle("Penjualan")
-        .navigationBarTitleDisplayMode(.large)
+        // v3.72: .inline agar judul tidak menimpa pill periode (large-title collapse
+        // hanya didorong inner List sementara filter pinned di VStack).
+        .navigationBarTitleDisplayMode(.inline)
         .task { await load() }
-        .refreshable { await load() }
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button { showQRScanner = true } label: {
@@ -184,10 +251,27 @@ struct PenjualanListView: View {
         }.map { (date: $0.key, orders: $0.value) }
     }
 
-    private func load() async {
-        isLoading = true
-        orders = (try? await api.getSalesOrders(from: fromDate, to: toDate)) ?? []
-        isLoading = false
+    // v3.72: silent reload (pull/refresh) tidak memakai fullscreen spinner dan
+    // TIDAK menimpa orders dengan [] saat error — data lama tetap tampil.
+    private func load(silent: Bool = false) async {
+        if silent {
+            guard !isRefreshing else { return }
+            isRefreshing = true
+        } else if orders.isEmpty {
+            isLoading = true
+        }
+        defer {
+            isLoading = false
+            isRefreshing = false
+        }
+        do {
+            orders = try await api.getSalesOrders(from: fromDate, to: toDate)
+            errorMsg = nil
+        } catch let e as APIError {
+            errorMsg = e.errorDescription
+        } catch {
+            errorMsg = error.localizedDescription
+        }
     }
 
     private func deleteOrder(_ order: SalesOrder) async {
