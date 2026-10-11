@@ -6,11 +6,18 @@ struct BerandaView: View {
 
     @State private var dashboard: DashboardSummary?
     @State private var isLoading = true
+    @State private var isRefreshing = false
+    @State private var lastRefresh: Date?
     @State private var errorMsg: String?
     @State private var showTambahPembelian = false
     @State private var showTambahPenjualan = false
     @State private var showScanJual = false
-    @State private var alertDisplayCount = 4
+    @State private var showAllOut = false
+
+    /// v3.70: hanya stok HABIS (qty == 0), max 5 di dashboard.
+    private var outOfStock: [LowStockAlert] {
+        (dashboard?.lowStockAlerts ?? []).filter { $0.currentStockQty == 0 }
+    }
 
     private var greeting: String {
         let hour = Calendar.current.component(.hour, from: Date())
@@ -38,21 +45,31 @@ struct BerandaView: View {
                     
                     quickActionsSection
                     
-                    if isLoading {
+                    if isLoading && dashboard == nil {
                         stockAlertsSkeletonSection
-                    } else if let dash = dashboard, !dash.lowStockAlerts.isEmpty {
-                        stockAlertsSection(dash.lowStockAlerts)
+                    } else if !outOfStock.isEmpty {
+                        stockOutSection(outOfStock)
                     }
                     
                     // Modul Kasir Penjualan Kilat kini berada di dalam ScrollView,
                     // di urutan terbawah, sehingga sejajar 100% simetris secara horizontal!
                     salesCapsuleSection
+
+                    // v3.70: sentinel reload saat scroll mentok bawah (debounced di loadDashboard).
+                    Color.clear
+                        .frame(height: 1)
+                        .onAppear {
+                            guard let last = lastRefresh,
+                                  Date().timeIntervalSince(last) > 2,
+                                  !isRefreshing else { return }
+                            Task { await loadDashboard(isBackground: true) }
+                        }
                 }
                 .padding(.horizontal, OuraTheme.Spacing.horizontal)
                 .padding(.top, 8)
                 .padding(.bottom, 16)
             }
-            .refreshable { await loadDashboard() }
+            .refreshable { await loadDashboard(force: true) }
             .background(OuraTheme.Colors.background)
             .navigationBarHidden(true)
             .sheet(isPresented: $showTambahPembelian) {
@@ -64,12 +81,31 @@ struct BerandaView: View {
             .sheet(isPresented: $showScanJual) {
                 TambahPenjualanSheet(autoStartScan: true)
             }
+            .sheet(isPresented: $showAllOut) {
+                StockOutAllSheet(alerts: outOfStock)
+            }
         }
-        .task { await loadDashboard() }
+        .task {
+            // v3.70 cache-first: render instan, revalidasi background.
+            if let (cached, date) = DashboardCache.load() {
+                dashboard = cached
+                lastRefresh = date
+                isLoading = false
+                await loadDashboard(isBackground: true)
+            } else {
+                await loadDashboard(isBackground: false)
+            }
+        }
+        .onChange(of: appState.selectedTab) { tab in
+            // v3.70 auto-reload saat kembali ke Beranda jika stale > 60 detik.
+            if tab == 0, let last = lastRefresh, Date().timeIntervalSince(last) > 60 {
+                Task { await loadDashboard(isBackground: true) }
+            }
+        }
         .onChange(of: appState.dashboardNeedsRefresh) { needsRefresh in
             if needsRefresh {
                 appState.dashboardNeedsRefresh = false
-                Task { await loadDashboard() }
+                Task { await loadDashboard(force: true) }
             }
         }
     }
@@ -100,11 +136,18 @@ struct BerandaView: View {
                     .minimumScaleFactor(0.6)
             }
             Spacer()
-            Text(todayFormatted)
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(OuraTheme.Colors.textTertiary)
-                .multilineTextAlignment(.trailing)
-                .frame(maxWidth: 120)
+            VStack(alignment: .trailing, spacing: 2) {
+                Text(todayFormatted)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(OuraTheme.Colors.textTertiary)
+                    .multilineTextAlignment(.trailing)
+                    .frame(maxWidth: 120)
+                if let age = DashboardCache.ageLabel(since: lastRefresh, isRefreshing: isRefreshing) {
+                    Text(age)
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(isRefreshing ? OuraTheme.Colors.accent : OuraTheme.Colors.textTertiary)
+                }
+            }
         }
         .padding(.top, 8)
     }
@@ -122,7 +165,7 @@ struct BerandaView: View {
                     .foregroundStyle(.white.opacity(0.8))
                     .padding(.bottom, 6)
 
-                if isLoading {
+                if isLoading && dashboard == nil {
                     RoundedRectangle(cornerRadius: 6)
                         .fill(.white.opacity(0.25))
                         .frame(width: 180, height: 36)
@@ -176,7 +219,7 @@ struct BerandaView: View {
     private var stockAlertsSkeletonSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                OuraSectionHeader(title: "Peringatan Stok")
+                OuraSectionHeader(title: "Stok Habis")
                 Spacer()
                 RoundedRectangle(cornerRadius: 4)
                     .fill(OuraTheme.Colors.textSecondary.opacity(0.1))
@@ -226,24 +269,45 @@ struct BerandaView: View {
         )
     }
 
-    private func stockAlertsSection(_ alerts: [LowStockAlert]) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+    /// v3.70: hanya tampilkan stok HABIS, max 5 + tombol Lihat Semua.
+    private func stockOutSection(_ alerts: [LowStockAlert]) -> some View {
+        let visible = Array(alerts.prefix(5))
+        return VStack(alignment: .leading, spacing: 8) {
             HStack {
-                OuraSectionHeader(title: "Peringatan Stok")
+                OuraSectionHeader(title: "Stok Habis")
                 Spacer()
-                Text("\(alerts.count) item")
+                Text("\(alerts.count) habis")
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(OuraTheme.Colors.textTertiary)
             }
+            .accessibilityIdentifier("stok-habis-section")
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 10) {
-                    ForEach(alerts) { alert in
+                    ForEach(visible) { alert in
                         stockAlertCard(alert)
                     }
                 }
                 .padding(.vertical, 2)
                 .padding(.horizontal, 2)
+            }
+
+            if alerts.count > 5 {
+                Button { showAllOut = true } label: {
+                    Text("Lihat semua (\(alerts.count))")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(OuraTheme.Colors.accent)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(OuraTheme.Colors.surfaceCard)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10)
+                                .stroke(OuraTheme.Colors.border, lineWidth: 0.75)
+                        )
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("lihat-semua-habis")
             }
         }
     }
@@ -448,16 +512,30 @@ struct BerandaView: View {
         .padding(.bottom, 12)
     }
 
-    // MARK: - Data
+    // MARK: - Data (v3.70 cache-first + smart reload)
 
-    private func loadDashboard() async {
-        isLoading = true
+    private func loadDashboard(force: Bool = false, isBackground: Bool = false) async {
+        // Debounce: cegah burst paralel (sentinel onAppear + tab switch bisa bareng).
+        if isRefreshing { return }
+        if !force, let last = lastRefresh, !isBackground, Date().timeIntervalSince(last) < 2 { return }
+        if !isBackground, dashboard == nil {
+            isLoading = true
+        } else {
+            isRefreshing = true
+        }
         errorMsg = nil
         do {
-            dashboard = try await api.getDashboard()
+            let fresh = try await api.getDashboard()
+            dashboard = fresh
+            DashboardCache.save(fresh)
+            lastRefresh = Date()
         } catch {
-            errorMsg = error.localizedDescription
+            // Background gagal → pertahankan cache, jangan kosongkan layar.
+            if dashboard == nil {
+                errorMsg = error.localizedDescription
+            }
         }
         isLoading = false
+        isRefreshing = false
     }
 }
