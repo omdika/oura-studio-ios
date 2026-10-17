@@ -173,6 +173,7 @@ struct PenjualanListView: View {
                     .clipShape(Circle())
                     .shadow(color: .black.opacity(0.18), radius: 8, x: 0, y: 4)
             }
+            .accessibilityIdentifier("fab-tambah-penjualan")
             .padding(.trailing, 20)
             .padding(.bottom, 24)
         }

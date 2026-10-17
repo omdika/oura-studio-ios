@@ -23,10 +23,13 @@
 1.  **Launch App:** App opens to main screen.
 2.  **Assert Header:** Element `"OURA STUDIOS"` must be visible.
 3.  **Assert Main Headings:** Section headings `"Aksi Cepat"` and `"Pendapatan Hari Ini"` must be visible.
-4.  **Tap Action:** Tap on `"Beli Bahan"` to open the sheet.
-5.  **Assert Transition:** Modal sheet `"Tambah Pembelian"` is visible.
-6.  **Tap Action:** Tap `"Batal"` to dismiss the sheet.
-7.  **Assert Dismissal:** Back on main dashboard, and `"OURA STUDIOS"` is visible again.
+4.  **Screenshot:** Capture `TC003_01_Dashboard` (dashboard awal).
+5.  **Tap Action:** Tap on `"Beli Bahan"` to open the sheet.
+6.  **Assert Transition:** Modal sheet `"Tambah Pembelian"` is visible.
+7.  **Screenshot:** Capture `TC003_02_SheetTambahPembelian` (sheet terbuka).
+8.  **Tap Action:** Tap `"Batal"` to dismiss the sheet.
+9.  **Assert Dismissal:** Back on main dashboard, and `"OURA STUDIOS"` is visible again.
+10. **Screenshot:** Capture `TC003_03_KembaliDashboard` (akhir, bukti kembali).
 
 ## 4. Maestro Test Definition (`test/scripts/TC003_DashboardFlow.yaml`)
 
@@ -44,17 +47,26 @@ appId: handika.oura-studio-frontend
 - assertVisible: "Aksi Cepat"
 - assertVisible: "Pendapatan Hari Ini"
 
-# 4. Tap on "Beli Bahan" to open the sheet
+# 4. Screenshot dashboard awal
+- takeScreenshot: TC003_01_Dashboard
+
+# 5. Tap on "Beli Bahan" to open the sheet
 - tapOn: "Beli Bahan"
 
-# 5. Assert that the sheet has successfully opened
+# 6. Assert that the sheet has successfully opened
 - assertVisible: "Tambah Pembelian"
 
-# 6. Tap "Batal" to dismiss the sheet
+# 7. Screenshot sheet terbuka
+- takeScreenshot: TC003_02_SheetTambahPembelian
+
+# 8. Tap "Batal" to dismiss the sheet
 - tapOn: "Batal"
 
-# 7. Assert that we are back on the main dashboard
+# 9. Assert that we are back on the main dashboard
 - assertVisible: "OURA STUDIOS"
+
+# 10. Screenshot akhir (bukti kembali ke dashboard)
+- takeScreenshot: TC003_03_KembaliDashboard
 ```
 
 ## 5. Execution & Allure Report Generation
@@ -66,15 +78,18 @@ Follow these command-line instructions to run the test and export the results to
 # Create results directory
 mkdir -p test-results/maestro
 
-# Run the test flow and export XML
-maestro test --format junit --output test-results/maestro/report.xml test/scripts/TC003_DashboardFlow.yaml
+# Run the test flow and export XML (+ screenshots ke test-results/maestro-artifacts/*/takeScreenshot/)
+maestro test --format junit --output test-results/maestro/report.xml --test-output-dir test-results/maestro-artifacts test/scripts/TC003_DashboardFlow.yaml
 ```
 
-### Step 2: Generate and Open Allure Report
+### Step 2: Lampirkan Screenshot + Generate Allure Report
 ```bash
-# Generate the interactive HTML Allure report
-allure generate test-results/maestro -o test-results/allure-report --clean
+# Ubah JUnit + PNG terbaru menjadi Allure result ber-attachment
+python3 test/attach_screenshots.py
 
-# View the report in your browser
+# Generate dari allure-results (bukan dari XML langsung agar screenshot inline)
+allure generate test-results/allure-results -o test-results/allure-report --clean
+
+# View the report in your browser (screenshot tampil di tab Attachments tiap test)
 allure open test-results/allure-report
 ```

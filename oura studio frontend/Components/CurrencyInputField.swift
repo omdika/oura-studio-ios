@@ -47,6 +47,8 @@ struct CurrencyInputField: View {
                 .font(.system(size: 15))
                 .foregroundStyle(OuraTheme.Colors.textPrimary)
                 .focused($isFocused)
+                .accessibilityLabel(label)
+                .accessibilityIdentifier("input-\(label)")
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 11)

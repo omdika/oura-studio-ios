@@ -1,0 +1,43 @@
+# Doc: doc/test/TC-004-tambah-produk-manual.md
+# TC-004 — Tambah produk manual + pastikan Free Size (write path, with cleanup note).
+appId: handika.oura-studio-frontend
+---
+# 1. Launch ke dashboard
+- launchApp
+
+# 2. Masuk tab Produk
+- tapOn: "Produk"
+- assertVisible: "Produk"
+
+# 3. Screenshot list awal
+- takeScreenshot: TC004_01_Produk
+
+# 4. Tap FAB tambah produk
+- tapOn:
+    id: "fab-tambah-produk"
+
+# 5. Assert sheet terbuka
+- assertVisible: "BUAT PRODUK BARU"
+- takeScreenshot: TC004_02_Sheet
+
+# 6. Isi nama produk (SKU auto = 3 char/word — kata terakhir HARUS unik di 3 char pertama)
+- tapOn: "contoh: Scrunchie Mini"
+- inputText: "Boneka Zeta TC004"
+
+# 7. Scroll ke Ukuran — scroll menutup keyboard (JANGAN hideKeyboard: tap-nya nyasar ke Lanjutkan ke Resep).
+# Free Size default terpilih — assert saja, JANGAN tap chip (tap nyasar ke step resep).
+- scroll
+- assertVisible: "Free Size"
+- takeScreenshot: TC004_03_SizeFreeSize
+
+# 8. Simpan tanpa resep (WRITE — cleanup manual setelah run)
+- tapOn: "Simpan Tanpa Resep"
+- assertVisible: "Boneka Zeta TC004"
+
+# 9. Screenshot detail (bukti tersimpan + Belum ada harga)
+- takeScreenshot: TC004_04_Tersimpan
+
+# 10. Tutup detail kembali ke list
+- tapOn: "Tutup"
+- assertVisible: "Produk"
+- takeScreenshot: TC004_05_KembaliList

@@ -1,0 +1,64 @@
+# Doc: doc/test/TC-005-tambah-stok-satu.md
+# TC-005 — Stok Free Size 0 → 1 pcs (write path).
+appId: handika.oura-studio-frontend
+---
+# 1. Launch + tab Produk
+- launchApp
+- tapOn: "Produk"
+- assertVisible: "Produk"
+- takeScreenshot: TC005_01_Produk
+
+# 2. Cari produk (matikan filter tanggal bila hasil kosong)
+- tapOn: "Cari produk atau bahan..."
+- inputText: "Zeta"
+- scroll
+- assertVisible: "Boneka Zeta TC004"
+- takeScreenshot: TC005_02_HasilCari
+
+# 3. Buka detail produk
+- tapOn: "Boneka Zeta TC004"
+- assertVisible: "UKURAN"
+- takeScreenshot: TC005_03_Detail
+
+# 4. Buka grup size Free Size, lalu baris varian.
+# NOTE: tap id/text tidak memicu NavigationLink di grup ini (tap ter-register tapi tak push, verified 3 run)
+# → point-tap di teks baris varian (bounds hierarchy x36-101 y329-347 → titik 70,338).
+- tapOn: "Free Size"
+- assertVisible: "VARIAN KAIN"
+- takeScreenshot: TC005_04_GrupVarian
+- tapOn:
+    point: 70,338
+# Retry bila push belum terjadi
+- runFlow:
+    when:
+      visible: "VARIAN KAIN"
+    commands:
+      - tapOn:
+          point: 70,338
+- assertVisible: "Stok"
+- assertVisible: "0 pcs"
+- takeScreenshot: TC005_05_SizeNol
+
+# 5. Buka sheet tambah stok
+- tapOn: "Tambah"
+- assertVisible: "Tambah Stok Manual"
+- takeScreenshot: TC005_06_Sheet
+
+# 6. Isi jumlah via id stabil
+- tapOn:
+    id: "input-Jumlah"
+- inputText: "1"
+- scroll
+- takeScreenshot: TC005_07_Terisi
+
+# 7. Simpan (WRITE)
+- tapOn: "Simpan"
+- assertVisible: "1 pcs"
+- takeScreenshot: TC005_08_StokSatu
+
+# 8. Kembali ke list
+- back
+- back
+- back
+- assertVisible: "Produk"
+- takeScreenshot: TC005_09_KembaliList
