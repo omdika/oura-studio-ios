@@ -314,6 +314,27 @@ struct ProductSizeDetail: Codable, Identifiable {
     }
 }
 
+// MARK: - v3.73 Scrunchie default selling price
+
+/// Hardcoded default selling price per size label for newly created scrunchie variants.
+/// Used to pre-fill the "Harga Jual" field on edit when the variant has no price yet,
+/// so the owner does not retype the same nominal for every scrunchie size.
+enum ScrunchieDefaultPrice {
+    static let bySize: [String: Double] = [
+        "XS": 10000,
+        "S": 12000,
+        "M": 15000,
+        "L": 18000,
+        "XL": 23000,
+        "XXL": 30000
+    ]
+
+    /// Case-insensitive, whitespace-trimmed lookup. Returns nil for unknown/custom sizes.
+    static func defaultPrice(forSizeLabel label: String) -> Double? {
+        bySize[label.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()]
+    }
+}
+
 // MARK: - v3.69 Slim scan DTOs
 
 /// Ringan untuk preload katalog + batch revalidation: tanpa HPP breakdown,

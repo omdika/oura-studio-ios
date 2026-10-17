@@ -1027,7 +1027,7 @@ struct ProdukSizeGroupView: View {
             } else {
                 VStack(spacing: 0) {
                     ForEach(Array(displayedVariants.enumerated()), id: \.element.id) { idx, variant in
-                        NavigationLink(destination: ProdukSizeDetailView(productSize: variant)) {
+                        NavigationLink(destination: ProdukSizeDetailView(productSize: variant, productCategory: product.category)) {
                             ProdukVariantRow(size: variant)
                         }
                         .buttonStyle(.plain)
@@ -1472,6 +1472,9 @@ struct ProdukSizeDetailView: View {
     let productSize: ProductSizeDetail
 
     @State private var size: ProductSizeDetail
+    /// v3.73: product category, passed from ProdukDetailView when known. When nil, resolved
+    /// by SKU in `.task` so the scrunchie default price also applies from QR/Beranda/Reports.
+    @State private var resolvedCategory: String?
     @State private var isEditing = false
     @State private var editSellingPrice: Double?
     @State private var editReorderMin: Double?
@@ -1507,9 +1510,10 @@ struct ProdukSizeDetailView: View {
     @State private var specHppBreakdown: HPPBreakdown? = nil
     @State private var hppFromSpec: Bool = false
 
-    init(productSize: ProductSizeDetail) {
+    init(productSize: ProductSizeDetail, productCategory: String? = nil) {
         self.productSize = productSize
         self._size = State(initialValue: productSize)
+        self._resolvedCategory = State(initialValue: productCategory)
     }
 
     private var editHppTotal: Double {
@@ -1611,7 +1615,8 @@ struct ProdukSizeDetailView: View {
         .task {
             async let a: Void = refreshSize()
             async let b: Void = loadSpec()
-            _ = await (a, b)
+            async let c: Void = resolveCategoryIfNeeded()
+            _ = await (a, b, c)
         }
         .sheet(isPresented: $showAddStock, onDismiss: { Task { await refreshSize() } }) {
             TambahStokSheet(size: size)
@@ -2226,8 +2231,24 @@ struct ProdukSizeDetailView: View {
 
     // MARK: - Edit lifecycle
 
+    // v3.73: resolve product category by SKU when the caller did not pass it
+    // (QR/Beranda/Reports entry points). Enables the scrunchie default price everywhere.
+    private func resolveCategoryIfNeeded() async {
+        guard resolvedCategory == nil else { return }
+        resolvedCategory = await api.resolveProductCategory(sku: size.productSku)
+    }
+
     private func startEdit() {
-        editSellingPrice = size.sellingPrice
+        let currentPrice = size.sellingPrice ?? 0
+        // v3.73: pre-fill scrunchie default price only when the variant has no price yet,
+        // so the owner never retypes the same nominal and the value is ready to save.
+        if currentPrice == 0,
+           resolvedCategory?.lowercased() == "scrunchie",
+           let def = ScrunchieDefaultPrice.defaultPrice(forSizeLabel: size.sizeLabel) {
+            editSellingPrice = def
+        } else {
+            editSellingPrice = size.sellingPrice
+        }
         editReorderMin = size.reorderMinQty
         editStockQty = Double(size.currentStockQty)
         hppFromSpec = false

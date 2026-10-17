@@ -251,6 +251,7 @@ This document details the screens, user flows, and interactive components of the
    **Level 3 — ProdukSizeDetailView (one specific size + fabric):**
    - Title: displayLabel ("M · Satin Pelangi").
    - Info card: stock, fabric name, selling price, margin, reorder min. Edit button to change selling price and reorder min.
+   - **v3.73:** saat Edit, bila harga jual masih kosong/0 dan kategori produk `scrunchie`, field "Harga Jual" auto-terisi default per size (XS 10.000 · S 12.000 · M 15.000 · L 18.000 · XL 23.000 · XXL 30.000) dan siap disimpan. Lihat `doc/versions/v3.73.md`.
    - HPP breakdown card (fabric / pooled / hardware / labor / overhead / total) — only shown after at least one confirmed production batch exists for this variant.
    - Price Advisor: collapsible section. Inputs: target margin %, marketplace fee %. Output: suggested price, actual margin, markup. "Gunakan Harga Ini" applies the suggested price via PATCH.
 

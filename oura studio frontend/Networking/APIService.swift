@@ -622,6 +622,14 @@ class APIService: ObservableObject {
         return products.first(where: { $0.sku == sku })?.name ?? sku
     }
 
+    // v3.73: looks up a product's category from /products by SKU. Falls back to nil if not found.
+    // Used to gate scrunchie default selling price in ProdukSizeDetailView when the caller
+    // (QR/Beranda/Reports entry points) can't pass the category directly.
+    func resolveProductCategory(sku: String) async -> String? {
+        let products: [Product] = (try? await getProducts()) ?? []
+        return products.first(where: { $0.sku == sku })?.category
+    }
+
     // MARK: - Pattern Specs
 
     func getPatternSpecs(productId: UUID? = nil, size: String? = nil, fabricMaterialId: UUID? = nil) async throws -> [PatternSpec] {
