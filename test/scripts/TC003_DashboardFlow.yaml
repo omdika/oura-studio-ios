@@ -1,0 +1,32 @@
+# Doc: doc/test/TC-003-dashboard-maestro-allure.md
+# TC-003 — Dashboard Flow: verifikasi layout Beranda + sheet Tambah Pembelian (read-only, tanpa ubah data/layout).
+appId: handika.oura-studio-frontend
+---
+# 1. Launch ke dashboard
+- launchApp
+
+# 2. Assert header + section utama
+- assertVisible: "OURA STUDIOS"
+- assertVisible: "Aksi Cepat"
+- assertVisible: "Pendapatan Hari Ini"
+
+# 3. Screenshot dashboard awal
+- takeScreenshot: TC003_01_Dashboard
+
+# 4. Buka sheet Beli Bahan
+- tapOn: "Beli Bahan"
+
+# 5. Assert sheet terbuka
+- assertVisible: "Tambah Pembelian"
+
+# 6. Screenshot sheet terbuka
+- takeScreenshot: TC003_02_SheetTambahPembelian
+
+# 7. Dismiss tanpa simpan (aman, tidak menulis data)
+- tapOn: "Batal"
+
+# 8. Assert kembali ke dashboard
+- assertVisible: "OURA STUDIOS"
+
+# 9. Screenshot akhir (bukti kembali ke dashboard)
+- takeScreenshot: TC003_03_KembaliDashboard

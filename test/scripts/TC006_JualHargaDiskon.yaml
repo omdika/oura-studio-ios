@@ -1,0 +1,46 @@
+# Doc: doc/test/TC-006-jual-harga-diskon.md
+# TC-006 — Jual 1pcs harga 1000 diskon 1000, total Rp0 (write path).
+appId: handika.oura-studio-frontend
+---
+# 1. Launch + tab Penjualan
+- launchApp
+- tapOn: "Penjualan"
+- assertVisible: "Penjualan"
+- takeScreenshot: TC006_01_Penjualan
+
+# 2. Buka sheet catat penjualan
+- tapOn:
+    id: "fab-tambah-penjualan"
+- assertVisible: "Catat Penjualan"
+- assertVisible: "Belum ada produk ditambahkan."
+- takeScreenshot: TC006_02_SheetKosong
+
+# 3. Buka picker + saring + pilih size (baris berlabel size, bukan nama produk)
+- tapOn: "Tambah Produk"
+- assertVisible: "Pilih Produk"
+- tapOn: "Cari produk / SKU..."
+- inputText: "Zeta"
+- scroll
+- takeScreenshot: TC006_03_Picker
+- tapOn: "Free Size"
+- assertVisible: "Harga Satuan"
+- takeScreenshot: TC006_04_ItemDitambah
+
+# 4. Isi harga satuan 1000 via id stabil
+- tapOn:
+    id: "input-Harga Satuan"
+- inputText: "1000"
+- scroll
+- takeScreenshot: TC006_05_Harga
+
+# 5. Isi diskon 1000 via id stabil
+- tapOn:
+    id: "input-Diskon"
+- inputText: "1000"
+- scroll
+- takeScreenshot: TC006_06_Diskon
+
+# 6. Simpan order (WRITE — total Rp0)
+- tapOn: "Simpan"
+- assertVisible: "Penjualan"
+- takeScreenshot: TC006_07_Tersimpan

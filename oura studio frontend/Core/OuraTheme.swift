@@ -154,6 +154,7 @@ struct OuraFAB: View {
                 .clipShape(RoundedRectangle(cornerRadius: 16))
                 .shadow(color: OuraTheme.Colors.accent.opacity(0.35), radius: 8, x: 0, y: 4)
         }
+        .accessibilityIdentifier("fab-tambah-produk")
     }
 }
 

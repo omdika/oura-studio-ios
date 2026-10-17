@@ -1036,6 +1036,7 @@ struct ProdukSizeGroupView: View {
                             ProdukVariantRow(size: variant)
                         }
                         .buttonStyle(.plain)
+                        .accessibilityIdentifier("varian-row-\(variant.fabricVariantName ?? variant.sizeLabel)")
                         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                             Button(role: .destructive) {
                                 Task { await archiveVariant(variant) }

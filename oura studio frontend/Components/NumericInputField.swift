@@ -22,6 +22,7 @@ struct NumericInputField: View {
                     .foregroundStyle(OuraTheme.Colors.textPrimary)
                     .focused($isFocused)
                     .accessibilityLabel(label)
+                    .accessibilityIdentifier("input-\(label)")
                     .onChange(of: text) { new in
                         let normalized = new.replacingOccurrences(of: ",", with: ".")
                         let filtered = normalized.filter { $0.isNumber || $0 == "." }
