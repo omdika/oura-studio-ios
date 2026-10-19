@@ -157,6 +157,26 @@ struct OuraFAB: View {
     }
 }
 
+// FAB varian menu: visual sama dengan OuraFAB, tapi label dibungkus Menu
+// untuk menampilkan beberapa aksi (dipakai tab Produk: produk baru vs stok dari resep).
+struct OuraFABMenu<Content: View>: View {
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        Menu {
+            content
+        } label: {
+            Image(systemName: "plus")
+                .font(.system(size: 16, weight: .bold))
+                .foregroundStyle(.white)
+                .frame(width: 52, height: 52)
+                .background(OuraTheme.Colors.accentGradient)
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+                .shadow(color: OuraTheme.Colors.accent.opacity(0.35), radius: 8, x: 0, y: 4)
+        }
+    }
+}
+
 // MARK: - OuraPrimaryButton
 
 struct OuraPrimaryButton: View {

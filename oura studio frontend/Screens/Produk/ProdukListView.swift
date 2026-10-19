@@ -19,6 +19,7 @@ struct ProdukListView: View {
 
     @State private var searchText: String = ""
     @State private var showAddProduct = false
+    @State private var showResepStockPicker = false
     @State private var showQRScanner = false
     @State private var showQRGenerator = false
     @State private var showShopeeBulkUpload = false
@@ -157,7 +158,14 @@ struct ProdukListView: View {
             }
             .background(OuraTheme.Colors.background)
 
-            OuraFAB { showAddProduct = true }
+            OuraFABMenu {
+                Button { showAddProduct = true } label: {
+                    Label("Buat Produk Baru", systemImage: "plus")
+                }
+                Button { showResepStockPicker = true } label: {
+                    Label("Tambah Stok dari Resep", systemImage: "shippingbox")
+                }
+            }
                 .padding(.trailing, OuraTheme.Spacing.horizontal)
                 .padding(.bottom, 20)
         }
@@ -208,7 +216,11 @@ struct ProdukListView: View {
                 .environmentObject(api)
         }
         .sheet(isPresented: $showAddProduct, onDismiss: { requestReload() }) {
-            TambahProdukLengkapSheet(onCreatedWithoutRecipe: { newlyCreatedProduct = $0 })
+            TambahProdukBaruSheet(onCreatedWithoutRecipe: { newlyCreatedProduct = $0 })
+        }
+        .sheet(isPresented: $showResepStockPicker) {
+            ResepStockPickerSheet()
+                .environmentObject(api)
         }
         .sheet(item: $newlyCreatedProduct, onDismiss: { requestReload() }) { product in
             NavigationStack {
