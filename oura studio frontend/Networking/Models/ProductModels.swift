@@ -342,6 +342,7 @@ enum ScrunchieDefaultPrice {
 /// dibawa agar total yang di-patch tidak bertentangan dengan rinciannya.
 struct ProductSizeSlim: Codable, Identifiable {
     let id: UUID
+    let productId: UUID?  // v3.75
     let productSku: String
     let productName: String
     let sizeLabel: String
@@ -354,6 +355,7 @@ struct ProductSizeSlim: Codable, Identifiable {
 
     enum CodingKeys: String, CodingKey {
         case id
+        case productId = "product_id"
         case productSku = "product_sku"
         case productName = "product_name"
         case sizeLabel = "size_label"
@@ -367,6 +369,7 @@ struct ProductSizeSlim: Codable, Identifiable {
 
     init(detail d: ProductSizeDetail) {
         id = d.id
+        productId = d.productId
         productSku = d.productSku
         productName = d.productName
         sizeLabel = d.sizeLabel
@@ -395,6 +398,30 @@ struct ScanResolveResponse: Codable {
 }
 
 extension ProductSizeDetail {
+    // v3.75: init dari slim + productId
+    init(slim: ProductSizeSlim, productId: UUID) {
+        self.id = slim.id
+        self.productId = productId
+        self.productSku = slim.productSku
+        self.productName = slim.productName
+        self.sizeLabel = slim.sizeLabel
+        self.fabricVariantName = slim.fabricVariantName
+        self.reorderMinQty = nil
+        self.isArchived = slim.isArchived
+        self.currentStockQty = slim.currentStockQty
+        self.productionStockQty = slim.productionStockQty
+        self.manualStockQty = slim.manualStockQty
+        self.latestHppBreakdown = nil
+        self.sellingPrice = slim.sellingPrice
+        self.marginPct = nil
+        self.manualHppFabric = nil
+        self.manualHppPooled = nil
+        self.manualHppHardware = nil
+        self.manualHppLabor = nil
+        self.manualHppOverhead = nil
+        self.images = nil
+    }
+
     /// Terapkan field slim ke entri full cache. HPP/images/manual dipertahankan.
     /// Margin dihitung ulang hanya bila harga berubah dan HPP efektif diketahui.
     func patched(with s: ProductSizeSlim) -> ProductSizeDetail {
@@ -409,7 +436,7 @@ extension ProductSizeDetail {
             }
         }
         return ProductSizeDetail(
-            id: s.id, productId: productId,
+            id: s.id, productId: s.productId ?? productId,
             productSku: s.productSku, productName: s.productName,
             sizeLabel: s.sizeLabel, fabricVariantName: s.fabricVariantName,
             reorderMinQty: reorderMinQty, isArchived: s.isArchived,

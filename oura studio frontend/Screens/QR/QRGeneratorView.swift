@@ -14,12 +14,17 @@ struct QRGeneratorView: View {
     @State private var qtyPerSize: [UUID: Int] = [:]
     @State private var isLoading = true
     @State private var searchText = ""
+    @State private var errorBanner: String? = nil
+    @State private var loadTask: Task<Void, Never>? = nil
 
     @AppStorage("labelIncludePrice") private var labelIncludePrice: Bool = false
     @State private var isFilterActive = false
     @State private var filterFrom = Date()
     @State private var filterTo = Date()
     @State private var additionsByVariant: [UUID: Int] = [:]
+
+    private static let qrCIContext = CIContext()
+    private static var qrImageCache: [String: UIImage] = [:]
 
     init(initialIsFilterActive: Bool = false,
          initialFilterFrom: Date = Date(),
@@ -98,13 +103,31 @@ struct QRGeneratorView: View {
             ZStack {
                 OuraTheme.Colors.background.ignoresSafeArea()
 
-                if isLoading {
-                    ProgressView()
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if products.isEmpty {
-                    emptyView
-                } else {
-                    productList
+                VStack(spacing: 0) {
+                    if let err = errorBanner {
+                        HStack {
+                            Text(err)
+                                .font(.system(size: 12))
+                                .foregroundStyle(OuraTheme.Colors.textSecondary)
+                            Spacer()
+                            Button("Coba lagi") {
+                                Task { await loadData(force: true) }
+                            }
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(OuraTheme.Colors.accent)
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .background(OuraTheme.Colors.warningBg)
+                    }
+                    if isLoading && products.isEmpty {
+                        ProgressView()
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else if products.isEmpty {
+                        emptyView
+                    } else {
+                        productList
+                    }
                 }
             }
             .navigationTitle("Generator QR")
@@ -136,9 +159,23 @@ struct QRGeneratorView: View {
             }
         }
         .onChange(of: isFilterActive) { _ in
-            Task { await loadData() }
+            loadTask?.cancel()
+            loadTask = Task { await loadLedger() }
+        }
+        .onChange(of: filterFrom) { _ in
+            if isFilterActive {
+                loadTask?.cancel()
+                loadTask = Task { await loadLedger() }
+            }
+        }
+        .onChange(of: filterTo) { _ in
+            if isFilterActive {
+                loadTask?.cancel()
+                loadTask = Task { await loadLedger() }
+            }
         }
         .task { await loadData() }
+        .onDisappear { loadTask?.cancel() }
     }
 
     // MARK: - Product list
@@ -516,17 +553,22 @@ struct QRGeneratorView: View {
 
                 let x = margin + CGFloat(col) * (qrSize + colSpacing)
 
-                let ciCtx = CIContext()
-                let filter = CIFilter.qrCodeGenerator()
-                // v3.69: payload label v2 (oura2 + harga) bila "Sertakan Harga" ON.
-                filter.message = Data(QRProductCache.qrPayload(
+                let payload = QRProductCache.qrPayload(
                     sizeId: sizeId, sellingPrice: size.sellingPrice,
-                    includePrice: includePrice).utf8)
-                filter.correctionLevel = "M"
-                if let output = filter.outputImage {
-                    let scaled = output.transformed(by: CGAffineTransform(scaleX: 12, y: 12))
-                    if let cgImg = ciCtx.createCGImage(scaled, from: scaled.extent) {
-                        UIImage(cgImage: cgImg).draw(in: CGRect(x: x, y: currentY, width: qrSize, height: qrSize))
+                    includePrice: includePrice)
+                if let cached = QRGeneratorView.qrImageCache[payload] {
+                    cached.draw(in: CGRect(x: x, y: currentY, width: qrSize, height: qrSize))
+                } else {
+                    let filter = CIFilter.qrCodeGenerator()
+                    filter.message = Data(payload.utf8)
+                    filter.correctionLevel = "M"
+                    if let output = filter.outputImage {
+                        let scaled = output.transformed(by: CGAffineTransform(scaleX: 12, y: 12))
+                        if let cgImg = QRGeneratorView.qrCIContext.createCGImage(scaled, from: scaled.extent) {
+                            let img = UIImage(cgImage: cgImg)
+                            QRGeneratorView.qrImageCache[payload] = img
+                            img.draw(in: CGRect(x: x, y: currentY, width: qrSize, height: qrSize))
+                        }
                     }
                 }
 
@@ -587,31 +629,116 @@ struct QRGeneratorView: View {
 
     // MARK: - Load data
 
-    private func loadData() async {
-        isLoading = true
-        defer { isLoading = false }
-
-        let prods = (try? await api.getProducts()) ?? []
-        products = prods.filter { !$0.isArchived }
-
-        let allSizes = (try? await api.getAllProductSizes()) ?? []
-        let activeSizes = allSizes.filter { !$0.isArchived }
-        sizesByProduct = Dictionary(grouping: activeSizes, by: { $0.productId })
-        
+    private func loadLedger() async {
+        guard isFilterActive else { return }
         var ledgerAdditions: [UUID: Int] = [:]
-        if isFilterActive {
-            do {
-                let entries = try await api.getStockLedger(from: filterFrom, to: filterTo)
-                // Group all entries by size, sum all changes (positive and negative) to get the net addition,
-                // and keep only those sizes that had a net positive stock increase in this period.
-                ledgerAdditions = Dictionary(grouping: entries, by: { $0.productSizeId })
-                    .mapValues { entries in entries.reduce(0) { $0 + $1.changeQty } }
-                    .filter { $0.value > 0 }
-            } catch {
-                print("⚠️ [v3.44] Gagal memuat stock ledger dari backend: \(error)")
+        do {
+            let entries = try await api.getStockLedger(from: filterFrom, to: filterTo)
+            ledgerAdditions = Dictionary(grouping: entries, by: { $0.productSizeId })
+                .mapValues { entries in entries.reduce(0) { $0 + $1.changeQty } }
+                .filter { $0.value > 0 }
+            additionsByVariant = ledgerAdditions
+            errorBanner = nil
+        } catch {
+            if products.isEmpty {
+                errorBanner = "Gagal memuat data filter"
+            } else {
+                // keep old data
+                errorBanner = "Gagal memperbarui filter"
             }
         }
-        additionsByVariant = ledgerAdditions
+    }
+
+    private func loadData(force: Bool = false) async {
+        loadTask?.cancel()
+        var startFromSnapshot = false
+        if !force {
+            if let snap = QRCatalogStore.shared.snapshot {
+                if QRCatalogStore.shared.isValid() || !snap.products.isEmpty {
+                    startFromSnapshot = true
+                }
+            }
+        }
+        if startFromSnapshot, let snap = QRCatalogStore.shared.snapshot {
+            await MainActor.run {
+                self.products = snap.products.filter { !$0.isArchived }
+                self.sizesByProduct = snap.sizesByProduct
+                self.isLoading = self.products.isEmpty
+            }
+        } else if products.isEmpty {
+            isLoading = true
+        } else {
+            isLoading = false
+        }
+        defer { if products.isEmpty { isLoading = false } }
+        errorBanner = nil
+
+        // try slim first
+        do {
+            let slim = try await api.getSlimProductSizes()
+            let prodsAll = try? await api.getProducts()
+            var prods = prodsAll ?? QRCatalogStore.shared.snapshot?.products ?? []
+            prods = prods.filter { !$0.isArchived }
+            var grouped: [UUID: [ProductSizeDetail]] = [:]
+            for s in slim {
+                if s.isArchived { continue }
+                let pid = s.productId ?? prods.first(where: { $0.sku == s.productSku })?.id
+                if let pid {
+                    let detail = ProductSizeDetail(slim: s, productId: pid)
+                    grouped[pid, default: []].append(detail)
+                } else {
+                    // fallback group by trying to find
+                }
+            }
+            // if some missing productId and grouping failed, try to build map
+            if grouped.isEmpty {
+                // fallback full
+                let allSizes = (try? await api.getAllProductSizes()) ?? []
+                let activeSizes = allSizes.filter { !$0.isArchived }
+                grouped = Dictionary(grouping: activeSizes, by: { $0.productId })
+                prods = (try? await api.getProducts())?.filter { !$0.isArchived } ?? prods
+            }
+            // prune selection
+            let allIds = Set(grouped.values.flatMap { $0 }.map { $0.id })
+            selectedSizeIds = selectedSizeIds.intersection(allIds)
+            for k in qtyPerSize.keys where !allIds.contains(k) { qtyPerSize.removeValue(forKey: k) }
+
+            products = prods.isEmpty ? Array(Set(grouped.keys)).compactMap { pid in prods.first(where: { $0.id == pid }) } : prods
+            // ensure products cover grouped
+            if products.count != grouped.keys.count {
+                let existing = Set(products.map { $0.id })
+                let missing = grouped.keys.filter { !existing.contains($0) }
+                if let more = prodsAll {
+                    for m in missing {
+                        if let p = more.first(where: { $0.id == m }) { products.append(p) }
+                    }
+                }
+            }
+            sizesByProduct = grouped
+            QRCatalogStore.shared.store(products: products, sizesByProduct: grouped)
+            isLoading = false
+        } catch {
+            // fallback full
+            let prods = (try? await api.getProducts()) ?? QRCatalogStore.shared.snapshot?.products ?? []
+            products = prods.filter { !$0.isArchived }
+            let allSizes = (try? await api.getAllProductSizes()) ?? []
+            let activeSizes = allSizes.filter { !$0.isArchived }
+            sizesByProduct = Dictionary(grouping: activeSizes, by: { $0.productId })
+            let allIds = Set(activeSizes.map { $0.id })
+            selectedSizeIds = selectedSizeIds.intersection(allIds)
+            for k in qtyPerSize.keys where !allIds.contains(k) { qtyPerSize.removeValue(forKey: k) }
+            QRCatalogStore.shared.store(products: products, sizesByProduct: sizesByProduct)
+            if products.isEmpty && sizesByProduct.isEmpty {
+                errorBanner = "Gagal memuat katalog QR"
+            } else {
+                errorBanner = "Gagal memperbarui katalog"
+            }
+            isLoading = false
+        }
+
+        if isFilterActive {
+            await loadLedger()
+        }
     }
 }
 

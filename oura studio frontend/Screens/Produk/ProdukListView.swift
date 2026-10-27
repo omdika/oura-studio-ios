@@ -647,6 +647,8 @@ struct ProdukListView: View {
             if Task.isCancelled { return }
             if !allProds.isEmpty { products = allProds }
             if !allSz.isEmpty { allSizes = allSz }
+            // v3.75: warm QR catalog
+            QRCatalogStore.shared.store(products: products, sizesByProduct: Dictionary(grouping: allSizes.filter { !$0.isArchived }, by: { $0.productId }))
             totalPages = 1
             hasMorePages = false
             return
@@ -680,6 +682,8 @@ struct ProdukListView: View {
             let wanted = Set(resP.data.map(\.id))
             allSizes = pageSizes.filter { wanted.contains($0.productId) }
         }
+        // v3.75: warm QR catalog
+        QRCatalogStore.shared.store(products: products, sizesByProduct: Dictionary(grouping: allSizes.filter { !$0.isArchived }, by: { $0.productId }))
 
         additionsByVariant = [:]
     }

@@ -95,6 +95,13 @@ class APIService: ObservableObject {
 
     // MARK: - Core HTTP helpers
 
+    init() {
+        let config = URLSessionConfiguration.default
+        config.urlCache = URLCache(memoryCapacity: 8 * 1024 * 1024, diskCapacity: 50 * 1024 * 1024, diskPath: "oura_api_cache")
+        config.requestCachePolicy = .useProtocolCachePolicy
+        self.session = URLSession(configuration: config)
+    }
+
     private func buildRequest(_ method: String, path: String, bodyData: Data? = nil) throws -> URLRequest {
         guard let url = URL(string: baseURL + path) else { throw APIError.invalidURL }
         var req = URLRequest(url: url)
@@ -565,8 +572,33 @@ class APIService: ObservableObject {
 
     func getSlimProductSizes() async throws -> [ProductSizeSlim] {
         if useMock { return try await MockAPIService.shared.getSlimProductSizes() }
-        let res: PaginatedResponse<ProductSizeSlim> = try await get(path: "/product-sizes/slim?page=1&limit=500")
-        return res.data
+        var all: [ProductSizeSlim] = []
+        var page = 1
+        while page <= 10 {
+            do {
+                let res: PaginatedResponse<ProductSizeSlim> = try await get(path: "/product-sizes/slim?page=\(page)&limit=500&with_total=false")
+                all.append(contentsOf: res.data)
+                if res.nextPage == nil { break }
+                page += 1
+            } catch {
+                // fallback kompatibilitas backend lama
+                let res: PaginatedResponse<ProductSizeSlim> = try await get(path: "/product-sizes/slim?page=\(page)&limit=500")
+                all.append(contentsOf: res.data)
+                if res.nextPage == nil { break }
+                page += 1
+            }
+        }
+        if all.isEmpty {
+            // terakhir fallback ke full jika slim tidak tersedia
+            do {
+                let res: PaginatedResponse<ProductSizeSlim> = try await get(path: "/product-sizes/slim?page=1&limit=500")
+                all = res.data
+            } catch {
+                let full: PaginatedResponse<ProductSizeDetail> = try await get(path: "/product-sizes?page=1&limit=500")
+                return full.data.map { ProductSizeSlim(detail: $0) }
+            }
+        }
+        return all
     }
 
     /// Batch slim resolve. Backend lama (belum deploy v3.69) menjawab 404
