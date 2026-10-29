@@ -705,7 +705,7 @@ struct ProdukDetailView: View {
             } else {
                 VStack(spacing: 0) {
                     ForEach(Array(sizeGroups.enumerated()), id: \.element.id) { idx, group in
-                        NavigationLink(destination: ProdukSizeGroupView(product: product, sizeLabel: group.sizeLabel)) {
+                        NavigationLink(destination: ProdukSizeGroupView(product: product, sizeLabel: group.sizeLabel, onProductChanged: onProductChanged)) {
                             SizeGroupRow(group: group)
                         }
                         .buttonStyle(.plain)
@@ -916,6 +916,7 @@ struct ProdukSizeGroupView: View {
 
     let product: Product
     let sizeLabel: String
+    var onProductChanged: (() -> Void)? = nil
 
     @State private var variants: [ProductSizeDetail] = []
     @State private var isLoading = true
@@ -1031,7 +1032,7 @@ struct ProdukSizeGroupView: View {
             } else {
                 VStack(spacing: 0) {
                     ForEach(Array(displayedVariants.enumerated()), id: \.element.id) { idx, variant in
-                        NavigationLink(destination: ProdukSizeDetailView(productSize: variant, productCategory: product.category)) {
+                        NavigationLink(destination: ProdukSizeDetailView(productSize: variant, productCategory: product.category, onProductChanged: onProductChanged)) {
                             ProdukVariantRow(size: variant)
                         }
                         .buttonStyle(.plain)
@@ -1066,6 +1067,7 @@ struct ProdukSizeGroupView: View {
         do {
             try await api.archiveProductSize(sku: product.sku, sizeId: v.id)
             variants.removeAll { $0.id == v.id }
+            onProductChanged?()
         } catch let e as APIError { errorMsg = e.errorDescription }
         catch { errorMsg = error.localizedDescription }
     }
@@ -1474,6 +1476,7 @@ struct ProdukSizeDetailView: View {
     @AppStorage("eventPriceAdjustmentAmount") private var eventAdjustmentAmount: Double = 0.0
 
     let productSize: ProductSizeDetail
+    var onProductChanged: (() -> Void)? = nil
 
     @State private var size: ProductSizeDetail
     /// v3.73: product category, passed from ProdukDetailView when known. When nil, resolved
@@ -1514,10 +1517,11 @@ struct ProdukSizeDetailView: View {
     @State private var specHppBreakdown: HPPBreakdown? = nil
     @State private var hppFromSpec: Bool = false
 
-    init(productSize: ProductSizeDetail, productCategory: String? = nil) {
+    init(productSize: ProductSizeDetail, productCategory: String? = nil, onProductChanged: (() -> Void)? = nil) {
         self.productSize = productSize
         self._size = State(initialValue: productSize)
         self._resolvedCategory = State(initialValue: productCategory)
+        self.onProductChanged = onProductChanged
     }
 
     private var editHppTotal: Double {
@@ -2311,6 +2315,7 @@ struct ProdukSizeDetailView: View {
             editStockQty = nil
             isSaving = false
             successMsg = "Perubahan berhasil disimpan"
+            onProductChanged?()
             withAnimation { isEditing = false }
             // Hilangkan banner sukses otomatis setelah 2.5 detik tanpa menahan spinner
             Task {

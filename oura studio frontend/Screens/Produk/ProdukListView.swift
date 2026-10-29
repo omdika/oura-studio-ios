@@ -946,7 +946,7 @@ private struct ProductGroupRow: View {
                         let groupAdditions = group.variants.reduce(0) { $0 + (additionsByVariant[$1.id] ?? 0) }
                         
                         // Each size label row → ProdukSizeGroupView (fabric variants)
-                        NavigationLink(destination: ProdukSizeGroupView(product: product, sizeLabel: group.sizeLabel)) {
+                        NavigationLink(destination: ProdukSizeGroupView(product: product, sizeLabel: group.sizeLabel, onProductChanged: onProductChanged)) {
                             HStack(spacing: 10) {
                                 HStack(spacing: 6) {
                                     Rectangle()
