@@ -157,6 +157,9 @@ struct ProdukListView: View {
                 )
             }
             .background(OuraTheme.Colors.background)
+            .onChange(of: searchText) { _ in
+                requestReload(force: true)
+            }
 
             OuraFABMenu {
                 Button { showAddProduct = true } label: {
@@ -183,7 +186,6 @@ struct ProdukListView: View {
                 await loadFirstPage(force: true)
             }
         }
-        .refreshable { await loadFirstPage(force: true) }
         .toolbar {
             // Split across leading/trailing (not grouped together on one side) so the two very
             // similar-looking QR icons (qrcode.viewfinder vs qrcode) read as two distinct actions
@@ -565,6 +567,7 @@ struct ProdukListView: View {
             .padding(.top, 12)
             .padding(.bottom, 100)
         }
+        .refreshable { await loadFirstPage(force: true) }
         .scrollDismissesKeyboard(.immediately)
         .background(OuraTheme.Colors.background)
         .simultaneousGesture(
@@ -651,6 +654,23 @@ struct ProdukListView: View {
             QRCatalogStore.shared.store(products: products, sizesByProduct: Dictionary(grouping: allSizes.filter { !$0.isArchived }, by: { $0.productId }))
             totalPages = 1
             hasMorePages = false
+            return
+        }
+
+        // v3.77: saat search aktif dan bukan filter tanggal, muat SEMUA halaman
+        // agar pencarian nama/SKU/ukuran/bahan menemukan produk di luar halaman 1.
+        // Filtering dilakukan client-side oleh `filtered` computed property.
+        if !searchText.isEmpty && !isFilterActive {
+            let allProds = await fetchAllProducts()
+            let allSz = await fetchAllSizesBulk()
+            if Task.isCancelled { return }
+            if !allProds.isEmpty { products = allProds }
+            if !allSz.isEmpty { allSizes = allSz }
+            // v3.75: warm QR catalog
+            QRCatalogStore.shared.store(products: products, sizesByProduct: Dictionary(grouping: allSizes.filter { !$0.isArchived }, by: { $0.productId }))
+            totalPages = 1
+            hasMorePages = false
+            additionsByVariant = [:]
             return
         }
 
