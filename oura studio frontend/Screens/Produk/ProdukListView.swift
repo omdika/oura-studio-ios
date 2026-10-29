@@ -128,34 +128,38 @@ struct ProdukListView: View {
 
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
-            VStack(spacing: 0) {
-                searchHeaderField
-                    .padding(.horizontal, OuraTheme.Spacing.horizontal)
-                    .padding(.top, 10)
-                    .padding(.bottom, 6)
-                    .animation(.easeInOut(duration: 0.2), value: isSearchFocused)
-                
-                Divider().overlay(OuraTheme.Colors.separator)
+            ScrollView {
+                VStack(spacing: 0) {
+                    searchHeaderField
+                        .padding(.horizontal, OuraTheme.Spacing.horizontal)
+                        .padding(.top, 10)
+                        .padding(.bottom, 6)
+                        .animation(.easeInOut(duration: 0.2), value: isSearchFocused)
+                    
+                    Divider().overlay(OuraTheme.Colors.separator)
 
-                Group {
-                    // Soft reload: cache tetap tampil saat kembali dari detail.
-                    // Full-screen spinner hanya saat list masih kosong (buka pertama).
-                    if isLoading && products.isEmpty {
-                        ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
-                    } else if products.filter({ !$0.isArchived }).isEmpty && !isRefreshing {
-                        emptyView
-                    } else {
-                        productList
+                    Group {
+                        // Soft reload: cache tetap tampil saat kembali dari detail.
+                        // Full-screen spinner hanya saat list masih kosong (buka pertama).
+                        if isLoading && products.isEmpty {
+                            ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+                        } else if products.filter({ !$0.isArchived }).isEmpty && !isRefreshing {
+                            emptyView
+                        } else {
+                            productList
+                        }
                     }
+                    // Tap di luar search field (list area, empty area) untuk hide keyboard
+                    .contentShape(Rectangle())
+                    .simultaneousGesture(
+                        TapGesture().onEnded {
+                            if isSearchFocused { isSearchFocused = false }
+                        }
+                    )
                 }
-                // Tap di luar search field (list area, empty area) untuk hide keyboard
-                .contentShape(Rectangle())
-                .simultaneousGesture(
-                    TapGesture().onEnded {
-                        if isSearchFocused { isSearchFocused = false }
-                    }
-                )
             }
+            .refreshable { await loadFirstPage(force: true) }
+            .scrollDismissesKeyboard(.immediately)
             .background(OuraTheme.Colors.background)
             .onChange(of: searchText) { _ in
                 requestReload(force: true)
@@ -486,8 +490,7 @@ struct ProdukListView: View {
     }
 
     private var productList: some View {
-        ScrollView {
-            VStack(spacing: 12) {
+        VStack(spacing: 12) {
                 // Indikator refresh non-blocking saat soft reload background.
                 if isRefreshing {
                     HStack(spacing: 8) {
@@ -566,15 +569,6 @@ struct ProdukListView: View {
             .padding(.horizontal, OuraTheme.Spacing.horizontal)
             .padding(.top, 12)
             .padding(.bottom, 100)
-        }
-        .refreshable { await loadFirstPage(force: true) }
-        .scrollDismissesKeyboard(.immediately)
-        .background(OuraTheme.Colors.background)
-        .simultaneousGesture(
-            TapGesture().onEnded {
-                if isSearchFocused { isSearchFocused = false }
-            }
-        )
     }
 
     private var emptyView: some View {
