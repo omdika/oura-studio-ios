@@ -161,6 +161,10 @@ struct ProdukDetailView: View {
             async let b: Void = loadGallery()
             _ = await (a, b)
         }
+        .refreshable {
+            await loadSizes()
+            await loadGallery()
+        }
         .sheet(isPresented: $showAddSize, onDismiss: { Task { await loadSizes() } }) {
             AddSizeSheet(productSku: product.sku, existingSizes: sizes, productName: (currentProduct ?? product).name)
         }
@@ -1587,7 +1591,7 @@ struct ProdukSizeDetailView: View {
             ToolbarItem(placement: .primaryAction) {
                 Button {
                     if isEditing { Task { await saveEdits() } }
-                    else { startEdit() }
+                    else { Task { await startEdit() } }
                 } label: {
                     if isSaving {
                         HStack(spacing: 6) {
@@ -2238,8 +2242,17 @@ struct ProdukSizeDetailView: View {
         resolvedCategory = await api.resolveProductCategory(sku: size.productSku)
     }
 
-    private func startEdit() {
+    private func startEdit() async {
         let currentPrice = size.sellingPrice ?? 0
+        // Kategori harus diketahui sebelum mengevaluasi gate default scrunchie.
+        // Di pintu masuk QR/Beranda/Laporan kategori di-resolve asinkron via
+        // resolveProductCategory(sku:) (getProducts). Menunggu di sini mencegah
+        // race condition: bila user cepat mengetik "Edit" sebelum kategori selesai
+        // di-resolve, resolvedCategory masih nil, gate gagal, dan field Harga Jual
+        // tinggal menampilkan placeholder "Rp 0" alih-alih harga default.
+        if resolvedCategory == nil {
+            resolvedCategory = await api.resolveProductCategory(sku: size.productSku)
+        }
         // v3.73: pre-fill scrunchie default price only when the variant has no price yet,
         // so the owner never retypes the same nominal and the value is ready to save.
         if currentPrice == 0,
