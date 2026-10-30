@@ -192,6 +192,11 @@ struct TambahPenjualanSheet: View {
             .listSectionSeparator(.hidden)
         }
         .scrollContentBackground(.hidden)
+        // Klik di luar field (area kosong form) menutup keyboard numerik,
+        // karena numberPad tidak memiliki tombol "Done" bawaan.
+        .onTapGesture {
+            UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+        }
         .background(OuraTheme.Colors.background)
         .task { await loadSizes() }
         .sheet(isPresented: $showProductPicker) {
@@ -339,6 +344,9 @@ struct TambahPenjualanSheet: View {
                 }
                 Spacer()
                 Button {
+                    // Tutup keyboard dulu agar TextField harga/diskon yang sedang
+                    // difokus tidak crash saat item ini dihapus dari daftar.
+                    UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
                     items.removeAll { $0.id == item.wrappedValue.id }
                 } label: {
                     Image(systemName: "xmark.circle.fill")
