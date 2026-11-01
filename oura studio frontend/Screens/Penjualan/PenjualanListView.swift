@@ -529,7 +529,7 @@ private struct EditPenjualanSheet: View {
                     .listRowBackground(OuraTheme.Colors.surfaceCard)
                 } header: { OuraSectionHeader(title: "Detail") }
 
-                if isEditable {
+                if isEditable && !order.isPaid {
                     Section {
                         TextField("Nama pelanggan (opsional)", text: $customerName)
                             .listRowBackground(OuraTheme.Colors.surfaceCard)
@@ -540,6 +540,19 @@ private struct EditPenjualanSheet: View {
                         }
                         .tint(OuraTheme.Colors.accent)
                         .listRowBackground(OuraTheme.Colors.surfaceCard)
+                    } header: { OuraSectionHeader(title: "Info Penjualan") }
+                } else if order.isPaid {
+                    Section {
+                        LabeledContent("Pembayaran", value: order.paymentMethod?.uppercased() ?? "-")
+                            .listRowBackground(OuraTheme.Colors.surfaceCard)
+                        if let customerName = order.customerName, !customerName.isEmpty {
+                            LabeledContent("Nama pelanggan", value: customerName)
+                                .listRowBackground(OuraTheme.Colors.surfaceCard)
+                        }
+                        Text("Metode pembayaran dan nama pelanggan tidak dapat diubah setelah transaksi lunas.")
+                            .font(.caption)
+                            .foregroundStyle(OuraTheme.Colors.textTertiary)
+                            .listRowBackground(OuraTheme.Colors.surfaceCard)
                     } header: { OuraSectionHeader(title: "Info Penjualan") }
                 }
 
@@ -656,7 +669,7 @@ private struct EditPenjualanSheet: View {
                     Button("Tutup") { dismiss() }
                         .foregroundStyle(OuraTheme.Colors.accent)
                 }
-                if isEditable {
+                if isEditable && !order.isPaid {
                     ToolbarItem(placement: .confirmationAction) {
                         Button("Simpan") { Task { await save() } }
                             .foregroundStyle(isSaving ? OuraTheme.Colors.textDisabled : OuraTheme.Colors.accent)
