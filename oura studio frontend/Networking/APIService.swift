@@ -345,9 +345,20 @@ class APIService: ObservableObject {
         return try await patch(path: "/products/\(sku)", body: PatchProductRequest(name: name, category: category))
     }
 
-    func downloadShopeeBulkUploadExcel() async throws -> URL {
-        if useMock { return try await MockAPIService.shared.downloadShopeeBulkUploadExcel() }
-        guard let url = URL(string: baseURL + "/products/shopee-bulk-upload") else {
+    func downloadShopeeBulkUploadExcel(productIds: [UUID]? = nil) async throws -> URL {
+        if useMock { return try await MockAPIService.shared.downloadShopeeBulkUploadExcel(productIds: productIds) }
+        guard var components = URLComponents(string: baseURL + "/products/shopee-bulk-upload") else {
+            throw APIError.invalidURL
+        }
+        
+        // v3.79: sertakan daftar ID produk terpilih sebagai query parameter (opsional).
+        if let productIds, !productIds.isEmpty {
+            components.queryItems = [
+                URLQueryItem(name: "product_ids", value: productIds.map { $0.uuidString }.joined(separator: ","))
+            ]
+        }
+        
+        guard let url = components.url else {
             throw APIError.invalidURL
         }
         

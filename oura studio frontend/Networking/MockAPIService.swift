@@ -619,7 +619,7 @@ class MockAPIService {
         return updated
     }
 
-    func downloadShopeeBulkUploadExcel() async throws -> URL {
+    func downloadShopeeBulkUploadExcel(productIds: [UUID]? = nil) async throws -> URL {
         await delay()
         
         let fileManager = FileManager.default
