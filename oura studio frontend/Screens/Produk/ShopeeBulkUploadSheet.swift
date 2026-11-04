@@ -16,6 +16,9 @@ struct ShopeeBulkUploadSheet: View {
     @State private var exportMode: ExportMode = .all
     @State private var selectedProductIds: Set<UUID> = []
     
+    // v3.80: search produk (client-only, muncul hanya di mode selection)
+    @State private var searchText: String = ""
+    
     enum ExportMode: String, CaseIterable, Identifiable {
         case all = "all"
         case selection = "selection"
@@ -39,6 +42,17 @@ struct ShopeeBulkUploadSheet: View {
     // v3.79: semua produk non-archived untuk daftar pilihan
     var allNonArchivedProducts: [Product] {
         products.filter { !$0.isArchived }
+    }
+    
+    // v3.80: produk yang cocok search (name atau SKU, case-insensitive).
+    // Selection (selectedProductIds) tidak terpengaruh oleh filter ini.
+    var filteredProductsForSelection: [Product] {
+        guard !searchText.isEmpty else { return allNonArchivedProducts }
+        let q = searchText.lowercased()
+        return allNonArchivedProducts.filter {
+            $0.name.localizedCaseInsensitiveContains(q) ||
+            $0.sku.localizedCaseInsensitiveContains(q)
+        }
     }
     
     var body: some View {
@@ -139,14 +153,16 @@ struct ShopeeBulkUploadSheet: View {
                                 
                                 // Tombol Pilih Semua / Kosongkan + ringkasan
                                 HStack {
+                                    let visibleCount = filteredProductsForSelection.count
                                     Button(
-                                        selectedProductIds.count == allNonArchivedProducts.count && !allNonArchivedProducts.isEmpty
+                                        selectedProductIds.filter({ filteredProductsForSelection.map(\.id).contains($0) }).count == visibleCount && visibleCount > 0
                                             ? "Kosongkan Semua" : "Pilih Semua"
                                     ) {
-                                        if selectedProductIds.count == allNonArchivedProducts.count && !allNonArchivedProducts.isEmpty {
-                                            selectedProductIds.removeAll()
+                                        let visibleIds = Set(filteredProductsForSelection.map(\.id))
+                                        if selectedProductIds.filter({ visibleIds.contains($0) }).count == visibleCount && visibleCount > 0 {
+                                            selectedProductIds.subtract(visibleIds)
                                         } else {
-                                            selectedProductIds = Set(allNonArchivedProducts.map(\.id))
+                                            selectedProductIds.formUnion(visibleIds)
                                         }
                                     }
                                     .font(.system(size: 13))
@@ -160,6 +176,33 @@ struct ShopeeBulkUploadSheet: View {
                                 }
                                 .padding(.horizontal, OuraTheme.Spacing.horizontal)
                                 
+                                // v3.80: Search produk by name atau SKU (client-side).
+                                HStack(spacing: 8) {
+                                    Image(systemName: "magnifyingglass")
+                                        .font(.system(size: 14))
+                                        .foregroundStyle(OuraTheme.Colors.textTertiary)
+                                    TextField("Cari nama atau SKU...", text: $searchText)
+                                        .font(.system(size: 14))
+                                        .foregroundStyle(OuraTheme.Colors.textPrimary)
+                                    if !searchText.isEmpty {
+                                        Button { searchText = "" } label: {
+                                            Image(systemName: "xmark.circle.fill")
+                                                .font(.system(size: 14))
+                                                .foregroundStyle(OuraTheme.Colors.textTertiary)
+                                        }
+                                        .buttonStyle(.plain)
+                                    }
+                                }
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 9)
+                                .background(OuraTheme.Colors.surfaceCard)
+                                .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.medium))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: OuraTheme.Radius.medium)
+                                        .stroke(OuraTheme.Colors.border, lineWidth: 0.75)
+                                )
+                                .padding(.horizontal, OuraTheme.Spacing.horizontal)
+                                
                                 if isLoading {
                                     HStack {
                                         Spacer()
@@ -170,15 +213,17 @@ struct ShopeeBulkUploadSheet: View {
                                     .padding(.vertical, 24)
                                     .ouraCard()
                                     .padding(.horizontal, OuraTheme.Spacing.horizontal)
-                                } else if allNonArchivedProducts.isEmpty {
+                                } else if filteredProductsForSelection.isEmpty {
                                     VStack(spacing: 8) {
                                         Image(systemName: "tag")
                                             .font(.system(size: 32))
                                             .foregroundStyle(OuraTheme.Colors.textTertiary)
-                                        Text("Tidak ada produk tersedia")
+                                        Text(searchText.isEmpty ? "Tidak ada produk tersedia" : "Produk tidak ditemukan")
                                             .font(.system(size: 14, weight: .medium))
                                             .foregroundStyle(OuraTheme.Colors.textSecondary)
-                                        Text("Tambah produk terlebih dahulu sebelum mengekspor.")
+                                        Text(searchText.isEmpty
+                                             ? "Tambah produk terlebih dahulu sebelum mengekspor."
+                                             : "Coba ganti kata kunci pencarian.")
                                             .font(.system(size: 12))
                                             .foregroundStyle(OuraTheme.Colors.textTertiary)
                                     }
@@ -190,7 +235,7 @@ struct ShopeeBulkUploadSheet: View {
                                     // Daftar produk dengan checkbox
                                     ScrollView {
                                         VStack(spacing: 0) {
-                                            ForEach(allNonArchivedProducts) { product in
+                                            ForEach(filteredProductsForSelection) { product in
                                                 let isSelected = selectedProductIds.contains(product.id)
                                                 HStack {
                                                     Image(systemName: isSelected ? "checkmark.square.fill" : "square")
@@ -216,7 +261,7 @@ struct ShopeeBulkUploadSheet: View {
                                                 }
                                                 .padding(.horizontal, OuraTheme.Spacing.horizontal)
                                                 .padding(.vertical, 10)
-                                                if product.id != allNonArchivedProducts.last?.id {
+                                                if product.id != filteredProductsForSelection.last?.id {
                                                     Divider()
                                                         .padding(.leading, OuraTheme.Spacing.horizontal)
                                                         .overlay(OuraTheme.Colors.separator)
