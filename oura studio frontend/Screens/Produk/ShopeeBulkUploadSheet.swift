@@ -61,7 +61,8 @@ struct ShopeeBulkUploadSheet: View {
                 OuraTheme.Colors.background
                     .ignoresSafeArea()
                 
-                VStack(spacing: OuraTheme.Spacing.sectionGap) {
+                ScrollView {
+                    VStack(spacing: OuraTheme.Spacing.sectionGap) {
                     // Header Description
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Ekspor Massal Shopee")
@@ -327,8 +328,17 @@ struct ShopeeBulkUploadSheet: View {
                     .padding(.horizontal, OuraTheme.Spacing.horizontal)
                     .padding(.bottom, 24)
                 }
+                .padding(.bottom, 8)
             }
-            .navigationTitle("Ekspor Shopee")
+            .ignoresSafeArea(.keyboard)
+            .scrollDismissesKeyboard(.interactively)
+            .simultaneousGesture(
+                TapGesture().onEnded {
+                    UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                }
+            )
+        }
+        .navigationTitle("Ekspor Shopee")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
