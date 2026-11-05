@@ -293,9 +293,20 @@ class APIService: ObservableObject {
 
     // MARK: - Products
 
-    func getProducts(page: Int = 1, limit: Int = 50) async throws -> PaginatedResponse<Product> {
-        if useMock { return try await MockAPIService.shared.getProducts(page: page, limit: limit) }
-        return try await get(path: "/products?page=\(page)&limit=\(limit)")
+    func getProducts(page: Int = 1, limit: Int = 50, search: String? = nil) async throws -> PaginatedResponse<Product> {
+        if useMock { return try await MockAPIService.shared.getProducts(page: page, limit: limit, search: search) }
+        var path = "/products?page=\(page)&limit=\(limit)"
+        if let q = search?.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) {
+            path += "&search=\(q)"
+        }
+        return try await get(path: path)
+    }
+
+    // v3.81: Statistik ringkasan produk dari endpoint terpisah (bukan dari pagination list)
+    // agar tampil instan tanpa menunggu semua halaman produk dimuat.
+    func getProductStats() async throws -> ProductStats {
+        if useMock { return try await MockAPIService.shared.getProductStats() }
+        return try await get(path: "/products/stats")
     }
 
     func getProducts() async throws -> [Product] {

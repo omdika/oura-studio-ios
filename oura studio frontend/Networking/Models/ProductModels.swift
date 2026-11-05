@@ -40,6 +40,26 @@ struct Product: Codable, Identifiable, Hashable {
     }
 }
 
+// v3.81: Statistik ringkasan produk (dari GET /products/stats), terpisah dari
+// pagination list agar tampil instan tanpa menunggu semua halaman dimuat.
+struct ProductStats: Codable {
+    let totalProduk: Int
+    let totalVarian: Int
+    let totalStok: Int
+    let stokKosong: Int
+    let nilaiModal: Double
+    let potensiOmset: Double
+
+    enum CodingKeys: String, CodingKey {
+        case totalProduk = "total_produk"
+        case totalVarian = "total_varian"
+        case totalStok = "total_stok"
+        case stokKosong = "stok_kosong"
+        case nilaiModal = "nilai_modal"
+        case potensiOmset = "potensi_omset"
+    }
+}
+
 struct ProductSize: Codable, Identifiable, Hashable {
     let id: UUID
     let productId: UUID

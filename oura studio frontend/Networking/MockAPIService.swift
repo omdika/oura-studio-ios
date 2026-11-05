@@ -491,9 +491,10 @@ class MockAPIService {
 
     // MARK: - Products
 
-    func getProducts(page: Int = 1, limit: Int = 50) async throws -> PaginatedResponse<Product> {
+    func getProducts(page: Int = 1, limit: Int = 50, search: String? = nil) async throws -> PaginatedResponse<Product> {
         await delay()
-        let active = _products.filter { !$0.isArchived }
+        let q = search?.lowercased() ?? ""
+        let active = _products.filter { !$0.isArchived && (q.isEmpty || $0.name.lowercased().contains(q) || $0.sku.lowercased().contains(q)) }
         let totalItems = active.count
         let totalPages = max(1, Int(ceil(Double(totalItems) / Double(limit))))
         let startIndex = (page - 1) * limit
@@ -511,6 +512,43 @@ class MockAPIService {
 
     func getProducts() async throws -> [Product] {
         return try await getProducts(page: 1, limit: 500).data
+    }
+
+    // v3.81: Statistik ringkasan dari mock data (mirip aggregasi backend).
+    func getProductStats() async throws -> ProductStats {
+        await delay()
+        let activeSizes = _productSizes.values.flatMap { $0 }.filter { !$0.isArchived }
+        let activeProducts = _products.filter { !$0.isArchived }
+
+        var totalStok = 0
+        var stokKosong = 0
+        var nilaiModal: Double = 0
+        var potensiOmset: Double = 0
+
+        for s in activeSizes {
+            let qty = s.currentStockQty
+            totalStok += qty
+            if qty == 0 {
+                stokKosong += 1
+            }
+            if qty > 0 {
+                // Effective HPP: batch (latestHppBreakdown) > selling_price fallback > 0
+                let effectiveHpp = s.latestHppBreakdown?.total ?? s.sellingPrice ?? 0
+                let unitModal = effectiveHpp
+                let unitOmset = s.sellingPrice ?? 0
+                nilaiModal += Double(qty) * unitModal
+                potensiOmset += Double(qty) * unitOmset
+            }
+        }
+
+        return ProductStats(
+            totalProduk: activeProducts.count,
+            totalVarian: activeSizes.count,
+            totalStok: totalStok,
+            stokKosong: stokKosong,
+            nilaiModal: nilaiModal,
+            potensiOmset: potensiOmset
+        )
     }
 
     func createProduct(name: String, sku: String? = nil, category: String? = nil) async throws -> Product {

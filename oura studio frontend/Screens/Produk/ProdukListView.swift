@@ -16,6 +16,9 @@ struct ProdukListView: View {
     @State private var totalPages = 1
     @State private var hasMorePages = true
     @State private var limit = 20
+    // v3.81: Statistik dari API terpisah (GET /products/stats), dimuat parallel
+    // dengan halaman 1 agar tampil instan tanpa menunggu list penuh.
+    @State private var productStats: ProductStats? = nil
 
     @State private var searchText: String = ""
     @State private var showAddProduct = false
@@ -72,23 +75,26 @@ struct ProdukListView: View {
         filtered
     }
 
+    // v3.81: Statistik dari API (GET /products/stats) — mencerminkan seluruh data
+    // non-archived di backend, bukan hanya subset yang sudah di-load. Fallback ke
+    // client-side calculation saat stats belum tersedia (error / pertama kali load).
     private var totalProductsCount: Int {
-        products.filter { !$0.isArchived }.count
+        productStats?.totalProduk ?? products.filter { !$0.isArchived }.count
     }
 
     private var totalStockQty: Int {
-        allSizes.filter { !$0.isArchived }.reduce(0) { $0 + $1.currentStockQty }
+        productStats?.totalStok ?? allSizes.filter { !$0.isArchived }.reduce(0) { $0 + $1.currentStockQty }
     }
 
     private var outOfStockCount: Int {
-        allSizes.filter { !$0.isArchived && $0.currentStockQty == 0 }.count
+        productStats?.stokKosong ?? allSizes.filter { !$0.isArchived && $0.currentStockQty == 0 }.count
     }
 
     private var totalVarianCount: Int {
-        allSizes.filter { !$0.isArchived }.count
+        productStats?.totalVarian ?? allSizes.filter { !$0.isArchived }.count
     }
 
-    // v3.60: varian yang tampil (ikut search + filter tanggal) untuk valuasi stok.
+    // v3.60: varian yang tampil (ikut search + filter tanggal) untuk hitung fallbackModal / unpriced.
     private var visibleSizesForValuation: [ProductSizeDetail] {
         let ids = Set(filteredProductsToDisplay.map(\.id))
         return allSizes.filter { s in
@@ -97,21 +103,25 @@ struct ProdukListView: View {
         }
     }
 
-    // v3.60: (modal, omset, fallbackModal, unpriced).
-    // unitModal = HPP efektif (batch -> manual) fallback harga jual; unitOmset = harga jual.
+    // v3.81: modal & omset dari API stats; fallbackModal & unpriced tetap dihitung
+    // client-side dari varian yang terlihat (banner footnote).
     private var stockValuation: (modal: Double, omset: Double, fallbackModal: Int, unpriced: Int) {
-        visibleSizesForValuation.reduce((0, 0, 0, 0)) { acc, s in
-            let qty = Double(s.currentStockQty)
-            guard qty > 0 else { return acc }
+        let modal = productStats?.nilaiModal ?? visibleSizesForValuation.reduce(0) { acc, s in
+            guard s.currentStockQty > 0 else { return acc }
+            return acc + Double(s.currentStockQty) * (s.effectiveHppBreakdown?.total ?? s.sellingPrice ?? 0)
+        }
+        let omset = productStats?.potensiOmset ?? visibleSizesForValuation.reduce(0) { acc, s in
+            guard s.currentStockQty > 0 else { return acc }
+            return acc + Double(s.currentStockQty) * (s.sellingPrice ?? 0)
+        }
+        let (fallbackModal, unpriced) = visibleSizesForValuation.reduce((0, 0)) { acc, s in
+            guard s.currentStockQty > 0 else { return acc }
             let hpp = s.effectiveHppBreakdown?.total
             let price = s.sellingPrice
-            let unitModal = hpp ?? price ?? 0
-            let unitOmset = price ?? 0
-            return (acc.0 + qty * unitModal,
-                    acc.1 + qty * unitOmset,
-                    acc.2 + ((hpp == nil && price != nil) ? 1 : 0),
-                    acc.3 + ((hpp == nil && price == nil) ? 1 : 0))
+            return (acc.0 + ((hpp == nil && price != nil) ? 1 : 0),
+                    acc.1 + ((hpp == nil && price == nil) ? 1 : 0))
         }
+        return (modal, omset, fallbackModal, unpriced)
     }
 
     // iOS 16 workaround: mengubah visibility nav bar di tengah push-transition
@@ -619,6 +629,11 @@ struct ProdukListView: View {
         }
         currentPage = 1
 
+        // v3.81: Muat statistik dari endpoint terpisah PARALLEL dengan halaman pertama,
+        // agar angka total / nilai modal / potensi omset tampil instan tanpa menunggu
+        // list produk selesai load semua halaman.
+        async let statsFetched: ProductStats? = try? await api.getProductStats()
+
         // v3.57 fix: date filter was invisible for products beyond page 1
         // (SCRSATARMPIN at 45/67, size 239/441) because we only fetched page 1
         // (20 products / 60 sizes) then filtered locally against additionsByVariant.
@@ -648,58 +663,59 @@ struct ProdukListView: View {
             QRCatalogStore.shared.store(products: products, sizesByProduct: Dictionary(grouping: allSizes.filter { !$0.isArchived }, by: { $0.productId }))
             totalPages = 1
             hasMorePages = false
-            return
-        }
-
-        // v3.77: saat search aktif dan bukan filter tanggal, muat SEMUA halaman
-        // agar pencarian nama/SKU/ukuran/bahan menemukan produk di luar halaman 1.
-        // Filtering dilakukan client-side oleh `filtered` computed property.
-        if !searchText.isEmpty && !isFilterActive {
-            let allProds = await fetchAllProducts()
-            let allSz = await fetchAllSizesBulk()
+        } else if !searchText.isEmpty {
+            // v3.81: Pencarian via backend ?search=, hanya halaman 1 (bukan
+            // fetchAllProducts load-all-then-filter client-side). Backend sudah
+            // filter Product.name.ilike server-side, jadi list muncul cepat tanpa
+            // memuat semua halaman. Pagination tetap berjalan normal.
+            guard let resP = try? await api.getProducts(page: 1, limit: limit, search: searchText) else {
+                // Gagal jangan kosongkan cache yang tampil; stats masih di-set di bawah.
+                productStats = try? await statsFetched
+                return
+            }
             if Task.isCancelled { return }
-            if !allProds.isEmpty { products = allProds }
-            if !allSz.isEmpty { allSizes = allSz }
+
+            let pageSizes = await fetchAllSizesBulk()
+            if Task.isCancelled { return }
+            products = resP.data
+            totalPages = resP.totalPages
+            hasMorePages = (resP.nextPage != nil)
+
+            if !pageSizes.isEmpty {
+                let wanted = Set(resP.data.map(\.id))
+                allSizes = pageSizes.filter { wanted.contains($0.productId) }
+            }
             // v3.75: warm QR catalog
             QRCatalogStore.shared.store(products: products, sizesByProduct: Dictionary(grouping: allSizes.filter { !$0.isArchived }, by: { $0.productId }))
-            totalPages = 1
-            hasMorePages = false
             additionsByVariant = [:]
-            return
+        } else {
+            // Default (tanpa search, tanpa filter tanggal): halaman 1 dengan pagination.
+            guard let resP = try? await api.getProducts(page: 1, limit: limit, search: nil) else {
+                productStats = try? await statsFetched
+                return
+            }
+            if Task.isCancelled { return }
+
+            // v3.67: assign products + sizes TOGETHER after the bulk (atomic seperti
+            // 2184526) agar kartu tidak sempat kosong dan trigger last-row tetap waras.
+            let pageSizes = await fetchAllSizesBulk()
+            if Task.isCancelled { return }
+            products = resP.data
+            totalPages = resP.totalPages
+            hasMorePages = (resP.nextPage != nil)
+
+            if !pageSizes.isEmpty {
+                let wanted = Set(resP.data.map(\.id))
+                allSizes = pageSizes.filter { wanted.contains($0.productId) }
+            }
+            // v3.75: warm QR catalog
+            QRCatalogStore.shared.store(products: products, sizesByProduct: Dictionary(grouping: allSizes.filter { !$0.isArchived }, by: { $0.productId }))
+
+            additionsByVariant = [:]
         }
 
-        // Fetch products page 1; then fetch sizes per-SKU so every visible product
-        // has its variants even when global /product-sizes pagination order does not
-        // align with product pagination order (e.g. sizes 1..60 belong to products
-        // beyond page 1). Global pagination caused empty cards where ProductGroupRow
-        // had groups.isEmpty.
-        guard let resP = try? await api.getProducts(page: 1, limit: limit) else {
-            // Gagal jaringan tidak boleh mengosongkan cache yang sedang tampil
-            return
-        }
-        if Task.isCancelled { return }
-
-        // Hanya timpa cache kalau fetch berhasil.
-        // v3.67: assign products + sizes TOGETHER after the bulk (atomic seperti
-        // 2184526) agar kartu tidak sempat kosong dan trigger last-row tetap waras.
-        let pageSizes = await fetchAllSizesBulk()
-        if Task.isCancelled { return }
-        products = resP.data
-        totalPages = resP.totalPages
-        hasMorePages = (resP.nextPage != nil)
-
-        // Correlate client-side (replaces per-SKU burst): keep sizes for the
-        // visible page so header stats/search semantics stay per-page.
-        // Lewati replace saat bulk gagal ([]) agar error transient tidak
-        // mengosongkan semua kartu yang sedang tampil.
-        if !pageSizes.isEmpty {
-            let wanted = Set(resP.data.map(\.id))
-            allSizes = pageSizes.filter { wanted.contains($0.productId) }
-        }
-        // v3.75: warm QR catalog
-        QRCatalogStore.shared.store(products: products, sizesByProduct: Dictionary(grouping: allSizes.filter { !$0.isArchived }, by: { $0.productId }))
-
-        additionsByVariant = [:]
+        // v3.81: Simpan statistik (selalu di-set, meskipun fetch produk gagal transient).
+        productStats = try? await statsFetched
     }
 
     // v3.66: single bulk sizes fetch with sequential pages (1 connection at a
@@ -749,7 +765,10 @@ struct ProdukListView: View {
         let nextPage = currentPage + 1
 
         do {
-            let resP = try await api.getProducts(page: nextPage, limit: limit)
+            // v3.81: saat search aktif, kirim parameter search ke halaman berikutnya
+            // agar hasil tetap difilter server-side (bukan load-all client-side).
+            let resP = try await api.getProducts(page: nextPage, limit: limit,
+                                                 search: searchText.isEmpty ? nil : searchText)
             if Task.isCancelled { return }
 
             let newProducts = resP.data.filter { newP in !products.contains(where: { $0.id == newP.id }) }
