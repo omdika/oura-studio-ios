@@ -192,11 +192,6 @@ struct TambahPenjualanSheet: View {
             .listSectionSeparator(.hidden)
         }
         .scrollContentBackground(.hidden)
-        // Klik di luar field (area kosong form) menutup keyboard numerik,
-        // karena numberPad tidak memiliki tombol "Done" bawaan.
-        .onTapGesture {
-            UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
-        }
         .background(OuraTheme.Colors.background)
         .task { await loadSizes() }
         .sheet(isPresented: $showProductPicker) {
