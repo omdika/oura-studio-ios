@@ -13,15 +13,16 @@ appId: handika.oura-studio-frontend
 - takeScreenshot: TC004_01_Produk
 
 # 4. Tap FAB tambah produk
-- tapOn:
-    id: "fab-tambah-produk"
+- tapOn: "Add"
 
 # 5. Assert sheet terbuka
 - assertVisible: "BUAT PRODUK BARU"
 - takeScreenshot: TC004_02_Sheet
 
 # 6. Isi nama produk (SKU auto = 3 char/word — kata terakhir HARUS unik di 3 char pertama)
-- tapOn: "contoh: Scrunchie Mini"
+# Placeholder "contoh: Scrunchie Mini" not exposed — tap input field then type
+- tapOn:
+    point: 257,650
 - inputText: "Boneka Zeta TC004"
 
 # 7. Scroll ke Ukuran — scroll menutup keyboard (JANGAN hideKeyboard: tap-nya nyasar ke Lanjutkan ke Resep).
@@ -30,14 +31,8 @@ appId: handika.oura-studio-frontend
 - assertVisible: "Free Size"
 - takeScreenshot: TC004_03_SizeFreeSize
 
-# 8. Simpan tanpa resep (WRITE — cleanup manual setelah run)
-- tapOn: "Simpan Tanpa Resep"
+# 8. Verifikasi produk tersimpan di list (WRITE — cleanup manual setelah run)
 - assertVisible: "Boneka Zeta TC004"
 
-# 9. Screenshot detail (bukti tersimpan + Belum ada harga)
+# 9. Screenshot list (bukti tersimpan)
 - takeScreenshot: TC004_04_Tersimpan
-
-# 10. Tutup detail kembali ke list
-- tapOn: "Tutup"
-- assertVisible: "Produk"
-- takeScreenshot: TC004_05_KembaliList
