@@ -499,10 +499,13 @@ class TSPLPrinterService: NSObject, ObservableObject {
             y += 20
         }
 
-        // Nama produk — font "1", maks 2 baris, dibatasi ruang sebelum size.
+        // Nama produk — font "1", maks 2 baris (1 baris bila harga akan dicetak agar
+        // ruang mencukupi), dibatasi ruang sebelum size.
         let nameMax = skuMax1
+        let includePrice = content.sellingPrice != nil
+        let maxNameLines = includePrice ? 1 : 2
         let roomForName = max(0, sizeY - y)
-        let nameAllowed = max(1, min(2, roomForName / 20))
+        let nameAllowed = max(1, min(maxNameLines, roomForName / 20))
         var nameLines = wordWrap(nameClean.isEmpty ? "-" : nameClean, maxChars: nameMax)
         if nameLines.count > nameAllowed {
             nameLines = Array(nameLines.prefix(nameAllowed))
@@ -533,7 +536,10 @@ class TSPLPrinterService: NSObject, ObservableObject {
             let priceRaw = formatRupiah(price)
             let priceClean = sanitizeForTSPL(priceRaw)
             let priceY = y + 8 // turun 1mm
-            if !priceClean.isEmpty, priceY + 20 <= sizeY {
+            if !priceClean.isEmpty, priceY < sizeY {
+                // Harga tetap dicetak asalkan posisinya di atas size (pinned di bawah).
+                // Kurangi ketatnya dari priceY + 20 <= sizeY -> priceY < sizeY agar
+                // harga tidak di-skip saat ruang vertikal label sempit.
                 let t = priceClean.count > nameMax ? String(priceClean.prefix(max(0, nameMax - 3))) + "..." : priceClean
                 out += "TEXT \(textX),\(priceY),\"1\",0,1,1,\"\(t)\"\r\n"
                 y = priceY + 20
