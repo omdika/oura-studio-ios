@@ -45,6 +45,8 @@ struct ProdukListView: View {
     // shared HTTP/2 connection and trigger nw_connection timestamp warnings.
     @State private var loadTask: Task<Void, Never>? = nil
     @State private var lastLoadAt: Date? = nil
+    // Debounce task untuk search — mencegah request backend pada setiap ketik karakter.
+    @State private var searchDebounceTask: Task<Void, Never>? = nil
 
     private var filtered: [Product] {
         let active = products.filter { !$0.isArchived }
@@ -172,7 +174,13 @@ struct ProdukListView: View {
             .scrollDismissesKeyboard(.immediately)
             .background(OuraTheme.Colors.background)
             .onChange(of: searchText) { _ in
-                requestReload(force: true)
+                // Debounce 400 ms agar tidak request backend pada setiap ketik karakter.
+                searchDebounceTask?.cancel()
+                searchDebounceTask = Task {
+                    try? await Task.sleep(nanoseconds: 400_000_000) // 400 ms
+                    guard !Task.isCancelled else { return }
+                    requestReload(force: true)
+                }
             }
 
             OuraFABMenu {
