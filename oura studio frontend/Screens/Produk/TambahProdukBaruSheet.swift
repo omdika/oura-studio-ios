@@ -599,11 +599,10 @@ struct TambahProdukBaruSheet: View {
     }
 
     private static func autoSKU(from name: String) -> String {
-        // Take up to 3 alphanumeric chars from each word, joined -- no overall cap, so every word
-        // (including the last one) is represented. A flat .prefix(8) on the joined string used to
-        // silently cut off trailing words for names with more than ~3 words.
+        // Take up to 2 alphanumeric chars from each word, joined -- no overall cap, so every word
+        // (including the last one) is represented.
         let words = name.uppercased().components(separatedBy: .whitespaces).filter { !$0.isEmpty }
-        return words.map { String($0.filter { $0.isLetter || $0.isNumber }.prefix(3)) }.joined()
+        return words.map { String($0.filter { $0.isLetter || $0.isNumber }.prefix(2)) }.joined()
     }
 
     // MARK: — Load
