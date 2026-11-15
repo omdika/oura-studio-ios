@@ -89,12 +89,21 @@ class ReceiptGenerator {
             let name = item.productName ?? "Produk"
             let size = item.sizeLabel ?? "-"
             let title = "\(name) (\(size))"
-            let revStr = item.lineRevenue.rupiahFormattedNoSymbol
+            let itemPrice = item.unitPrice
+            let itemSubtotal = itemPrice * Double(item.qty)
+            let revStr = itemSubtotal.rupiahFormattedNoSymbol
+            let priceStr = itemPrice.rupiahFormattedNoSymbol
             if title.count + qtyStr.count + 1 + revStr.count <= 32 {
                 padded(left: "\(title) \(qtyStr)", right: revStr)
             } else {
                 line(title)
-                padded(left: "- \(qtyStr) @ \(item.effectivePrice.rupiahFormattedNoSymbol)", right: revStr)
+                padded(left: "- \(qtyStr) @ \(priceStr)", right: revStr)
+            }
+            // Diskon per item ditampilkan di bawah baris harga, satu per satu.
+            let itemDisc = item.discount * Double(item.qty)
+            if itemDisc > 0 {
+                let qtyIndicator = item.qty > 1 ? " (×\(item.qty))" : ""
+                line("  Diskon: -\(itemDisc.rupiahFormattedNoSymbol)\(qtyIndicator)")
             }
         }
         dashes()
@@ -104,7 +113,7 @@ class ReceiptGenerator {
         let totalDiscount = order.items.reduce(0.0) { $0 + ($1.discount * Double($1.qty)) }
         padded(left: "Total Belanja:", right: originalTotal.rupiahFormattedNoSymbol)
         if totalDiscount > 0 {
-            padded(left: "Diskon:", right: "-\(totalDiscount.rupiahFormattedNoSymbol)")
+            padded(left: "Total Diskon:", right: "-\(totalDiscount.rupiahFormattedNoSymbol)")
         }
         padded(left: "Total Bayar:", right: order.displayRevenue.rupiahFormattedNoSymbol)
         let isCash = order.paymentMethod?.lowercased() == "cash"
@@ -266,13 +275,23 @@ class ReceiptPDFGenerator {
                 let name = item.productName ?? "Produk"
                 let size = item.sizeLabel ?? "-"
                 let title = "\(name) (\(size))"
-                let revStr = item.lineRevenue.rupiahFormattedNoSymbol
+                let itemPrice = item.unitPrice
+                let itemSubtotal = itemPrice * Double(item.qty)
+                let revStr = itemSubtotal.rupiahFormattedNoSymbol
+                let priceStr = itemPrice.rupiahFormattedNoSymbol
                 
                 if title.count + qtyStr.count + 1 + revStr.count <= charLimit {
                     addLeftRightText(left: "\(title) \(qtyStr)", right: revStr, font: regularFont)
                 } else {
                     addLeftText(title, font: regularFont)
-                    addLeftRightText(left: "  \(qtyStr) x \(item.effectivePrice.rupiahFormattedNoSymbol)", right: revStr, font: regularFont)
+                    addLeftRightText(left: "  \(qtyStr) x \(priceStr)", right: revStr, font: regularFont)
+                }
+                
+                // Diskon per item ditampilkan di bawah baris harga, satu per satu.
+                let itemDisc = item.discount * Double(item.qty)
+                if itemDisc > 0 {
+                    let qtyIndicator = item.qty > 1 ? " (×\(item.qty))" : ""
+                    addLeftText("  Diskon: -\(itemDisc.rupiahFormattedNoSymbol)\(qtyIndicator)", font: regularFont)
                 }
             }
             addSeparator()
@@ -283,7 +302,7 @@ class ReceiptPDFGenerator {
             
             addLeftRightText(left: "Total Belanja:", right: originalTotal.rupiahFormattedNoSymbol, font: regularFont)
             if totalDiscount > 0 {
-                addLeftRightText(left: "Diskon:", right: "-\(totalDiscount.rupiahFormattedNoSymbol)", font: regularFont)
+                addLeftRightText(left: "Total Diskon:", right: "-\(totalDiscount.rupiahFormattedNoSymbol)", font: regularFont)
             }
             addLeftRightText(left: "Total Bayar:", right: order.displayRevenue.rupiahFormattedNoSymbol, font: boldFont)
             
