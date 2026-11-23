@@ -568,16 +568,26 @@ class MockAPIService {
         return (_productSizes[sku] ?? []).filter { !$0.isArchived }
     }
 
-    func getAllProductSizes(page: Int = 1, limit: Int = 50) async throws -> PaginatedResponse<ProductSizeDetail> {
+    func getAllProductSizes(page: Int = 1, limit: Int = 50, search: String? = nil, all: Bool = false) async throws -> PaginatedResponse<ProductSizeDetail> {
         await delay()
-        let active = _productSizes.values.flatMap { $0 }.filter { !$0.isArchived }
-        let totalItems = active.count
+        let allSizes = _productSizes.values.flatMap { $0 }
+        let filtered = allSizes.filter { item in
+            if !all && item.isArchived { return false }
+            if let q = search, !q.isEmpty {
+                let lowercase = q.lowercased()
+                return item.productSku.lowercased().contains(lowercase)
+                    || item.productName.lowercased().contains(lowercase)
+                    || item.sizeLabel.lowercased().contains(lowercase)
+            }
+            return true
+        }
+        let totalItems = filtered.count
         let totalPages = max(1, Int(ceil(Double(totalItems) / Double(limit))))
         let startIndex = (page - 1) * limit
         let endIndex = min(startIndex + limit, totalItems)
         let pageData: [ProductSizeDetail]
         if startIndex < totalItems {
-            pageData = Array(active[startIndex..<endIndex])
+            pageData = Array(filtered[startIndex..<endIndex])
         } else {
             pageData = []
         }

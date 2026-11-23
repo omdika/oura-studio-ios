@@ -853,7 +853,7 @@ private struct ProductPickerSheet: View {
         }
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
-        .onChange(of: searchText) { _, newValue in
+        .onChange(of: searchText) { newValue in
             searchTask?.cancel()
             searchTask = Task {
                 try? await Task.sleep(nanoseconds: 400_000_000) // debounce 400ms
