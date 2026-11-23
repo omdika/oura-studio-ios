@@ -718,7 +718,11 @@ private struct ProductPickerSheet: View {
     let onSelect: (ProductSizeDetail) -> Void
 
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var api: APIService
     @State private var searchText = ""
+    @State private var productsFromSearch: [ProductSizeDetail] = []
+    @State private var isLoading = false
+    @State private var searchTask: Task<Void, Never>? = nil
     @AppStorage("eventPriceAdjustmentActive") private var isEventActive: Bool = false
     @AppStorage("eventPriceAdjustmentAmount") private var eventAdjustmentAmount: Double = 0.0
 
@@ -729,13 +733,7 @@ private struct ProductPickerSheet: View {
     private var filtered: [ProductSizeDetail] {
         let trimmed = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.isEmpty { return pickable }
-        let q = trimmed.lowercased()
-        return pickable.filter {
-            $0.productName.lowercased().contains(q) ||
-            $0.productSku.lowercased().contains(q) ||
-            $0.sizeLabel.lowercased().contains(q) ||
-            ($0.fabricVariantName?.lowercased().contains(q) ?? false)
-        }
+        return productsFromSearch.filter { !alreadySelected.contains($0.id) }
     }
 
     private var groups: [(sku: String, productName: String, sizes: [ProductSizeDetail])] {
@@ -765,6 +763,17 @@ private struct ProductPickerSheet: View {
                 .padding(.horizontal, 16)
                 .padding(.vertical, 10)
 
+                if isLoading {
+                    HStack {
+                        ProgressView()
+                            .scaleEffect(0.8)
+                        Text("Mencari…")
+                            .font(.system(size: 13))
+                            .foregroundStyle(OuraTheme.Colors.textSecondary)
+                    }
+                    .padding(.vertical, 8)
+                }
+
                 Divider().overlay(OuraTheme.Colors.separator)
 
                 if groups.isEmpty {
@@ -773,7 +782,9 @@ private struct ProductPickerSheet: View {
                         Image(systemName: "cube.box")
                             .font(.system(size: 36))
                             .foregroundStyle(OuraTheme.Colors.textTertiary)
-                        Text(sizes.isEmpty ? "Belum ada stok produk." : "Tidak ada hasil pencarian.")
+                        Text(searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                            ? (sizes.isEmpty ? "Belum ada stok produk." : "Tidak ada hasil pencarian.")
+                            : "Tidak ada hasil pencarian.")
                             .font(.system(size: 14, weight: .medium))
                             .foregroundStyle(OuraTheme.Colors.textSecondary)
                         if sizes.isEmpty {
@@ -842,6 +853,31 @@ private struct ProductPickerSheet: View {
         }
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
+        .onChange(of: searchText) { _, newValue in
+            searchTask?.cancel()
+            searchTask = Task {
+                try? await Task.sleep(nanoseconds: 400_000_000) // debounce 400ms
+                guard !Task.isCancelled else { return }
+                let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
+                if trimmed.isEmpty {
+                    await MainActor.run {
+                        productsFromSearch = []
+                        isLoading = false
+                    }
+                    return
+                }
+                await MainActor.run { isLoading = true }
+                do {
+                    let res = try await api.getAllProductSizes(page: 1, limit: 50, search: trimmed, all: false)
+                    await MainActor.run {
+                        productsFromSearch = res.data
+                        isLoading = false
+                    }
+                } catch {
+                    await MainActor.run { isLoading = false }
+                }
+            }
+        }
     }
 }
 

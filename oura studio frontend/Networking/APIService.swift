@@ -579,6 +579,17 @@ class APIService: ObservableObject {
         return try await get(path: "/product-sizes?page=\(page)&limit=\(limit)")
     }
 
+    // v3.85: server-side search support
+    func getAllProductSizes(page: Int = 1, limit: Int = 50, search: String? = nil, all: Bool = false) async throws -> PaginatedResponse<ProductSizeDetail> {
+        if useMock { return try await MockAPIService.shared.getAllProductSizes(page: page, limit: limit, search: search, all: all) }
+        var path = "/product-sizes?page=\(page)&limit=\(limit)"
+        if let q = search?.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) {
+            path += "&search=\(q)"
+        }
+        if all { path += "&all=true" }
+        return try await get(path: path)
+    }
+
     func getAllProductSizes() async throws -> [ProductSizeDetail] {
         if useMock { return try await MockAPIService.shared.getAllProductSizes() }
         let res: PaginatedResponse<ProductSizeDetail> = try await get(path: "/product-sizes?page=1&limit=500")
