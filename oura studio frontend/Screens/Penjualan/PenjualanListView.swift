@@ -741,16 +741,20 @@ private struct EditPenjualanSheet: View {
         }
     }
 
-    /// Cari UIViewController yang bisa present UIActivityViewController.
-    /// Iterasi semua connectedScenes terlebih dahulu (andalkan window aktif),
-    /// baru fallback ke keyWindow bila tidak ditemukan.
+    /// Cari UIViewController terpaling atas yang bisa present UIActivityViewController.
+    /// Iterasi semua connectedScenes terlebih dahulu, lalu turun turunkan rantai
+    /// presentedViewController agar tidak gagal saat rootViewController sedang
+    /// mempresentasikan sheet lain (mis. EditPenjualanSheet sebagai PresentationHostingController).
     private func findPresentingViewController() -> UIViewController? {
         for scene in UIApplication.shared.connectedScenes {
             guard let windowScene = scene as? UIWindowScene else { continue }
             for window in windowScene.windows where window.rootViewController != nil {
-                if let rootVC = window.rootViewController {
-                    return rootVC
+                var vc: UIViewController = window.rootViewController!
+                // Turun ke view controller yang paling atas (yang sedang visible)
+                while let presented = vc.presentedViewController {
+                    vc = presented
                 }
+                return vc
             }
         }
         return UIApplication.shared.keyWindow?.rootViewController
