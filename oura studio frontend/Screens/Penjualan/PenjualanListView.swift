@@ -699,23 +699,58 @@ private struct EditPenjualanSheet: View {
         dismiss()
     }
 
+    @MainActor
     private func shareReceiptPDF() {
+        // Sanitasi invoiceNo untuk nama file: hilangkan karakter tidak aman untuk path
+        let safeInvoiceNo = order.invoiceNo
+            .replacingOccurrences(of: "/", with: "-")
+            .replacingOccurrences(of: ":", with: "-")
+            .replacingOccurrences(of: "<", with: "-")
+            .replacingOccurrences(of: ">", with: "-")
+            .replacingOccurrences(of: "\\", with: "-")
+            .replacingOccurrences(of: "|", with: "-")
+            .replacingOccurrences(of: "?", with: "-")
+            .replacingOccurrences(of: "*", with: "-")
+
         let pdfData = ReceiptPDFGenerator.generatePDF(order: order)
-        let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("Struk_\(order.invoiceNo).pdf")
+        let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("Struk_\(safeInvoiceNo).pdf")
+
         do {
             try pdfData.write(to: tempURL)
+
             let activityVC = UIActivityViewController(activityItems: [tempURL], applicationActivities: nil)
-            if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-               let rootVC = windowScene.windows.first?.rootViewController {
-                if let popoverController = activityVC.popoverPresentationController {
-                    popoverController.sourceView = rootVC.view
-                    popoverController.sourceRect = CGRect(x: rootVC.view.bounds.midX, y: rootVC.view.bounds.midY, width: 0, height: 0)
-                    popoverController.permittedArrowDirections = []
-                }
-                rootVC.present(activityVC, animated: true, completion: nil)
+
+            // Resolusi presenting view controller yang robust: iterate semua
+            // connectedScenes (multitasking / external display) sebelum fallback ke keyWindow.
+            guard let rootVC = findPresentingViewController() else {
+                errorMsg = "Gagal membuka share sheet: tidak ada window yang aktif"
+                return
             }
-        } catch {
+
+            if let popoverController = activityVC.popoverPresentationController {
+                popoverController.sourceView = rootVC.view
+                popoverController.sourceRect = CGRect(x: rootVC.view.bounds.midX, y: rootVC.view.bounds.midY, width: 0, height: 0)
+                popoverController.permittedArrowDirections = []
+            }
+            rootVC.present(activityVC, animated: true, completion: nil)
+
+        } catch let error as NSError {
             errorMsg = "Gagal membuat file PDF: \(error.localizedDescription)"
         }
+    }
+
+    /// Cari UIViewController yang bisa present UIActivityViewController.
+    /// Iterasi semua connectedScenes terlebih dahulu (andalkan window aktif),
+    /// baru fallback ke keyWindow bila tidak ditemukan.
+    private func findPresentingViewController() -> UIViewController? {
+        for scene in UIApplication.shared.connectedScenes {
+            guard let windowScene = scene as? UIWindowScene else { continue }
+            for window in windowScene.windows where window.rootViewController != nil {
+                if let rootVC = window.rootViewController {
+                    return rootVC
+                }
+            }
+        }
+        return UIApplication.shared.keyWindow?.rootViewController
     }
 }
