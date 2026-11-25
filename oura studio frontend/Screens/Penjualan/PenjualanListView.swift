@@ -713,12 +713,14 @@ private struct EditPenjualanSheet: View {
             .replacingOccurrences(of: "*", with: "-")
 
         let pdfData = ReceiptPDFGenerator.generatePDF(order: order)
-        let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("Struk_\(safeInvoiceNo).pdf")
 
         do {
-            try pdfData.write(to: tempURL)
-
-            let activityVC = UIActivityViewController(activityItems: [tempURL], applicationActivities: nil)
+            // Penting: kirim Data langsung (bukan fileURL) ke UIActivityViewController.
+            // Mengirim fileURL ke temp directory sering causa error
+            // NSOSStatusErrorDomain Code=-10814 (Launch Services rejects temp file URL).
+            // Dengan Data, iOS mengelola temporary file secara internal dan share sheet
+            // (termasuk "Simpan ke Files") berfungsi normal.
+            let activityVC = UIActivityViewController(activityItems: [pdfData], applicationActivities: nil)
 
             // Resolusi presenting view controller yang robust: iterate semua
             // connectedScenes (multitasking / external display) sebelum fallback ke keyWindow.
