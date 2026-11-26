@@ -39,6 +39,21 @@ struct ProdukListView: View {
     @State private var filterTo: Date = Date()
     @State private var additionsByVariant: [UUID: Int] = [:]
 
+    // v3.87: Filter kategori produk (pouch / scrunchie / all default).
+    enum ProductCategory: String, CaseIterable {
+        case all = "all"
+        case pouch = "pouch"
+        case scrunchie = "scrunchie"
+        var title: String {
+            switch self {
+            case .all: return "All"
+            case .pouch: return "Pouch"
+            case .scrunchie: return "Scrunchie"
+            }
+        }
+    }
+    @State private var selectedCategory: ProductCategory = .all
+
     // Single-flight + debounce for list reloads. Back-navigation from detail fires
     // onProductChanged + sheet onDismiss in quick succession on the same reused
     // URLSession connection — without this, parallel loadFirstPage() calls spam the
@@ -51,7 +66,13 @@ struct ProdukListView: View {
     private var filtered: [Product] {
         let active = products.filter { !$0.isArchived }
 
-        let dateFiltered = active.filter { product in
+        // v3.87: Filter kategori — server-side via ?category=, difilter ulang client-side
+        // sebagai belt-and-suspenders untuk data yang sudah di-load.
+        let categoryFiltered = active.filter { product in
+            selectedCategory == .all || product.category?.lowercased() == selectedCategory.rawValue.lowercased()
+        }
+
+        let dateFiltered = categoryFiltered.filter { product in
             if isFilterActive {
                 let sizes = allSizes.filter { $0.productId == product.id && !$0.isArchived }
                 return sizes.contains { additionsByVariant[$0.id] != nil }
@@ -80,20 +101,51 @@ struct ProdukListView: View {
     // v3.81: Statistik dari API (GET /products/stats) — mencerminkan seluruh data
     // non-archived di backend, bukan hanya subset yang sudah di-load. Fallback ke
     // client-side calculation saat stats belum tersedia (error / pertama kali load).
+    // v3.87: Statistik dihormati filter kategori. productStats di-fetch dengan
+    // parameter category saat selectedCategory != .all, jadi sudah per-kategori.
+    // Fallback client-side dari products/allSizes yang sudah server-filtered.
     private var totalProductsCount: Int {
         productStats?.totalProduk ?? products.filter { !$0.isArchived }.count
     }
 
     private var totalStockQty: Int {
-        productStats?.totalStok ?? allSizes.filter { !$0.isArchived }.reduce(0) { $0 + $1.currentStockQty }
+        if let stats = productStats { return stats.totalStok }
+        return categorySizes.reduce(0) { $0 + $1.currentStockQty }
     }
 
     private var outOfStockCount: Int {
-        productStats?.stokKosong ?? allSizes.filter { !$0.isArchived && $0.currentStockQty == 0 }.count
+        if let stats = productStats { return stats.stokKosong }
+        return categorySizes.filter { $0.currentStockQty == 0 }.count
     }
 
     private var totalVarianCount: Int {
-        productStats?.totalVarian ?? allSizes.filter { !$0.isArchived }.count
+        if let stats = productStats { return stats.totalVarian }
+        return categorySizes.count
+    }
+
+    // v3.87: ID produk non-archived dalam kategori yang dipilih. products sudah
+    // difilter server-side via ?category=, cukup untuk korelasi size.
+    private var categoryProductIds: Set<UUID> {
+        Set(products.filter { !$0.isArchived }.map(\.id))
+    }
+
+    // v3.87: Varian non-archived milik produk dalam kategori yang dipilih.
+    private var categorySizes: [ProductSizeDetail] {
+        allSizes.filter { !$0.isArchived && categoryProductIds.contains($0.productId) }
+    }
+
+    // v3.87: Jumlah varian per label ukuran (XS, S, M, L, XL, XXL, Free Size)
+    // dari varian yang lolos filter kategori + search + tanggal.
+    private var sizeCountByLabel: [(label: String, count: Int)] {
+        let order = ["XS", "S", "M", "L", "XL", "XXL", "Free Size"]
+        let productIds = Set(filteredProductsToDisplay.map(\.id))
+        let sizes = allSizes.filter { s in
+            !s.isArchived && productIds.contains(s.productId)
+        }
+        let grouped = Dictionary(grouping: sizes) { $0.sizeLabel.uppercased() }
+        return order.map { label in
+            (label: label, count: grouped[label]?.count ?? 0)
+        }
     }
 
     // v3.60: varian yang tampil (ikut search + filter tanggal) untuk hitung fallbackModal / unpriced.
@@ -150,6 +202,9 @@ struct ProdukListView: View {
                     
                     Divider().overlay(OuraTheme.Colors.separator)
 
+                    // v3.87: Filter kategori produk
+                    categoryFilterSection
+
                     Group {
                         // Soft reload: cache tetap tampil saat kembali dari detail.
                         // Full-screen spinner hanya saat list masih kosong (buka pertama).
@@ -198,6 +253,10 @@ struct ProdukListView: View {
         .navigationBarTitleDisplayMode(.large)
         .toolbar(navBarVisibility, for: .navigationBar)
         .onChange(of: isFilterActive) { _ in
+            requestReload(force: true)
+        }
+        // v3.87: ganti kategori → muat ulang list dan stats per kategori baru.
+        .onChange(of: selectedCategory) { _ in
             requestReload(force: true)
         }
         // .task re-fire saat pop dari detail (SwiftUI cancel + restart task saat view
@@ -507,6 +566,72 @@ struct ProdukListView: View {
         .ouraCard()
     }
 
+    // v3.87: Binding adaptor — ChipSingleSelect pakai ProductCategory? (nil = all),
+    // sementara state pakai ProductCategory (.all = default).
+    private var selectedCategoryBinding: Binding<ProductCategory?> {
+        Binding(
+            get: { selectedCategory == .all ? nil : selectedCategory },
+            set: { selectedCategory = $0 ?? .all }
+        )
+    }
+
+    // v3.87: Chip single-select filter kategori (pouch / scrunchie / all).
+    private var categoryFilterSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Kategori")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(OuraTheme.Colors.textSecondary)
+                .padding(.horizontal, OuraTheme.Spacing.cardPad)
+
+            ChipSingleSelect(
+                label: "",
+                selected: selectedCategoryBinding,
+                options: ProductCategory.allCases.filter { $0 != .all }.map {
+                    (value: $0, title: $0.title)
+                }
+            )
+            .padding(.horizontal, OuraTheme.Spacing.cardPad)
+            .padding(.bottom, OuraTheme.Spacing.cardPad)
+        }
+        .ouraCard()
+    }
+
+    // v3.87: Distribusi jumlah size per varian di atas list produk.
+    private var sizeDistributionSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Size per Varian")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(OuraTheme.Colors.textSecondary)
+                .padding(.horizontal, OuraTheme.Spacing.cardPad)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(sizeCountByLabel, id: \.label) { item in
+                        VStack(spacing: 4) {
+                            Text(item.label)
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(OuraTheme.Colors.textPrimary)
+                            Text("\(item.count)")
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundStyle(item.count > 0 ? OuraTheme.Colors.accent : OuraTheme.Colors.textTertiary)
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 7)
+                        .background(OuraTheme.Colors.surfaceSheet)
+                        .clipShape(Capsule())
+                        .overlay(
+                            Capsule().stroke(OuraTheme.Colors.border, lineWidth: 1)
+                        )
+                    }
+                }
+                .padding(.horizontal, OuraTheme.Spacing.cardPad)
+                .padding(.bottom, OuraTheme.Spacing.cardPad)
+            }
+        }
+        .padding(.top, 8)
+        .ouraCard()
+    }
+
     private var productList: some View {
         VStack(spacing: 12) {
                 // Indikator refresh non-blocking saat soft reload background.
@@ -520,6 +645,11 @@ struct ProdukListView: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 4)
                     .transition(.opacity)
+                }
+
+                // v3.87: Distribusi jumlah size per varian
+                if !filteredProductsToDisplay.isEmpty {
+                    sizeDistributionSection
                 }
 
                 summaryHeaderView
@@ -640,7 +770,8 @@ struct ProdukListView: View {
         // v3.81: Muat statistik dari endpoint terpisah PARALLEL dengan halaman pertama,
         // agar angka total / nilai modal / potensi omset tampil instan tanpa menunggu
         // list produk selesai load semua halaman.
-        async let statsFetched: ProductStats? = try? await api.getProductStats()
+        // v3.87: kirim parameter category agar stats difilter per kategori.
+        async let statsFetched: ProductStats? = try? await api.getProductStats(category: selectedCategory.rawValue)
 
         // v3.57 fix: date filter was invisible for products beyond page 1
         // (SCRSATARMPIN at 45/67, size 239/441) because we only fetched page 1
@@ -662,7 +793,9 @@ struct ProdukListView: View {
 
             // Load full dataset so filter can find products beyond page 1.
             // 67 products / 441 sizes → ~3 + 8 requests, acceptable vs missing results.
-            let allProds = await fetchAllProducts()
+            // v3.87: kirim parameter category agar data yang difilter tanggal juga
+            // difilter per kategori.
+            let allProds = await fetchAllProducts(category: selectedCategory.rawValue)
             let allSz = await fetchAllProductSizes()
             if Task.isCancelled { return }
             if !allProds.isEmpty { products = allProds }
@@ -676,7 +809,7 @@ struct ProdukListView: View {
             // fetchAllProducts load-all-then-filter client-side). Backend sudah
             // filter Product.name.ilike server-side, jadi list muncul cepat tanpa
             // memuat semua halaman. Pagination tetap berjalan normal.
-            guard let resP = try? await api.getProducts(page: 1, limit: limit, search: searchText) else {
+            guard let resP = try? await api.getProducts(page: 1, limit: limit, search: searchText, category: selectedCategory.rawValue) else {
                 // Gagal jangan kosongkan cache yang tampil; stats masih di-set di bawah.
                 productStats = try? await statsFetched
                 return
@@ -698,7 +831,8 @@ struct ProdukListView: View {
             additionsByVariant = [:]
         } else {
             // Default (tanpa search, tanpa filter tanggal): halaman 1 dengan pagination.
-            guard let resP = try? await api.getProducts(page: 1, limit: limit, search: nil) else {
+            // v3.87: kirim parameter category untuk filter server-side.
+            guard let resP = try? await api.getProducts(page: 1, limit: limit, search: nil, category: selectedCategory.rawValue) else {
                 productStats = try? await statsFetched
                 return
             }
@@ -745,12 +879,13 @@ struct ProdukListView: View {
     }
 
     // v3.57 helper: fetch all pages sequentially (used only when date filter active)
-    private func fetchAllProducts() async -> [Product] {
+    // v3.87: terima parameter category untuk filter server-side per halaman.
+    private func fetchAllProducts(category: String? = nil) async -> [Product] {
         var result: [Product] = []
         var page = 1
         while true {
             if Task.isCancelled { break }
-            guard let res = try? await api.getProducts(page: page, limit: limit) else { break }
+            guard let res = try? await api.getProducts(page: page, limit: limit, category: category) else { break }
             result.append(contentsOf: res.data)
             if res.nextPage == nil { break }
             page += 1
@@ -775,8 +910,10 @@ struct ProdukListView: View {
         do {
             // v3.81: saat search aktif, kirim parameter search ke halaman berikutnya
             // agar hasil tetap difilter server-side (bukan load-all client-side).
+            // v3.87: kirim parameter category untuk filter server-side.
             let resP = try await api.getProducts(page: nextPage, limit: limit,
-                                                 search: searchText.isEmpty ? nil : searchText)
+                                                 search: searchText.isEmpty ? nil : searchText,
+                                                 category: selectedCategory.rawValue)
             if Task.isCancelled { return }
 
             let newProducts = resP.data.filter { newP in !products.contains(where: { $0.id == newP.id }) }

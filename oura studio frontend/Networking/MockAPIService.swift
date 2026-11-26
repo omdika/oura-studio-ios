@@ -491,10 +491,13 @@ class MockAPIService {
 
     // MARK: - Products
 
-    func getProducts(page: Int = 1, limit: Int = 50, search: String? = nil) async throws -> PaginatedResponse<Product> {
+    func getProducts(page: Int = 1, limit: Int = 50, search: String? = nil, category: String? = nil) async throws -> PaginatedResponse<Product> {
         await delay()
         let q = search?.lowercased() ?? ""
-        let active = _products.filter { !$0.isArchived && (q.isEmpty || $0.name.lowercased().contains(q) || $0.sku.lowercased().contains(q)) }
+        let cat = category?.lowercased() ?? ""
+        let active = _products.filter { !$0.isArchived
+            && (q.isEmpty || $0.name.lowercased().contains(q) || $0.sku.lowercased().contains(q))
+            && (cat.isEmpty || cat == "all" || $0.category?.lowercased() == cat) }
         let totalItems = active.count
         let totalPages = max(1, Int(ceil(Double(totalItems) / Double(limit))))
         let startIndex = (page - 1) * limit
@@ -515,10 +518,13 @@ class MockAPIService {
     }
 
     // v3.81: Statistik ringkasan dari mock data (mirip aggregasi backend).
-    func getProductStats() async throws -> ProductStats {
+    // v3.87: support filter per kategori.
+    func getProductStats(category: String? = nil) async throws -> ProductStats {
         await delay()
-        let activeSizes = _productSizes.values.flatMap { $0 }.filter { !$0.isArchived }
-        let activeProducts = _products.filter { !$0.isArchived }
+        let cat = category?.lowercased() ?? ""
+        let activeProducts = _products.filter { !$0.isArchived && (cat.isEmpty || cat == "all" || $0.category?.lowercased() == cat) }
+        let activeProductIds = Set(activeProducts.map { $0.id })
+        let activeSizes = _productSizes.values.flatMap { $0 }.filter { !$0.isArchived && activeProductIds.contains($0.productId) }
 
         var totalStok = 0
         var stokKosong = 0
