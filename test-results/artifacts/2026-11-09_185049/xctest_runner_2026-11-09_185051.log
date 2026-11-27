@@ -1,0 +1,253 @@
+2026-11-09 18:50:53.177 xcodebuild[92180:3286709] [MT] IDERunDestination: Supported platforms for the buildables in the current scheme is empty.
+2026-11-09 18:50:53.188 xcodebuild[92180:3286709] [MT] IDERunDestination: Supported platforms for the buildables in the current scheme is empty.
+2026-11-09 18:50:54.883 xcodebuild[92180:3286709] [MT] IDERunDestination: Supported platforms for the buildables in the current scheme is empty.
+** BUILD INTERRUPTED **
+1:01.310591+0700 maestro-driver-iosUITests-Runner[92191:3287057] [Default] Running tests...
+2026-11-09 18:51:01.546615+0700 maestro-driver-iosUITests-Runner[92191:3287057] snapshotKeyHonorModalViews configured to value: (null)
+    t =      nans Interface orientation changed to Portrait
+Test Suite 'Selected tests' started at 2026-11-09 18:51:03.725.
+Test Suite 'maestro-driver-iosUITests.xctest' started at 2026-11-09 18:51:03.726.
+Test Suite 'SwipeRouteHandlerV2ClassificationTests' started at 2026-11-09 18:51:03.727.
+Test Case '-[maestro_driver_iosUITests.SwipeRouteHandlerV2ClassificationTests testClassifiedTimeoutPreservesTheRealMessage]' started.
+    t =     0.01s Start Test at 2026-11-09 18:51:03.741
+    t =     0.02s Set Up
+    t =     0.03s Tear Down
+Test Case '-[maestro_driver_iosUITests.SwipeRouteHandlerV2ClassificationTests testClassifiedTimeoutPreservesTheRealMessage]' passed (0.019 seconds).
+Test Case '-[maestro_driver_iosUITests.SwipeRouteHandlerV2ClassificationTests testMainThreadBusyIsClassifiedAsTimeout]' started.
+    t =     0.00s Start Test at 2026-11-09 18:51:03.760
+    t =     0.00s Set Up
+    t =     0.00s Tear Down
+Test Case '-[maestro_driver_iosUITests.SwipeRouteHandlerV2ClassificationTests testMainThreadBusyIsClassifiedAsTimeout]' passed (0.003 seconds).
+Test Case '-[maestro_driver_iosUITests.SwipeRouteHandlerV2ClassificationTests testTimeoutMessageWithWrongDomainStaysInternal]' started.
+    t =     0.00s Start Test at 2026-11-09 18:51:03.763
+    t =     0.00s Set Up
+    t =     0.00s Tear Down
+Test Case '-[maestro_driver_iosUITests.SwipeRouteHandlerV2ClassificationTests testTimeoutMessageWithWrongDomainStaysInternal]' passed (0.003 seconds).
+Test Case '-[maestro_driver_iosUITests.SwipeRouteHandlerV2ClassificationTests testUIQueryTimeoutIsClassifiedAsTimeout]' started.
+    t =     0.00s Start Test at 2026-11-09 18:51:03.766
+    t =     0.00s Set Up
+    t =     0.01s Tear Down
+Test Case '-[maestro_driver_iosUITests.SwipeRouteHandlerV2ClassificationTests testUIQueryTimeoutIsClassifiedAsTimeout]' passed (0.009 seconds).
+Test Case '-[maestro_driver_iosUITests.SwipeRouteHandlerV2ClassificationTests testUnrelatedXCTFutureErrorStaysInternal]' started.
+    t =     0.00s Start Test at 2026-11-09 18:51:03.793
+    t =     0.00s Set Up
+    t =     0.00s Tear Down
+Test Case '-[maestro_driver_iosUITests.SwipeRouteHandlerV2ClassificationTests testUnrelatedXCTFutureErrorStaysInternal]' passed (0.003 seconds).
+Test Case '-[maestro_driver_iosUITests.SwipeRouteHandlerV2ClassificationTests testXCTFutureCode1000WithUnrelatedMessageStaysInternal]' started.
+    t =     0.00s Start Test at 2026-11-09 18:51:03.796
+    t =     0.00s Set Up
+    t =     0.00s Tear Down
+Test Case '-[maestro_driver_iosUITests.SwipeRouteHandlerV2ClassificationTests testXCTFutureCode1000WithUnrelatedMessageStaysInternal]' passed (0.003 seconds).
+Test Suite 'SwipeRouteHandlerV2ClassificationTests' passed at 2026-11-09 18:51:03.799.
+	 Executed 6 tests, with 0 failures (0 unexpected) in 0.040 (0.073) seconds
+Test Suite 'maestro_driver_iosUITests' started at 2026-11-09 18:51:03.800.
+    t =      nans Suite Set Up
+Test Case '-[maestro_driver_iosUITests.maestro_driver_iosUITests testHttpServer]' started.
+    t =     0.00s Start Test at 2026-11-09 18:51:03.801
+    t =     0.00s Set Up
+2026-11-09 18:51:03.803302+0700 maestro-driver-iosUITests-Runner[92191:3287250] [maestro_driver_iosUITests] Will start HTTP server
+2026-11-09 18:51:03.908987+0700 maestro-driver-iosUITests-Runner[92191:3287250] [FlyingFox] starting server 127.0.0.1:62168
+2026-11-09 18:51:03.948505+0700 maestro-driver-iosUITests-Runner[92191:3287168] [FlyingFox] <127.0.0.1> open connection
+2026-11-09 18:51:03.956117+0700 maestro-driver-iosUITests-Runner[92191:3287168] [FlyingFox] <127.0.0.1> request: GET /status
+2026-11-09 18:51:04.061098+0700 maestro-driver-iosUITests-Runner[92191:3287170] [FlyingFox] <127.0.0.1> open connection
+2026-11-09 18:51:04.063725+0700 maestro-driver-iosUITests-Runner[92191:3287168] [FlyingFox] <127.0.0.1> request: POST /deviceInfo
+    t =     0.38s Getting device orientation
+2026-11-09 18:51:04.219559+0700 maestro-driver-iosUITests-Runner[92191:3287057] Using singleton test manager
+2026-11-09 18:51:04.243871+0700 maestro-driver-iosUITests-Runner[92191:3287057] Detected running apps: ["handika.oura-studio-frontend"]
+    t =     0.45s Getting device orientation
+    t =     0.45s Find the Application 'handika.oura-studio-frontend'
+2026-11-09 18:51:09.576140+0700 maestro-driver-iosUITests-Runner[92191:3287057] Device orientation is 1
+2026-11-09 18:51:10.508048+0700 maestro-driver-iosUITests-Runner[92191:3287170] [FlyingFox] <127.0.0.1> request: POST /setPermissions
+2026-11-09 18:51:10.531893+0700 maestro-driver-iosUITests-Runner[92191:3287168] [FlyingFox] <127.0.0.1> request: POST /terminateApp
+2026-11-09 18:51:10.534823+0700 maestro-driver-iosUITests-Runner[92191:3287057] [Start] Terminating app handika.oura-studio-frontend
+    t =     6.74s Terminate handika.oura-studio-frontend:91945
+2026-11-09 18:51:11.623574+0700 maestro-driver-iosUITests-Runner[92191:3287057] [End] Terminating app handika.oura-studio-frontend
+2026-11-09 18:51:12.080751+0700 maestro-driver-iosUITests-Runner[92191:3287169] [FlyingFox] <127.0.0.1> request: POST /deviceInfo
+    t =     8.28s Getting device orientation
+2026-11-09 18:51:12.129178+0700 maestro-driver-iosUITests-Runner[92191:3287057] Detected running apps: ["handika.oura-studio-frontend"]
+    t =     8.33s Getting device orientation
+2026-11-09 18:51:12.133345+0700 maestro-driver-iosUITests-Runner[92191:3287057] Returning cached screen size
+2026-11-09 18:51:12.133502+0700 maestro-driver-iosUITests-Runner[92191:3287057] Device orientation is 1
+2026-11-09 18:51:12.283427+0700 maestro-driver-iosUITests-Runner[92191:3287170] [FlyingFox] <127.0.0.1> request: POST /viewHierarchy
+2026-11-09 18:51:12.299589+0700 maestro-driver-iosUITests-Runner[92191:3287057] Detected running apps: ["handika.oura-studio-frontend"]
+2026-11-09 18:51:12.300588+0700 maestro-driver-iosUITests-Runner[92191:3287057] [Start] View hierarchy snapshot for Application 'handika.oura-studio-frontend'
+2026-11-09 18:51:12.300708+0700 maestro-driver-iosUITests-Runner[92191:3287057] [ViewHierarchyHandler] Starting getHierarchyWithFallback for element.
+    t =     8.50s Find the Application 'handika.oura-studio-frontend'
+2026-11-09 18:51:16.367728+0700 maestro-driver-iosUITests-Runner[92191:3287057] [ViewHierarchyHandler] Successfully retrieved element hierarchy.
+2026-11-09 18:51:16.369682+0700 maestro-driver-iosUITests-Runner[92191:3287057] Foreground app is not springboard skipping auto tapping on permissions
+2026-11-09 18:51:16.369885+0700 maestro-driver-iosUITests-Runner[92191:3287057] [ViewHierarchyHandler] Fetch status bar hierarchy - start
+    t =    12.57s Checking existence of `StatusBar (First Match)`
+    t =    12.68s Get all elements bound by index for: Descendants matching type StatusBar
+    t =    12.75s Find the StatusBar (Element at index 0)
+    t =    12.80s Find the StatusBar (Element at index 1)
+2026-11-09 18:51:16.651091+0700 maestro-driver-iosUITests-Runner[92191:3287057] Fetch status bar hierarchy - duration 0.28095197677612305
+2026-11-09 18:51:16.651191+0700 maestro-driver-iosUITests-Runner[92191:3287057] [ViewHierarchyHandler] Fetch Safari WebView hierarchy - start
+2026-11-09 18:51:16.656236+0700 maestro-driver-iosUITests-Runner[92191:3287057] Fetch Safari WebView hierarchy - duration 0.0050199031829833984
+    t =    12.86s Find the Application 'com.apple.springboard'
+2026-11-09 18:51:16.700593+0700 maestro-driver-iosUITests-Runner[92191:3287057] [Done] View hierarchy snapshot for Application 'handika.oura-studio-frontend' 
+2026-11-09 18:51:16.853925+0700 maestro-driver-iosUITests-Runner[92191:3287170] [FlyingFox] <127.0.0.1> request: POST /deviceInfo
+    t =    13.05s Getting device orientation
+2026-11-09 18:51:16.875822+0700 maestro-driver-iosUITests-Runner[92191:3287057] Detected running apps: ["handika.oura-studio-frontend"]
+    t =    13.08s Getting device orientation
+2026-11-09 18:51:16.879418+0700 maestro-driver-iosUITests-Runner[92191:3287057] Returning cached screen size
+2026-11-09 18:51:16.879572+0700 maestro-driver-iosUITests-Runner[92191:3287057] Device orientation is 1
+2026-11-09 18:51:16.883418+0700 maestro-driver-iosUITests-Runner[92191:3287168] [FlyingFox] <127.0.0.1> request: POST /viewHierarchy
+2026-11-09 18:51:16.891824+0700 maestro-driver-iosUITests-Runner[92191:3287057] Detected running apps: ["handika.oura-studio-frontend"]
+2026-11-09 18:51:16.893316+0700 maestro-driver-iosUITests-Runner[92191:3287057] [Start] View hierarchy snapshot for Application 'handika.oura-studio-frontend'
+2026-11-09 18:51:16.893501+0700 maestro-driver-iosUITests-Runner[92191:3287057] [ViewHierarchyHandler] Starting getHierarchyWithFallback for element.
+    t =    13.09s Find the Application 'handika.oura-studio-frontend'
+2026-11-09 18:51:17.037611+0700 maestro-driver-iosUITests-Runner[92191:3287057] [ViewHierarchyHandler] Successfully retrieved element hierarchy.
+2026-11-09 18:51:17.037859+0700 maestro-driver-iosUITests-Runner[92191:3287057] Foreground app is not springboard skipping auto tapping on permissions
+2026-11-09 18:51:17.037932+0700 maestro-driver-iosUITests-Runner[92191:3287057] [ViewHierarchyHandler] Fetch status bar hierarchy - start
+    t =    13.24s Checking existence of `StatusBar (First Match)`
+    t =    13.25s Get all elements bound by index for: Descendants matching type StatusBar
+    t =    13.28s Find the StatusBar (Element at index 0)
+    t =    13.32s Find the StatusBar (Element at index 1)
+2026-11-09 18:51:17.154955+0700 maestro-driver-iosUITests-Runner[92191:3287057] Fetch status bar hierarchy - duration 0.11699402332305908
+2026-11-09 18:51:17.155025+0700 maestro-driver-iosUITests-Runner[92191:3287057] [ViewHierarchyHandler] Fetch Safari WebView hierarchy - start
+2026-11-09 18:51:17.155687+0700 maestro-driver-iosUITests-Runner[92191:3287057] Fetch Safari WebView hierarchy - duration 0.0006519556045532227
+    t =    13.36s Find the Application 'com.apple.springboard'
+2026-11-09 18:51:17.182734+0700 maestro-driver-iosUITests-Runner[92191:3287057] [Done] View hierarchy snapshot for Application 'handika.oura-studio-frontend' 
+2026-11-09 18:51:17.212160+0700 maestro-driver-iosUITests-Runner[92191:3287250] [FlyingFox] <127.0.0.1> request: POST /deviceInfo
+    t =    13.41s Getting device orientation
+2026-11-09 18:51:17.217313+0700 maestro-driver-iosUITests-Runner[92191:3287057] Detected running apps: ["handika.oura-studio-frontend"]
+    t =    13.42s Getting device orientation
+2026-11-09 18:51:17.219196+0700 maestro-driver-iosUITests-Runner[92191:3287057] Returning cached screen size
+2026-11-09 18:51:17.219271+0700 maestro-driver-iosUITests-Runner[92191:3287057] Device orientation is 1
+2026-11-09 18:51:17.221412+0700 maestro-driver-iosUITests-Runner[92191:3287251] [FlyingFox] <127.0.0.1> request: POST /viewHierarchy
+2026-11-09 18:51:17.225291+0700 maestro-driver-iosUITests-Runner[92191:3287057] Detected running apps: ["handika.oura-studio-frontend"]
+2026-11-09 18:51:17.225996+0700 maestro-driver-iosUITests-Runner[92191:3287057] [Start] View hierarchy snapshot for Application 'handika.oura-studio-frontend'
+2026-11-09 18:51:17.226064+0700 maestro-driver-iosUITests-Runner[92191:3287057] [ViewHierarchyHandler] Starting getHierarchyWithFallback for element.
+    t =    13.43s Find the Application 'handika.oura-studio-frontend'
+2026-11-09 18:51:17.338190+0700 maestro-driver-iosUITests-Runner[92191:3287057] [ViewHierarchyHandler] Successfully retrieved element hierarchy.
+2026-11-09 18:51:17.338398+0700 maestro-driver-iosUITests-Runner[92191:3287057] Foreground app is not springboard skipping auto tapping on permissions
+2026-11-09 18:51:17.338467+0700 maestro-driver-iosUITests-Runner[92191:3287057] [ViewHierarchyHandler] Fetch status bar hierarchy - start
+    t =    13.54s Checking existence of `StatusBar (First Match)`
+    t =    13.55s Get all elements bound by index for: Descendants matching type StatusBar
+    t =    13.58s Find the StatusBar (Element at index 0)
+    t =    13.61s Find the StatusBar (Element at index 1)
+2026-11-09 18:51:17.450729+0700 maestro-driver-iosUITests-Runner[92191:3287057] Fetch status bar hierarchy - duration 0.11223900318145752
+2026-11-09 18:51:17.450798+0700 maestro-driver-iosUITests-Runner[92191:3287057] [ViewHierarchyHandler] Fetch Safari WebView hierarchy - start
+2026-11-09 18:51:17.451458+0700 maestro-driver-iosUITests-Runner[92191:3287057] Fetch Safari WebView hierarchy - duration 0.0006480216979980469
+    t =    13.65s Find the Application 'com.apple.springboard'
+2026-11-09 18:51:17.478106+0700 maestro-driver-iosUITests-Runner[92191:3287057] [Done] View hierarchy snapshot for Application 'handika.oura-studio-frontend' 
+2026-11-09 18:51:17.503212+0700 maestro-driver-iosUITests-Runner[92191:3287169] [FlyingFox] <127.0.0.1> request: GET /screenshot
+2026-11-09 18:51:17.745635+0700 maestro-driver-iosUITests-Runner[92191:3287170] [FlyingFox] <127.0.0.1> request: POST /deviceInfo
+    t =    13.95s Getting device orientation
+2026-11-09 18:51:17.750739+0700 maestro-driver-iosUITests-Runner[92191:3287057] Detected running apps: ["handika.oura-studio-frontend"]
+    t =    13.95s Getting device orientation
+2026-11-09 18:51:17.752705+0700 maestro-driver-iosUITests-Runner[92191:3287057] Returning cached screen size
+2026-11-09 18:51:17.752780+0700 maestro-driver-iosUITests-Runner[92191:3287057] Device orientation is 1
+2026-11-09 18:51:17.754850+0700 maestro-driver-iosUITests-Runner[92191:3287169] [FlyingFox] <127.0.0.1> request: POST /viewHierarchy
+2026-11-09 18:51:17.758362+0700 maestro-driver-iosUITests-Runner[92191:3287057] Detected running apps: ["handika.oura-studio-frontend"]
+2026-11-09 18:51:17.759065+0700 maestro-driver-iosUITests-Runner[92191:3287057] [Start] View hierarchy snapshot for Application 'handika.oura-studio-frontend'
+2026-11-09 18:51:17.759144+0700 maestro-driver-iosUITests-Runner[92191:3287057] [ViewHierarchyHandler] Starting getHierarchyWithFallback for element.
+    t =    13.96s Find the Application 'handika.oura-studio-frontend'
+2026-11-09 18:51:17.869452+0700 maestro-driver-iosUITests-Runner[92191:3287057] [ViewHierarchyHandler] Successfully retrieved element hierarchy.
+2026-11-09 18:51:17.869695+0700 maestro-driver-iosUITests-Runner[92191:3287057] Foreground app is not springboard skipping auto tapping on permissions
+2026-11-09 18:51:17.869768+0700 maestro-driver-iosUITests-Runner[92191:3287057] [ViewHierarchyHandler] Fetch status bar hierarchy - start
+    t =    14.07s Checking existence of `StatusBar (First Match)`
+    t =    14.08s Get all elements bound by index for: Descendants matching type StatusBar
+    t =    14.11s Find the StatusBar (Element at index 0)
+    t =    14.15s Find the StatusBar (Element at index 1)
+2026-11-09 18:51:17.985206+0700 maestro-driver-iosUITests-Runner[92191:3287057] Fetch status bar hierarchy - duration 0.11540806293487549
+2026-11-09 18:51:17.985337+0700 maestro-driver-iosUITests-Runner[92191:3287057] [ViewHierarchyHandler] Fetch Safari WebView hierarchy - start
+2026-11-09 18:51:17.986048+0700 maestro-driver-iosUITests-Runner[92191:3287057] Fetch Safari WebView hierarchy - duration 0.0007070302963256836
+    t =    14.19s Find the Application 'com.apple.springboard'
+2026-11-09 18:51:18.015773+0700 maestro-driver-iosUITests-Runner[92191:3287057] [Done] View hierarchy snapshot for Application 'handika.oura-studio-frontend' 
+2026-11-09 18:51:18.057795+0700 maestro-driver-iosUITests-Runner[92191:3287251] [FlyingFox] <127.0.0.1> request: GET /isScreenStatic
+2026-11-09 18:51:18.753287+0700 maestro-driver-iosUITests-Runner[92191:3287168] [FlyingFox] <127.0.0.1> request: GET /screenshot
+2026-11-09 18:51:19.329387+0700 maestro-driver-iosUITests-Runner[92191:3287168] [FlyingFox] <127.0.0.1> request: POST /touch
+2026-11-09 18:51:19.352357+0700 maestro-driver-iosUITests-Runner[92191:3287057] Detected running apps: ["handika.oura-studio-frontend"]
+    t =    15.55s Getting device orientation
+2026-11-09 18:51:19.354734+0700 maestro-driver-iosUITests-Runner[92191:3287057] Returning cached screen size
+    t =    15.55s Getting device orientation
+2026-11-09 18:51:19.356140+0700 maestro-driver-iosUITests-Runner[92191:3287057] Tapping 111.0, 357.0
+    t =    15.56s Getting device orientation
+2026-11-09 18:51:19.737980+0700 maestro-driver-iosUITests-Runner[92191:3287057] Tapping took 0.3680530786514282
+2026-11-09 18:51:19.741737+0700 maestro-driver-iosUITests-Runner[92191:3287169] [FlyingFox] <127.0.0.1> request: GET /isScreenStatic
+2026-11-09 18:51:20.164618+0700 maestro-driver-iosUITests-Runner[92191:3287168] [FlyingFox] <127.0.0.1> request: POST /deviceInfo
+    t =    16.36s Getting device orientation
+2026-11-09 18:51:20.173693+0700 maestro-driver-iosUITests-Runner[92191:3287057] Detected running apps: ["handika.oura-studio-frontend"]
+    t =    16.37s Getting device orientation
+2026-11-09 18:51:20.175874+0700 maestro-driver-iosUITests-Runner[92191:3287057] Returning cached screen size
+2026-11-09 18:51:20.175973+0700 maestro-driver-iosUITests-Runner[92191:3287057] Device orientation is 1
+2026-11-09 18:51:20.180834+0700 maestro-driver-iosUITests-Runner[92191:3287170] [FlyingFox] <127.0.0.1> request: POST /viewHierarchy
+2026-11-09 18:51:20.187077+0700 maestro-driver-iosUITests-Runner[92191:3287057] Detected running apps: ["handika.oura-studio-frontend"]
+2026-11-09 18:51:20.187752+0700 maestro-driver-iosUITests-Runner[92191:3287057] [Start] View hierarchy snapshot for Application 'handika.oura-studio-frontend'
+2026-11-09 18:51:20.187834+0700 maestro-driver-iosUITests-Runner[92191:3287057] [ViewHierarchyHandler] Starting getHierarchyWithFallback for element.
+    t =    16.39s Find the Application 'handika.oura-studio-frontend'
+2026-11-09 18:51:20.366615+0700 maestro-driver-iosUITests-Runner[92191:3287057] [ViewHierarchyHandler] Successfully retrieved element hierarchy.
+2026-11-09 18:51:20.373899+0700 maestro-driver-iosUITests-Runner[92191:3287057] Foreground app is not springboard skipping auto tapping on permissions
+2026-11-09 18:51:20.374007+0700 maestro-driver-iosUITests-Runner[92191:3287057] [ViewHierarchyHandler] Fetch status bar hierarchy - start
+    t =    16.57s Checking existence of `StatusBar (First Match)`
+    t =    16.59s Get all elements bound by index for: Descendants matching type StatusBar
+    t =    16.63s Find the StatusBar (Element at index 0)
+    t =    16.66s Find the StatusBar (Element at index 1)
+2026-11-09 18:51:20.503972+0700 maestro-driver-iosUITests-Runner[92191:3287057] Fetch status bar hierarchy - duration 0.12994492053985596
+2026-11-09 18:51:20.504056+0700 maestro-driver-iosUITests-Runner[92191:3287057] [ViewHierarchyHandler] Fetch Safari WebView hierarchy - start
+2026-11-09 18:51:20.504723+0700 maestro-driver-iosUITests-Runner[92191:3287057] Fetch Safari WebView hierarchy - duration 0.0006560087203979492
+    t =    16.70s Find the Application 'com.apple.springboard'
+2026-11-09 18:51:20.538862+0700 maestro-driver-iosUITests-Runner[92191:3287057] [Done] View hierarchy snapshot for Application 'handika.oura-studio-frontend' 
+2026-11-09 18:51:20.569246+0700 maestro-driver-iosUITests-Runner[92191:3287169] [FlyingFox] <127.0.0.1> request: GET /screenshot
+2026-11-09 18:51:20.801256+0700 maestro-driver-iosUITests-Runner[92191:3287170] [FlyingFox] <127.0.0.1> request: POST /deviceInfo
+    t =    17.00s Getting device orientation
+2026-11-09 18:51:20.812334+0700 maestro-driver-iosUITests-Runner[92191:3287057] Detected running apps: ["handika.oura-studio-frontend"]
+    t =    17.01s Getting device orientation
+2026-11-09 18:51:20.816610+0700 maestro-driver-iosUITests-Runner[92191:3287057] Returning cached screen size
+2026-11-09 18:51:20.816800+0700 maestro-driver-iosUITests-Runner[92191:3287057] Device orientation is 1
+2026-11-09 18:51:20.821030+0700 maestro-driver-iosUITests-Runner[92191:3287168] [FlyingFox] <127.0.0.1> request: POST /viewHierarchy
+2026-11-09 18:51:20.828745+0700 maestro-driver-iosUITests-Runner[92191:3287057] Detected running apps: ["handika.oura-studio-frontend"]
+2026-11-09 18:51:20.830396+0700 maestro-driver-iosUITests-Runner[92191:3287057] [Start] View hierarchy snapshot for Application 'handika.oura-studio-frontend'
+2026-11-09 18:51:20.830561+0700 maestro-driver-iosUITests-Runner[92191:3287057] [ViewHierarchyHandler] Starting getHierarchyWithFallback for element.
+    t =    17.03s Find the Application 'handika.oura-studio-frontend'
+2026-11-09 18:51:21.025822+0700 maestro-driver-iosUITests-Runner[92191:3287057] [ViewHierarchyHandler] Successfully retrieved element hierarchy.
+2026-11-09 18:51:21.026109+0700 maestro-driver-iosUITests-Runner[92191:3287057] Foreground app is not springboard skipping auto tapping on permissions
+2026-11-09 18:51:21.026208+0700 maestro-driver-iosUITests-Runner[92191:3287057] [ViewHierarchyHandler] Fetch status bar hierarchy - start
+    t =    17.23s Checking existence of `StatusBar (First Match)`
+    t =    17.24s Get all elements bound by index for: Descendants matching type StatusBar
+    t =    17.28s Find the StatusBar (Element at index 0)
+    t =    17.31s Find the StatusBar (Element at index 1)
+2026-11-09 18:51:21.154988+0700 maestro-driver-iosUITests-Runner[92191:3287057] Fetch status bar hierarchy - duration 0.12875497341156006
+2026-11-09 18:51:21.155068+0700 maestro-driver-iosUITests-Runner[92191:3287057] [ViewHierarchyHandler] Fetch Safari WebView hierarchy - start
+2026-11-09 18:51:21.155760+0700 maestro-driver-iosUITests-Runner[92191:3287057] Fetch Safari WebView hierarchy - duration 0.000680088996887207
+    t =    17.36s Find the Application 'com.apple.springboard'
+2026-11-09 18:51:21.183122+0700 maestro-driver-iosUITests-Runner[92191:3287057] [Done] View hierarchy snapshot for Application 'handika.oura-studio-frontend' 
+2026-11-09 18:51:21.195244+0700 maestro-driver-iosUITests-Runner[92191:3287170] [FlyingFox] <127.0.0.1> request: GET /isScreenStatic
+2026-11-09 18:51:21.523886+0700 maestro-driver-iosUITests-Runner[92191:3287251] [FlyingFox] <127.0.0.1> request: GET /screenshot
+2026-11-09 18:51:21.748973+0700 maestro-driver-iosUITests-Runner[92191:3287251] [FlyingFox] <127.0.0.1> request: POST /touch
+2026-11-09 18:51:21.753572+0700 maestro-driver-iosUITests-Runner[92191:3287057] Detected running apps: ["handika.oura-studio-frontend"]
+    t =    17.95s Getting device orientation
+2026-11-09 18:51:21.755547+0700 maestro-driver-iosUITests-Runner[92191:3287057] Returning cached screen size
+    t =    17.96s Getting device orientation
+2026-11-09 18:51:21.756902+0700 maestro-driver-iosUITests-Runner[92191:3287057] Tapping 51.0, 100.0
+    t =    17.96s Getting device orientation
+2026-11-09 18:51:22.086279+0700 maestro-driver-iosUITests-Runner[92191:3287057] Tapping took 0.3280329704284668
+2026-11-09 18:51:22.089958+0700 maestro-driver-iosUITests-Runner[92191:3287168] [FlyingFox] <127.0.0.1> request: GET /isScreenStatic
+2026-11-09 18:51:22.534404+0700 maestro-driver-iosUITests-Runner[92191:3287169] [FlyingFox] <127.0.0.1> request: GET /isScreenStatic
+2026-11-09 18:51:23.050424+0700 maestro-driver-iosUITests-Runner[92191:3287251] [FlyingFox] <127.0.0.1> request: GET /isScreenStatic
+2026-11-09 18:51:23.477022+0700 maestro-driver-iosUITests-Runner[92191:3287168] [FlyingFox] <127.0.0.1> request: POST /deviceInfo
+    t =    19.68s Getting device orientation
+2026-11-09 18:51:23.490374+0700 maestro-driver-iosUITests-Runner[92191:3287057] Detected running apps: ["handika.oura-studio-frontend"]
+    t =    19.69s Getting device orientation
+2026-11-09 18:51:23.492184+0700 maestro-driver-iosUITests-Runner[92191:3287057] Returning cached screen size
+2026-11-09 18:51:23.492251+0700 maestro-driver-iosUITests-Runner[92191:3287057] Device orientation is 1
+2026-11-09 18:51:23.494961+0700 maestro-driver-iosUITests-Runner[92191:3287170] [FlyingFox] <127.0.0.1> request: POST /viewHierarchy
+2026-11-09 18:51:23.498379+0700 maestro-driver-iosUITests-Runner[92191:3287057] Detected running apps: ["handika.oura-studio-frontend"]
+2026-11-09 18:51:23.498998+0700 maestro-driver-iosUITests-Runner[92191:3287057] [Start] View hierarchy snapshot for Application 'handika.oura-studio-frontend'
+2026-11-09 18:51:23.499086+0700 maestro-driver-iosUITests-Runner[92191:3287057] [ViewHierarchyHandler] Starting getHierarchyWithFallback for element.
+    t =    19.70s Find the Application 'handika.oura-studio-frontend'
+2026-11-09 18:51:23.615436+0700 maestro-driver-iosUITests-Runner[92191:3287057] [ViewHierarchyHandler] Successfully retrieved element hierarchy.
+2026-11-09 18:51:23.615712+0700 maestro-driver-iosUITests-Runner[92191:3287057] Foreground app is not springboard skipping auto tapping on permissions
+2026-11-09 18:51:23.615777+0700 maestro-driver-iosUITests-Runner[92191:3287057] [ViewHierarchyHandler] Fetch status bar hierarchy - start
+    t =    19.82s Checking existence of `StatusBar (First Match)`
+    t =    19.83s Get all elements bound by index for: Descendants matching type StatusBar
+    t =    19.86s Find the StatusBar (Element at index 0)
+    t =    19.90s Find the StatusBar (Element at index 1)
+2026-11-09 18:51:23.736780+0700 maestro-driver-iosUITests-Runner[92191:3287057] Fetch status bar hierarchy - duration 0.1208949089050293
+2026-11-09 18:51:23.736855+0700 maestro-driver-iosUITests-Runner[92191:3287057] [ViewHierarchyHandler] Fetch Safari WebView hierarchy - start
+2026-11-09 18:51:23.737503+0700 maestro-driver-iosUITests-Runner[92191:3287057] Fetch Safari WebView hierarchy - duration 0.0006400346755981445
+    t =    19.94s Find the Application 'com.apple.springboard'
+2026-11-09 18:51:23.763599+0700 maestro-driver-iosUITests-Runner[92191:3287057] [Done] View hierarchy snapshot for Application 'handika.oura-studio-frontend' 
+2026-11-09 18:51:23.782341+0700 maestro-driver-iosUITests-Runner[92191:3287170] [FlyingFox] <127.0.0.1> request: GET /screenshot
+2026-11-09 18:51:34.139339+0700 maestro-driver-iosUITests-Runner[92191:3287251] [FlyingFox] <127.0.0.1> request: GET /status

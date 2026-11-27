@@ -1,0 +1,9 @@
+09:50:04.379 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Define variables RUNNING
+09:50:04.383 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Define variables COMPLETED
+09:50:04.384 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Apply configuration RUNNING
+09:50:04.384 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Apply configuration COMPLETED
+09:50:04.385 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Launch app "handika.oura-studio-frontend" RUNNING
+09:50:05.367 [ INFO] maestro.Maestro.launchApp$lambda$5: Launching app handika.oura-studio-frontend
+09:50:05.368 [ INFO] maestro.Maestro.launchApp$lambda$5: Stopping handika.oura-studio-frontend app during launch
+09:50:06.989 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Launch app "handika.oura-studio-frontend" COMPLETED
+09:50:06.992 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Tap on "Produk" RUNNING

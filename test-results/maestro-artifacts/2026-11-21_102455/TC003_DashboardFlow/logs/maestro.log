@@ -1,0 +1,46 @@
+10:25:09.976 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Define variables RUNNING
+10:25:09.980 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Define variables COMPLETED
+10:25:09.980 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Apply configuration RUNNING
+10:25:09.981 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Apply configuration COMPLETED
+10:25:09.981 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Launch app "handika.oura-studio-frontend" RUNNING
+10:25:10.534 [ INFO] maestro.Maestro.launchApp$lambda$5: Launching app handika.oura-studio-frontend
+10:25:10.534 [ INFO] maestro.Maestro.launchApp$lambda$5: Stopping handika.oura-studio-frontend app during launch
+10:25:11.978 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Launch app "handika.oura-studio-frontend" COMPLETED
+10:25:11.979 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Assert that "OURA STUDIOS" is visible RUNNING
+10:25:15.085 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Assert that "OURA STUDIOS" is visible COMPLETED
+10:25:15.086 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Assert that "Aksi Cepat" is visible RUNNING
+10:25:15.384 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Assert that "Aksi Cepat" is visible COMPLETED
+10:25:15.384 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Assert that "Pendapatan Hari Ini" is visible RUNNING
+10:25:15.769 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Assert that "Pendapatan Hari Ini" is visible COMPLETED
+10:25:15.769 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Take screenshot TC003_01_Dashboard RUNNING
+10:25:15.773 [ INFO] maestro.Maestro.takeScreenshot: Taking screenshot
+10:25:15.774 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+10:25:16.005 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Take screenshot TC003_01_Dashboard COMPLETED
+10:25:16.006 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Tap on "Beli Bahan" RUNNING
+10:25:16.308 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tapping on element:  UiElement(treeNode=TreeNode(attributes={accessibilityText=Beli Bahan, title=, value=, text=, hintText=, resource-id=, bounds=[80,353][143,367], enabled=true, focused=false, selected=false, checked=false}, children=[], clickable=null, enabled=true, focused=false, checked=false, selected=false), bounds=Bounds(x=80, y=353, width=63, height=14))
+10:25:16.751 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tap aimed via trusted pre-wait hierarchy (null settle, no recent scroll)
+10:25:16.755 [ INFO] maestro.Maestro.screenshotBasedTap-ogj28Uc: Try tapping at (111, 360) using hierarchy based logic for wait
+10:25:16.756 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to byte array
+10:25:16.756 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+10:25:17.968 [ INFO] maestro.Maestro.screenshotBasedTap-ogj28Uc: Something have changed in the UI judging by view hierarchy. Proceed.
+10:25:17.968 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Tap on "Beli Bahan" COMPLETED
+10:25:17.968 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Assert that "Tambah Pembelian" is visible RUNNING
+10:25:18.486 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Assert that "Tambah Pembelian" is visible COMPLETED
+10:25:18.486 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Take screenshot TC003_02_SheetTambahPembelian RUNNING
+10:25:18.488 [ INFO] maestro.Maestro.takeScreenshot: Taking screenshot
+10:25:18.490 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+10:25:18.685 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Take screenshot TC003_02_SheetTambahPembelian COMPLETED
+10:25:18.685 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Tap on "Batal" RUNNING
+10:25:18.964 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tapping on element:  UiElement(treeNode=TreeNode(attributes={accessibilityText=Batal, title=, value=, text=, hintText=, resource-id=pembelian-batal-button, bounds=[20,82][82,118], enabled=true, focused=false, selected=false, checked=false}, children=[], clickable=null, enabled=true, focused=false, checked=false, selected=false), bounds=Bounds(x=20, y=82, width=62, height=36))
+10:25:19.285 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tap aimed via trusted pre-wait hierarchy (null settle, no recent scroll)
+10:25:19.286 [ INFO] maestro.Maestro.screenshotBasedTap-ogj28Uc: Try tapping at (51, 100) using hierarchy based logic for wait
+10:25:19.287 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to byte array
+10:25:19.287 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+10:25:21.205 [ INFO] maestro.Maestro.screenshotBasedTap-ogj28Uc: Something have changed in the UI judging by view hierarchy. Proceed.
+10:25:21.206 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Tap on "Batal" COMPLETED
+10:25:21.206 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Assert that "OURA STUDIOS" is visible RUNNING
+10:25:21.484 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Assert that "OURA STUDIOS" is visible COMPLETED
+10:25:21.485 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Take screenshot TC003_03_KembaliDashboard RUNNING
+10:25:21.487 [ INFO] maestro.Maestro.takeScreenshot: Taking screenshot
+10:25:21.487 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+10:25:21.704 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Take screenshot TC003_03_KembaliDashboard COMPLETED

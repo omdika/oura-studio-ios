@@ -9,83 +9,71 @@ struct StokOpnameListView: View {
     @State private var showingNewSession = false
 
     var body: some View {
-        NavigationStack {
-            Group {
-                if isLoading && sessions.isEmpty {
-                    ProgressView("Memuat…")
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if sessions.isEmpty {
-                    VStack(spacing: 16) {
-                        Image(systemName: "clipboard")
-                            .font(.system(size: 48))
-                            .foregroundStyle(OuraTheme.Colors.textTertiary)
-                        Text("Belum ada sesi stok opname")
-                            .font(.system(size: 17, weight: .semibold))
-                            .foregroundStyle(OuraTheme.Colors.textPrimary)
-                        Text("Mulai sesi baru untuk menghitung stok fisik produk dengan scan QR.")
-                            .font(.system(size: 14))
-                            .foregroundStyle(OuraTheme.Colors.textSecondary)
-                            .multilineTextAlignment(.center)
-                        Button("Buat Opname Baru") {
-                            showingNewSession = true
-                        }
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 48)
-                        .background(OuraTheme.Colors.accentGradient)
-                        .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.large))
-                    }
-                    .padding(32)
+        Group {
+            if isLoading && sessions.isEmpty {
+                ProgressView("Memuat…")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(OuraTheme.Colors.background)
-                } else {
-                    List {
-                        ForEach(sessions) { session in
-                            NavigationLink(value: session) {
-                                sessionRow(session)
-                            }
-                        }
-                    }
-                    .listStyle(.plain)
-                    .scrollContentBackground(.hidden)
-                    .background(OuraTheme.Colors.background)
-                    .navigationDestination(for: StockOpnameSession.self) { session in
-                        if session.status == "completed" {
-                            StokOpnameResultView(session: session)
-                                .environmentObject(api)
-                        } else {
-                            StokOpnameScannerView(session: session)
-                                .environmentObject(api)
-                        }
-                    }
-                }
-            }
-            .navigationTitle("Stok Opname")
-            .navigationBarTitleDisplayMode(.large)
-            .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    Button("Baru") {
+            } else if sessions.isEmpty {
+                VStack(spacing: 16) {
+                    Image(systemName: "clipboard")
+                        .font(.system(size: 48))
+                        .foregroundStyle(OuraTheme.Colors.textTertiary)
+                    Text("Belum ada sesi stok opname")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(OuraTheme.Colors.textPrimary)
+                    Text("Mulai sesi baru untuk menghitung stok fisik produk dengan scan QR.")
+                        .font(.system(size: 14))
+                        .foregroundStyle(OuraTheme.Colors.textSecondary)
+                        .multilineTextAlignment(.center)
+                    Button("Buat Opname Baru") {
                         showingNewSession = true
                     }
-                    .foregroundStyle(OuraTheme.Colors.accent)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 48)
+                    .background(OuraTheme.Colors.accentGradient)
+                    .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.large))
                 }
+                .padding(32)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(OuraTheme.Colors.background)
+            } else {
+                List {
+                    ForEach(sessions) { session in
+                        NavigationLink(value: session) {
+                            sessionRow(session)
+                        }
+                    }
+                }
+                .listStyle(.plain)
+                .scrollContentBackground(.hidden)
+                .background(OuraTheme.Colors.background)
             }
-            .refreshable {
-                await loadSessions()
-            }
-            .task {
-                await loadSessions()
-            }
-            .alert("Error", isPresented: .constant(errorMsg != nil)) {
-                Button("OK") { errorMsg = nil }
-            } message: {
-                Text(errorMsg ?? "")
-            }
-            .sheet(isPresented: $showingNewSession) {
-                StokOpnameNewSessionSheet()
+        }
+        .navigationDestination(for: StockOpnameSession.self) { session in
+            if session.status == "completed" {
+                StokOpnameResultView(session: session)
+                    .environmentObject(api)
+            } else {
+                StokOpnameScannerView(session: session)
                     .environmentObject(api)
             }
+        }
+        .refreshable {
+            await loadSessions()
+        }
+        .task {
+            await loadSessions()
+        }
+        .alert("Error", isPresented: .constant(errorMsg != nil)) {
+            Button("OK") { errorMsg = nil }
+        } message: {
+            Text(errorMsg ?? "")
+        }
+        .sheet(isPresented: $showingNewSession) {
+            StokOpnameNewSessionSheet()
+                .environmentObject(api)
         }
     }
 
@@ -104,7 +92,7 @@ struct StokOpnameListView: View {
                     .font(.system(size: 12))
                     .foregroundStyle(OuraTheme.Colors.textSecondary)
             }
-            Text("\(session.itemCount) item • \(session.totalVarianceValue, specifier: "%.0f") Rp variansi")
+            Text("\(session.itemCount) item • \(String(format: "%.0f", session.totalVarianceValue)) Rp variansi")
                 .font(.system(size: 14))
                 .foregroundStyle(OuraTheme.Colors.textPrimary)
             if let note = session.note, !note.isEmpty {

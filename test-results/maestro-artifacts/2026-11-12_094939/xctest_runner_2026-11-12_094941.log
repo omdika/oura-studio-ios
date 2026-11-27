@@ -1,0 +1,70 @@
+2026-11-12 09:49:43.417 xcodebuild[43128:5352793] [MT] IDERunDestination: Supported platforms for the buildables in the current scheme is empty.
+2026-11-12 09:49:43.430 xcodebuild[43128:5352793] [MT] IDERunDestination: Supported platforms for the buildables in the current scheme is empty.
+2026-11-12 09:49:45.259 xcodebuild[43128:5352793] [MT] IDERunDestination: Supported platforms for the buildables in the current scheme is empty.
+2026-11-12 09:50:55.497 xcodebuild[43128:5352793] [MT] IDETesting: Failed to construct test run summaries and write them to the result bundle: fileSystemFailure(reason: "mkstemp: No such file or directory")
+2026-11-12 09:50:55.500 xcodebuild[43128:5352793] [MT] IDETestOperationsObserverDebug: 70.236 elapsed -- Testing started completed.
+2026-11-12 09:50:55.500 xcodebuild[43128:5352793] [MT] IDETestOperationsObserverDebug: 0.000 sec, +0.000 sec -- start
+2026-11-12 09:50:55.500 xcodebuild[43128:5352793] [MT] IDETestOperationsObserverDebug: 70.237 sec, +70.237 sec -- end
+2026-11-12 09:50:55.686 xcodebuild[43128:5352793] [MT] IDEResultKit: Warning: While writing a result bundle to /var/folders/3g/1my7cjns0hv_ty65clq5x7fw0000gn/T/maestro_xctestrunner_xcodebuild_output15334849663750687530/Logs/Test/Test-maestro-driver-ios-2026.11.12_09-49-43-+0700.xcresult, not all contents have been imported, as the Staging directory still contains the following files/directories: ["1_Test"]
+2026-11-12 09:50:55.690 xcodebuild[43128:5352793] [MT] IDETesting: Result bundle saving failed with error: Error Domain=IDEFoundationErrorDomain Code=12 "The result bundle could not be saved due to multiple errors: failed to import activity log, underlying error: fileSystemFailure(reason: "mkstemp: No such file or directory"), The operation couldn’t be completed. (XCResultKit_CASDB.FileBackedCASDatabase.Error error 0.)" UserInfo={NSLocalizedDescription=The result bundle could not be saved due to multiple errors: failed to import activity log, underlying error: fileSystemFailure(reason: "mkstemp: No such file or directory"), The operation couldn’t be completed. (XCResultKit_CASDB.FileBackedCASDatabase.Error error 0.), NSUnderlyingError=0x83ccb49c0 {Error Domain=IDEFoundation.ResultBundleError Code=2 "failed to import activity log, underlying error: fileSystemFailure(reason: "mkstemp: No such file or directory")"}}.
+Failing tests:
+	maestro_driver_iosUITests.testHttpServer()
+
+** TEST EXECUTE FAILED **
+
+dlerV2ClassificationTests testUIQueryTimeoutIsClassifiedAsTimeout]' started.
+    t =     0.00s Start Test at 2026-11-12 09:50:03.598
+    t =     0.01s Set Up
+    t =     0.01s Tear Down
+Test Case '-[maestro_driver_iosUITests.SwipeRouteHandlerV2ClassificationTests testUIQueryTimeoutIsClassifiedAsTimeout]' passed (0.014 seconds).
+Test Case '-[maestro_driver_iosUITests.SwipeRouteHandlerV2ClassificationTests testUnrelatedXCTFutureErrorStaysInternal]' started.
+    t =     0.00s Start Test at 2026-11-12 09:50:03.609
+    t =     0.00s Set Up
+    t =     0.00s Tear Down
+Test Case '-[maestro_driver_iosUITests.SwipeRouteHandlerV2ClassificationTests testUnrelatedXCTFutureErrorStaysInternal]' passed (0.003 seconds).
+Test Case '-[maestro_driver_iosUITests.SwipeRouteHandlerV2ClassificationTests testXCTFutureCode1000WithUnrelatedMessageStaysInternal]' started.
+    t =     0.00s Start Test at 2026-11-12 09:50:03.613
+    t =     0.00s Set Up
+    t =     0.00s Tear Down
+Test Case '-[maestro_driver_iosUITests.SwipeRouteHandlerV2ClassificationTests testXCTFutureCode1000WithUnrelatedMessageStaysInternal]' passed (0.003 seconds).
+Test Suite 'SwipeRouteHandlerV2ClassificationTests' passed at 2026-11-12 09:50:03.642.
+	 Executed 6 tests, with 0 failures (0 unexpected) in 0.034 (0.064) seconds
+Test Suite 'maestro_driver_iosUITests' started at 2026-11-12 09:50:03.643.
+    t =      nans Suite Set Up
+Test Case '-[maestro_driver_iosUITests.maestro_driver_iosUITests testHttpServer]' started.
+    t =     0.00s Start Test at 2026-11-12 09:50:03.644
+    t =     0.00s Set Up
+2026-11-12 09:50:03.646496+0700 maestro-driver-iosUITests-Runner[43178:5353970] [maestro_driver_iosUITests] Will start HTTP server
+2026-11-12 09:50:03.744788+0700 maestro-driver-iosUITests-Runner[43178:5354103] [General] Failed to send CA Event for app launch measurements for ca_event_type: 1 event_name: com.apple.app_launch_measurement.ExtendedLaunchMetrics
+2026-11-12 09:50:03.766366+0700 maestro-driver-iosUITests-Runner[43178:5353970] [FlyingFox] starting server 127.0.0.1:56003
+2026-11-12 09:50:03.774896+0700 maestro-driver-iosUITests-Runner[43178:5353970] [FlyingFox] <127.0.0.1> open connection
+2026-11-12 09:50:03.782401+0700 maestro-driver-iosUITests-Runner[43178:5353970] [FlyingFox] <127.0.0.1> request: GET /status
+2026-11-12 09:50:03.910789+0700 maestro-driver-iosUITests-Runner[43178:5354107] [FlyingFox] <127.0.0.1> open connection
+2026-11-12 09:50:03.912164+0700 maestro-driver-iosUITests-Runner[43178:5353969] [FlyingFox] <127.0.0.1> request: POST /deviceInfo
+    t =     0.27s Getting device orientation
+2026-11-12 09:50:03.956035+0700 maestro-driver-iosUITests-Runner[43178:5353659] Using singleton test manager
+2026-11-12 09:50:03.957533+0700 maestro-driver-iosUITests-Runner[43178:5353659] Detected running apps: ["handika.oura-studio-frontend"]
+    t =     0.32s Getting device orientation
+    t =     0.32s Find the Application 'handika.oura-studio-frontend'
+2026-11-12 09:50:04.270704+0700 maestro-driver-iosUITests-Runner[43178:5353659] Device orientation is 1
+2026-11-12 09:50:05.356584+0700 maestro-driver-iosUITests-Runner[43178:5353970] [FlyingFox] <127.0.0.1> request: POST /setPermissions
+2026-11-12 09:50:05.372130+0700 maestro-driver-iosUITests-Runner[43178:5354103] [FlyingFox] <127.0.0.1> request: POST /terminateApp
+2026-11-12 09:50:05.374858+0700 maestro-driver-iosUITests-Runner[43178:5353659] [Start] Terminating app handika.oura-studio-frontend
+    t =     1.73s Terminate handika.oura-studio-frontend:1907
+2026-11-12 09:50:06.430909+0700 maestro-driver-iosUITests-Runner[43178:5353659] [End] Terminating app handika.oura-studio-frontend
+2026-11-12 09:50:07.011073+0700 maestro-driver-iosUITests-Runner[43178:5354107] [FlyingFox] <127.0.0.1> request: POST /deviceInfo
+    t =     3.37s Getting device orientation
+2026-11-12 09:50:07.096161+0700 maestro-driver-iosUITests-Runner[43178:5353659] Detected running apps: ["handika.oura-studio-frontend"]
+    t =     3.46s Getting device orientation
+2026-11-12 09:50:07.102127+0700 maestro-driver-iosUITests-Runner[43178:5353659] Returning cached screen size
+2026-11-12 09:50:07.102501+0700 maestro-driver-iosUITests-Runner[43178:5353659] Device orientation is 1
+2026-11-12 09:50:07.679361+0700 maestro-driver-iosUITests-Runner[43178:5353968] [FlyingFox] <127.0.0.1> request: POST /viewHierarchy
+2026-11-12 09:50:07.694875+0700 maestro-driver-iosUITests-Runner[43178:5353659] Detected running apps: ["handika.oura-studio-frontend"]
+2026-11-12 09:50:07.696505+0700 maestro-driver-iosUITests-Runner[43178:5353659] [Start] View hierarchy snapshot for Application 'handika.oura-studio-frontend'
+2026-11-12 09:50:07.696686+0700 maestro-driver-iosUITests-Runner[43178:5353659] [ViewHierarchyHandler] Starting getHierarchyWithFallback for element.
+    t =     4.05s Find the Application 'handika.oura-studio-frontend'
+
+Test session results, code coverage, and logs:
+	/var/folders/3g/1my7cjns0hv_ty65clq5x7fw0000gn/T/maestro_xctestrunner_xcodebuild_output15334849663750687530/Logs/Test/Test-maestro-driver-ios-2026.11.12_09-49-43-+0700.xcresult
+
+Testing started

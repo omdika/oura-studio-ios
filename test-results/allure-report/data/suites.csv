@@ -1,0 +1,5 @@
+"DESCRIPTION","DURATION IN MS","NAME","PARENT SUITE","START TIME","STATUS","STOP TIME","SUB SUITE","SUITE","TEST CLASS","TEST METHOD"
+"","28518","TC006_JualHargaDiskon","","2026-11-20","passed","2026-11-20","","Maestro","TC-006",""
+"","22835","TC003_DashboardFlow","","2026-11-20","passed","2026-11-20","","Maestro","TC-003",""
+"","107081","TC005_TambahStokSatu","","2026-11-20","passed","2026-11-20","","Maestro","TC-005",""
+"","101171","TC004_TambahProdukManual","","2026-11-20","failed","2026-11-20","","Maestro","TC-004",""

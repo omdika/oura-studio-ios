@@ -1,0 +1,6 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<testsuites>
+  <testsuite name="Test Suite" device="iPhone 17 Pro - iOS 26.2 - 8FA3AD06-AED5-421F-A1B6-178EFEF3D25A" tests="1" failures="0" time="13.082" timestamp="2026-11-21T10:25:09">
+    <testcase id="TC003_DashboardFlow" name="TC003_DashboardFlow" classname="TC003_DashboardFlow" file="test/scripts/TC003_DashboardFlow.yaml" time="13.068" timestamp="2026-11-21T10:25:09" status="SUCCESS"/>
+  </testsuite>
+</testsuites>

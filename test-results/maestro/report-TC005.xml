@@ -1,0 +1,6 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<testsuites>
+  <testsuite name="Test Suite" device="iPhone 17 Pro - iOS 26.2 - 8FA3AD06-AED5-421F-A1B6-178EFEF3D25A" tests="1" failures="0" time="97.708" timestamp="2026-11-12T11:07:56">
+    <testcase id="TC005_TambahStokSatu" name="TC005_TambahStokSatu" classname="TC005_TambahStokSatu" file="test/scripts/TC005_TambahStokSatu.yaml" time="97.681" timestamp="2026-11-12T11:07:56" status="SUCCESS"/>
+  </testsuite>
+</testsuites>

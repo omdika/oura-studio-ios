@@ -1,0 +1,60 @@
+20:40:50.997 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Define variables RUNNING
+20:40:51.002 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Define variables COMPLETED
+20:40:51.003 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Apply configuration RUNNING
+20:40:51.003 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Apply configuration COMPLETED
+20:40:51.004 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Launch app "handika.oura-studio-frontend" RUNNING
+20:40:52.048 [ INFO] maestro.Maestro.launchApp$lambda$5: Launching app handika.oura-studio-frontend
+20:40:52.048 [ INFO] maestro.Maestro.launchApp$lambda$5: Stopping handika.oura-studio-frontend app during launch
+20:40:53.707 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Launch app "handika.oura-studio-frontend" COMPLETED
+20:40:53.709 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Tap on "Produk" RUNNING
+20:40:58.698 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tapping on element:  UiElement(treeNode=TreeNode(attributes={accessibilityText=Produk, title=, value=, text=, hintText=, resource-id=, bounds=[161,795][235,849], enabled=true, focused=false, selected=false, checked=false}, children=[TreeNode(attributes={accessibilityText=tag, title=, value=, text=, hintText=, resource-id=tag.fill, bounds=[183,801][214,831], enabled=true, focused=false, selected=false, checked=false}, children=[], clickable=null, enabled=true, focused=false, checked=false, selected=false)], clickable=null, enabled=true, focused=false, checked=false, selected=false), bounds=Bounds(x=161, y=795, width=74, height=54))
+20:40:59.294 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tap aimed via trusted pre-wait hierarchy (null settle, no recent scroll)
+20:40:59.301 [ INFO] maestro.Maestro.screenshotBasedTap-ogj28Uc: Try tapping at (198, 822) using hierarchy based logic for wait
+20:40:59.313 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to byte array
+20:40:59.313 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+20:41:33.283 [ INFO] maestro.Maestro.screenshotBasedTap-ogj28Uc: Something have changed in the UI judging by view hierarchy. Proceed.
+20:41:33.285 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Tap on "Produk" COMPLETED
+20:41:33.287 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Assert that "Produk" is visible RUNNING
+20:41:38.720 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Assert that "Produk" is visible COMPLETED
+20:41:38.721 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Take screenshot TC004_01_Produk RUNNING
+20:41:38.729 [ INFO] maestro.Maestro.takeScreenshot: Taking screenshot
+20:41:38.730 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+20:41:38.933 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Take screenshot TC004_01_Produk COMPLETED
+20:41:38.933 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Tap on "Add" RUNNING
+20:41:44.407 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tapping on element:  UiElement(treeNode=TreeNode(attributes={accessibilityText=Add, title=, value=, text=, hintText=, resource-id=plus, bounds=[349,738][363,752], enabled=true, focused=false, selected=false, checked=false}, children=[], clickable=null, enabled=true, focused=false, checked=false, selected=false), bounds=Bounds(x=349, y=738, width=14, height=14))
+20:41:44.770 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tap aimed via trusted pre-wait hierarchy (null settle, no recent scroll)
+20:41:44.772 [ INFO] maestro.Maestro.screenshotBasedTap-ogj28Uc: Try tapping at (356, 745) using hierarchy based logic for wait
+20:41:44.773 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to byte array
+20:41:44.773 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+20:41:45.745 [ INFO] maestro.Maestro.screenshotBasedTap-ogj28Uc: Something have changed in the UI judging by view hierarchy. Proceed.
+20:41:45.746 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Tap on "Add" COMPLETED
+20:41:45.746 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Assert that "BUAT PRODUK BARU" is visible RUNNING
+20:41:52.951 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Assert that "BUAT PRODUK BARU" is visible COMPLETED
+20:41:52.955 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Take screenshot TC004_02_Sheet RUNNING
+20:41:52.957 [ INFO] maestro.Maestro.takeScreenshot: Taking screenshot
+20:41:52.958 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+20:41:53.438 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Take screenshot TC004_02_Sheet COMPLETED
+20:41:53.442 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Tap on point (257,650) RUNNING
+20:41:53.454 [ INFO] maestro.Maestro.screenshotBasedTap-ogj28Uc: Try tapping at (257, 650) using hierarchy based logic for wait
+20:41:55.679 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to byte array
+20:41:55.679 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+20:41:57.414 [ INFO] maestro.Maestro.screenshotBasedTap-ogj28Uc: Something have changed in the UI judging by view hierarchy. Proceed.
+20:41:57.414 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Tap on point (257,650) COMPLETED
+20:41:57.415 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Input text Boneka Zeta Healed RUNNING
+20:41:57.417 [ INFO] maestro.Maestro.inputText: Inputting text: Boneka Zeta Healed
+20:42:02.443 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Input text Boneka Zeta Healed COMPLETED
+20:42:02.445 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Tap on point (200,400) RUNNING
+20:42:02.446 [ INFO] maestro.Maestro.screenshotBasedTap-ogj28Uc: Try tapping at (200, 400) using hierarchy based logic for wait
+20:42:04.521 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to byte array
+20:42:04.522 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+20:42:05.608 [ INFO] maestro.Maestro.screenshotBasedTap-ogj28Uc: Something have changed in the UI judging by view hierarchy. Proceed.
+20:42:05.608 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Tap on point (200,400) COMPLETED
+20:42:05.608 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Take screenshot TC004_04_AfterSave RUNNING
+20:42:05.610 [ INFO] maestro.Maestro.takeScreenshot: Taking screenshot
+20:42:05.610 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+20:42:05.794 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Take screenshot TC004_04_AfterSave COMPLETED
+20:42:05.794 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Assert that "Boneka Zeta Healed" is visible RUNNING
+20:42:35.644 [ERROR] maestro.orchestra.Orchestra.executeCommands: [Command execution] CommandFailed: Assertion is false: "Boneka Zeta Healed" is visible
+20:42:40.898 [ INFO] maestro.Maestro.takeScreenshot: Taking screenshot
+20:42:40.899 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+20:42:41.106 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Assert that "Boneka Zeta Healed" is visible FAILED

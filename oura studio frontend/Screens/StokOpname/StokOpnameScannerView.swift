@@ -1,7 +1,8 @@
 import SwiftUI
+import VisionKit
 
 /// Layar scanner + cart hitungan untuk satu sesi stok opname.
-/// Kamera di atas, cart hitungan di bawah.
+/// Kamera QR live di atas, cart hitungan di bawah.
 struct StokOpnameScannerView: View {
     @EnvironmentObject private var api: APIService
     @Environment(\.dismiss) private var dismiss
@@ -13,85 +14,160 @@ struct StokOpnameScannerView: View {
     @State private var errorMsg: String?
     @State private var showingNewProduct = false
     @State private var navigatingToReconcile = false
+    @State private var isScannerActive = true
+    @State private var lastScanMessage: String?
+    @State private var isProcessingScan = false
+
+    private let cache = QRProductCache.shared
 
     var body: some View {
-        NavigationStack {
-            ZStack {
-                // Placeholder kamera QR — integrate dengan QRScannerSheet
-                VStack(spacing: 0) {
-                    cameraPlaceholder
-
-                    // Cart hitungan (inline di bawah)
-                    cartSection
-                }
-                .background(OuraTheme.Colors.background)
-            }
-            .navigationTitle("Scan & Hitung")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Tutup") { dismiss() }
-                        .foregroundStyle(OuraTheme.Colors.accent)
-                }
-                ToolbarItem(placement: .primaryAction) {
-                    Button("Tambah Produk") {
-                        showingNewProduct = true
-                    }
+        VStack(spacing: 0) {
+            cameraSection
+            cartSection
+        }
+        .background(OuraTheme.Colors.background)
+        .navigationTitle("Scan & Hitung")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("Tutup") { dismiss() }
                     .foregroundStyle(OuraTheme.Colors.accent)
+            }
+            ToolbarItem(placement: .primaryAction) {
+                Button("Tambah Manual") {
+                    showingNewProduct = true
                 }
+                .foregroundStyle(OuraTheme.Colors.accent)
             }
-            .sheet(isPresented: $showingNewProduct) {
-                StokOpnameNewProductSheet(sessionId: session.id)
-                    .environmentObject(api)
-            }
-            .navigationDestination(isPresented: $navigatingToReconcile) {
-                StokOpnameReconcileView(session: session, items: items)
-                    .environmentObject(api)
-            }
-            .task {
-                await loadItems()
-            }
-            .alert("Error", isPresented: .constant(errorMsg != nil)) {
-                Button("OK") { errorMsg = nil }
-            } message: {
-                Text(errorMsg ?? "")
-            }
+        }
+        .sheet(isPresented: $showingNewProduct) {
+            StokOpnameNewProductSheet(sessionId: session.id)
+                .environmentObject(api)
+        }
+        .navigationDestination(isPresented: $navigatingToReconcile) {
+            StokOpnameReconcileView(session: session, items: items)
+                .environmentObject(api)
+        }
+        .task {
+            await cache.preload(api: api)
+            await loadItems()
+        }
+        .alert("Error", isPresented: .constant(errorMsg != nil)) {
+            Button("OK") { errorMsg = nil }
+        } message: {
+            Text(errorMsg ?? "")
         }
     }
 
-    private var cameraPlaceholder: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "qrcode.viewfinder")
-                .font(.system(size: 64))
-                .foregroundStyle(OuraTheme.Colors.accent)
-            Text("Kamera QR")
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(OuraTheme.Colors.textPrimary)
-            Text("Arahkan kamera ke QR code produk untuk menambah ke hitungan.")
-                .font(.system(size: 14))
-                .foregroundStyle(OuraTheme.Colors.textSecondary)
-                .multilineTextAlignment(.center)
-            Button("Integrasikan QRScannerSheet di sini") {
-                // Placeholder — integrasikan DataScannerViewController seperti QRScannerSheet
+    // MARK: - Camera Section
+
+    private var cameraSection: some View {
+        ZStack(alignment: .bottom) {
+            if DataScannerViewController.isSupported && DataScannerViewController.isAvailable {
+                DataScannerRepresentable(isActive: isScannerActive) { raw in
+                    Task { await handleScan(raw) }
+                }
+                .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.large))
+            } else {
+                VStack(spacing: 12) {
+                    Image(systemName: "camera.fill")
+                        .font(.system(size: 40))
+                        .foregroundStyle(OuraTheme.Colors.textTertiary)
+                    Text("Kamera tidak tersedia")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(OuraTheme.Colors.textSecondary)
+                    Text("Gunakan \"Tambah Manual\" untuk menambah produk.")
+                        .font(.system(size: 13))
+                        .foregroundStyle(OuraTheme.Colors.textTertiary)
+                        .multilineTextAlignment(.center)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(OuraTheme.Colors.surfaceCard)
+                .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.large))
             }
-            .font(.system(size: 13))
-            .foregroundStyle(OuraTheme.Colors.accent)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
-            .background(OuraTheme.Colors.accentLight.opacity(0.3))
-            .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.medium))
+
+            // Scan status overlay
+            if let msg = lastScanMessage {
+                Text(msg)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .background(.black.opacity(0.7))
+                    .clipShape(Capsule())
+                    .padding(.bottom, 12)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .animation(.easeInOut(duration: 0.3), value: lastScanMessage)
+            }
+
+            if isProcessingScan {
+                ProgressView()
+                    .tint(.white)
+                    .padding(8)
+                    .background(.black.opacity(0.5))
+                    .clipShape(Circle())
+                    .padding(.bottom, 12)
+            }
         }
-        .padding(32)
-        .frame(maxWidth: .infinity)
-        .frame(height: 260)
-        .background(OuraTheme.Colors.surfaceCard)
-        .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.large))
+        .frame(height: 240)
         .padding(.horizontal, 16)
         .padding(.top, 8)
     }
 
+    // MARK: - Cart Section
+
     private var cartSection: some View {
         VStack(alignment: .leading, spacing: 0) {
+            // Progress Header (Sudah vs Belum Dicek)
+            let totalCatalog = max(cache.count, items.count)
+            let scannedCount = items.count
+            let unscannedCount = max(0, totalCatalog - scannedCount)
+            let progressPct = totalCatalog > 0 ? Double(scannedCount) / Double(totalCatalog) : 0.0
+
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text("Progress Hitung Fisik")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(OuraTheme.Colors.textPrimary)
+                    Spacer()
+                    Text("\(Int(progressPct * 100))% Selesai")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(OuraTheme.Colors.accent)
+                }
+
+                // Progress Bar
+                GeometryReader { geo in
+                    ZStack(alignment: .leading) {
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(OuraTheme.Colors.border.opacity(0.3))
+                            .frame(height: 6)
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(OuraTheme.Colors.accentGradient)
+                            .frame(width: max(0, min(geo.size.width, geo.size.width * CGFloat(progressPct))), height: 6)
+                    }
+                }
+                .frame(height: 6)
+
+                // Stats badges
+                HStack(spacing: 12) {
+                    Label("\(scannedCount) Sudah", systemImage: "checkmark.circle.fill")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(.green)
+                    Label("\(unscannedCount) Belum", systemImage: "circle")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(OuraTheme.Colors.textSecondary)
+                    Spacer()
+                    Text("Total Katalog: \(totalCatalog)")
+                        .font(.system(size: 11))
+                        .foregroundStyle(OuraTheme.Colors.textTertiary)
+                }
+            }
+            .padding(14)
+            .background(OuraTheme.Colors.surfaceCard)
+            .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.medium))
+            .padding(.horizontal, 16)
+            .padding(.top, 8)
+
             HStack {
                 Text("Hitungan Fisik (\(items.count) item)")
                     .font(.system(size: 15, weight: .semibold))
@@ -120,7 +196,7 @@ struct StokOpnameScannerView: View {
                     Text("Belum ada produk yang dihitung")
                         .font(.system(size: 15, weight: .medium))
                         .foregroundStyle(OuraTheme.Colors.textSecondary)
-                    Text("Scan QR produk atau tambah produk manual untuk memulai.")
+                    Text("Scan QR produk atau tambah manual untuk memulai.")
                         .font(.system(size: 13))
                         .foregroundStyle(OuraTheme.Colors.textTertiary)
                 }
@@ -140,6 +216,8 @@ struct StokOpnameScannerView: View {
         .background(OuraTheme.Colors.background)
     }
 
+    // MARK: - Item Row
+
     private func stockOpnameItemRow(_ item: StockOpnameItem) -> some View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
@@ -153,7 +231,7 @@ struct StokOpnameScannerView: View {
             Spacer()
             HStack(spacing: 8) {
                 Button {
-                    // decrement
+                    Task { await decrementQty(item) }
                 } label: {
                     Image(systemName: "minus.circle")
                         .font(.system(size: 20))
@@ -191,12 +269,99 @@ struct StokOpnameScannerView: View {
         .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
     }
 
+    // MARK: - QR Scan Handler
+
+    private func handleScan(_ raw: String) async {
+        guard !isProcessingScan else { return }
+
+        guard let parsed = cache.parseQR(raw) else {
+            ScanFeedback.error()
+            showScanMessage("❌ QR tidak dikenali")
+            return
+        }
+
+        isProcessingScan = true
+        defer { isProcessingScan = false }
+
+        let productSizeId = parsed.id
+
+        // Lookup product name from cache for feedback
+        let productName = cache.lookup(productSizeId)?.productName ?? "Produk"
+        let sizeLabel = cache.lookup(productSizeId)?.sizeLabel ?? ""
+        let displayName = sizeLabel.isEmpty ? productName : "\(productName) – \(sizeLabel)"
+
+        do {
+            let updatedItem = try await api.addStockOpnameItem(
+                sessionId: session.id,
+                productSizeId: productSizeId,
+                scannedQty: 1,
+                note: nil
+            )
+
+            await MainActor.run {
+                // Update or insert item in list
+                if let idx = items.firstIndex(where: { $0.productSizeId == productSizeId }) {
+                    items[idx] = updatedItem
+                } else {
+                    items.insert(updatedItem, at: 0)
+                }
+            }
+
+            ScanFeedback.success()
+            let qty = Int(updatedItem.scannedQty)
+            showScanMessage("✅ \(displayName) → \(qty) pcs")
+        } catch {
+            ScanFeedback.error()
+            if let apiErr = error as? APIError {
+                showScanMessage("❌ \(apiErr.errorDescription ?? "Gagal")")
+            } else {
+                showScanMessage("❌ \(error.localizedDescription)")
+            }
+        }
+    }
+
+    private func showScanMessage(_ msg: String) {
+        withAnimation { lastScanMessage = msg }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+            withAnimation {
+                if lastScanMessage == msg { lastScanMessage = nil }
+            }
+        }
+    }
+
+    // MARK: - CRUD Actions
+
     private func incrementQty(_ item: StockOpnameItem) async {
         do {
             let updated = try await api.addStockOpnameItem(
                 sessionId: session.id,
                 productSizeId: item.productSizeId,
                 scannedQty: 1,
+                note: nil
+            )
+            await MainActor.run {
+                if let idx = items.firstIndex(where: { $0.id == item.id }) {
+                    items[idx] = updated
+                }
+            }
+        } catch {
+            await MainActor.run {
+                if let apiErr = error as? APIError {
+                    errorMsg = apiErr.errorDescription
+                } else {
+                    errorMsg = error.localizedDescription
+                }
+            }
+        }
+    }
+
+    private func decrementQty(_ item: StockOpnameItem) async {
+        let newQty = max(0, item.scannedQty - 1)
+        do {
+            let updated = try await api.addStockOpnameItem(
+                sessionId: session.id,
+                productSizeId: item.productSizeId,
+                scannedQty: newQty - item.scannedQty,
                 note: nil
             )
             await MainActor.run {

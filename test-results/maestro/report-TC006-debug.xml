@@ -1,0 +1,8 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<testsuites>
+  <testsuite name="Test Suite" device="iPhone 17 Pro - iOS 26.2 - 8FA3AD06-AED5-421F-A1B6-178EFEF3D25A" tests="1" failures="1" time="48.045" timestamp="2026-11-12T10:21:04">
+    <testcase id="TC006_JualHargaDiskon" name="TC006_JualHargaDiskon" classname="TC006_JualHargaDiskon" file="test/scripts/TC006_JualHargaDiskon.yaml" time="48.024" timestamp="2026-11-12T10:21:04" status="ERROR">
+      <failure>Element not found: Id matching regex: input-Harga Satuan</failure>
+    </testcase>
+  </testsuite>
+</testsuites>

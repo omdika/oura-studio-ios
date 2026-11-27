@@ -87,7 +87,7 @@ struct StokOpnameNewProductSheet: View {
 
             // 3. Dapatkan product_size yang baru dibuat (ambil dari getProductSizes)
             let sizes = try await api.getProductSizes(sku: product.sku, productName: productName)
-            guard let newSize = sizes.first(where: { $0.sizeLabel == sizeLabel && $0.fabricVariantName == fabricVariant.isEmpty ? nil : fabricVariant }) else {
+            guard let newSize = sizes.first(where: { $0.sizeLabel == sizeLabel && $0.fabricVariantName == (fabricVariant.isEmpty ? nil : fabricVariant) }) else {
                 throw APIError.serverError(500, "Gagal menemukan ukuran yang baru dibuat")
             }
 

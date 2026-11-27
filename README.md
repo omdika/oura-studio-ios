@@ -114,6 +114,50 @@ Native **BLE thermal printing** for 57mm receipts and 33×15mm QR labels, built 
 
 ---
 
+## 🧪 QA & Test Automation
+
+Frontend UI tests use **Maestro** (black-box, run on iOS Simulator) with **Allure** reporting (screenshots shown inline per test in the Attachments tab). Test scripts are in `test/scripts/` and per-TC documentation is in `doc/test/`.
+
+### Prerequisites
+- **Xcode 15+** with a running iOS Simulator (e.g., iPhone 17 Pro), app installed with Bundle ID `handika.oura-studio-frontend`.
+- **Maestro CLI:** `curl -FsSL https://get.maestro.mobile.dev | bash`
+- **Allure CLI:** `brew install allure`
+- **Python 3** (to attach screenshots to Allure results via `test/attach_screenshots.py`).
+
+### Run a single test flow + generate Allure report
+```bash
+# 1. Create results directory
+mkdir -p test-results/maestro
+
+# 2. Run Maestro flow, export JUnit XML + screenshots
+maestro test --format junit \
+  --output test-results/maestro/report.xml \
+  --test-output-dir test-results/maestro-artifacts \
+  test/scripts/TC003_DashboardFlow.yaml
+
+# 3. Attach latest screenshots to Allure results
+python3 test/attach_screenshots.py --flow TC003_DashboardFlow --tc TC-003
+
+# 4. Generate Allure report (cleans old report first)
+allure generate test-results/allure-results -o test-results/allure-report --clean
+
+# 5. Open report in browser
+allure open test-results/allure-report
+```
+
+### Available test flows (`test/scripts/`)
+
+| File | TC ID | Scenario | Type |
+|------|-------|----------|------|
+| `TC003_DashboardFlow.yaml` | TC-003 | Dashboard + Buy Material sheet (read-only, does not write data) | Sanity / Positive |
+| `TC004_TambahProdukManual.yaml` | TC-004 | Add manual product (Free Size) | Write |
+| `TC005_TambahStokSatu.yaml` | TC-005 | Free Size stock 0 → 1 pcs | Write |
+| `TC006_JualHargaDiskon.yaml` | TC-006 | Sell 1 pc, price Rp1,000, discount Rp1,000 → total Rp0 | Write |
+
+Full reference (run all flows at once, merge Allure results, `test-results/` folder structure, troubleshooting, CI notes): `doc/test/TESTING.md`.
+
+---
+
 ## 📁 Project Folder Structure
 
 ```text

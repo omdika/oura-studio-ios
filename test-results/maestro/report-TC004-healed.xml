@@ -1,0 +1,8 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<testsuites>
+  <testsuite name="Test Suite" device="iPhone 17 Pro - iOS 26.2 - 8FA3AD06-AED5-421F-A1B6-178EFEF3D25A" tests="1" failures="1" time="101.093" timestamp="2026-11-21T10:22:19">
+    <testcase id="TC004_TambahProdukManual" name="TC004_TambahProdukManual" classname="TC004_TambahProdukManual" file="test/scripts/TC004_TambahProdukManual.yaml" time="101.078" timestamp="2026-11-21T10:22:19" status="ERROR">
+      <failure>Assertion is false: "Boneka Zeta Healed" is visible</failure>
+    </testcase>
+  </testsuite>
+</testsuites>

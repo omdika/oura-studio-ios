@@ -16,7 +16,7 @@ struct StokOpnameResultView: View {
                 ProgressView("Memuat…")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                let items = sessionDetail?.items ?? []
+                let items = sessionDetail?.items ?? session.items ?? []
                 ScrollView {
                     VStack(spacing: 20) {
                         // Status header
@@ -28,7 +28,7 @@ struct StokOpnameResultView: View {
                                 Text("Stok Opname Selesai")
                                     .font(.system(size: 17, weight: .bold))
                                     .foregroundStyle(OuraTheme.Colors.textPrimary)
-                                Text(session.completedAt.formatted(date: .abbreviated, time: .shortened))
+                                Text(session.completedAt?.formatted(date: .abbreviated, time: .shortened) ?? "-")
                                     .font(.system(size: 13))
                                     .foregroundStyle(OuraTheme.Colors.textSecondary)
                             }
@@ -43,23 +43,65 @@ struct StokOpnameResultView: View {
                         HStack(spacing: 16) {
                             statCard(title: "Total Item", value: "\(session.itemCount)")
                             statCard(title: "Penyesuaian ditulis", value: "\(items.filter { $0.varianceQty != 0 }.count)")
-                            statCard(title: "Total Variansi (pcs)", value: "\(totalVariansiQty(items), specifier: "%+d")", color: totalVariansiQty(items) >= 0 ? .green : .red)
+                            statCard(title: "Total Variansi (pcs)", value: String(format: "%+d", totalVariansiQty(items)), color: totalVariansiQty(items) >= 0 ? .green : .red)
                         }
                         .padding(.horizontal, 16)
 
-                        // Daftar penyesuaian ledger
+                        // Daftar penyesuaian ledger / item dihitung (Group by SKU / Produk)
                         if !items.isEmpty {
-                            VStack(alignment: .leading, spacing: 12) {
-                                Text("Penyesuaian Stok yang Disimpan")
+                            VStack(alignment: .leading, spacing: 16) {
+                                Text("Daftar Item & Penyesuaian Stok")
                                     .font(.system(size: 15, weight: .semibold))
                                     .foregroundStyle(OuraTheme.Colors.textPrimary)
                                     .padding(.horizontal, 16)
 
-                                ForEach(items.filter { $0.varianceQty != 0 }) { item in
-                                    adjustmentRow(item)
+                                // Group items by productSku or productName
+                                let grouped = Dictionary(grouping: items) { item in
+                                    item.productSku ?? item.productName ?? "Produk Lain"
+                                }
+
+                                ForEach(grouped.keys.sorted(), id: \.self) { skuKey in
+                                    let groupItems = grouped[skuKey] ?? []
+                                    let productName = groupItems.first?.productName ?? skuKey
+
+                                    VStack(alignment: .leading, spacing: 8) {
+                                        // Product Header (SKU & Nama)
+                                        HStack {
+                                            VStack(alignment: .leading, spacing: 2) {
+                                                Text(productName)
+                                                    .font(.system(size: 14, weight: .bold))
+                                                    .foregroundStyle(OuraTheme.Colors.textPrimary)
+                                                Text("SKU: \(skuKey)")
+                                                    .font(.system(size: 12))
+                                                    .foregroundStyle(OuraTheme.Colors.textSecondary)
+                                            }
+                                            Spacer()
+                                            Text("\(groupItems.count) varian")
+                                                .font(.system(size: 12, weight: .medium))
+                                                .foregroundStyle(OuraTheme.Colors.textTertiary)
+                                        }
+                                        .padding(.horizontal, 16)
+                                        .padding(.vertical, 8)
+                                        .background(OuraTheme.Colors.surfaceCard)
+                                        .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.medium))
+
+                                        // Variant rows
+                                        ForEach(groupItems) { item in
+                                            adjustmentRow(item)
+                                                .padding(.leading, 12)
+                                        }
+                                    }
+                                    .padding(.horizontal, 16)
                                 }
                             }
-                            .padding(.horizontal, 16)
+                        } else {
+                            VStack(spacing: 8) {
+                                Text("Tidak ada item dalam sesi ini")
+                                    .font(.system(size: 14))
+                                    .foregroundStyle(OuraTheme.Colors.textSecondary)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(24)
                         }
 
                         // Tombol kembali
@@ -106,23 +148,23 @@ struct StokOpnameResultView: View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(item.displayLabel)
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(OuraTheme.Colors.textPrimary)
-                Text("SKU: \(item.productSku ?? "-")")
-                    .font(.system(size: 12))
+                Text("Fisik: \(Int(item.scannedQty)) pcs | Sistem: \(Int(item.systemStockQtySnapshot)) pcs")
+                    .font(.system(size: 11))
                     .foregroundStyle(OuraTheme.Colors.textSecondary)
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 2) {
-                Text(item.varianceQty >= 0 ? "+\(Int(item.varianceQty))" : "\(Int(item.varianceQty))")
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundStyle(item.varianceQty >= 0 ? .green : .red)
-                Text("disimpan ke ledger")
-                    .font(.system(size: 11))
+                Text(item.varianceQty == 0 ? "Sesuai" : (item.varianceQty > 0 ? "+\(Int(item.varianceQty))" : "\(Int(item.varianceQty))"))
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(item.varianceQty == 0 ? OuraTheme.Colors.textSecondary : (item.varianceQty > 0 ? .green : .red))
+                Text(item.varianceQty == 0 ? "akurat" : "disimpan ke ledger")
+                    .font(.system(size: 10))
                     .foregroundStyle(OuraTheme.Colors.textTertiary)
             }
         }
-        .padding(12)
+        .padding(10)
         .background(OuraTheme.Colors.surfaceCard)
         .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.medium))
     }

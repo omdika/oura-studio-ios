@@ -15,23 +15,41 @@ struct StokOpnameReconcileView: View {
     var body: some View {
         List {
             Section {
+                let totalCatalog = max(QRProductCache.shared.count, items.count)
+                let scannedCount = items.count
+                let unscannedCount = max(0, totalCatalog - scannedCount)
+
                 HStack {
-                    Text("Total Item")
+                    Text("Item Sudah Dihitung")
                     Spacer()
-                    Text("\(items.count)")
+                    Text("\(scannedCount) pcs")
+                        .foregroundStyle(.green)
+                        .font(.system(size: 15, weight: .semibold))
+                }
+                HStack {
+                    Text("Item Belum Dihitung")
+                    Spacer()
+                    Text("\(unscannedCount) pcs")
+                        .foregroundStyle(unscannedCount > 0 ? .orange : OuraTheme.Colors.textSecondary)
+                        .font(.system(size: 15, weight: .semibold))
+                }
+                HStack {
+                    Text("Total Katalog Toko")
+                    Spacer()
+                    Text("\(totalCatalog) pcs")
                         .foregroundStyle(OuraTheme.Colors.textSecondary)
                 }
                 HStack {
                     Text("Total Variansi (pcs)")
                     Spacer()
-                    Text("\(totalVariansiQty, specifier: "%+d")")
+                    Text(String(format: "%+d", totalVariansiQty))
                         .foregroundStyle(totalVariansiQty >= 0 ? .green : .red)
                         .font(.system(size: 15, weight: .semibold))
                 }
                 HStack {
                     Text("Dampak Finansial (est.)")
                     Spacer()
-                    Text("\(totalVariansiValue, specifier: "%.0f") Rp")
+                    Text(String(format: "%.0f", totalVariansiValue) + " Rp")
                         .foregroundStyle(totalVariansiValue >= 0 ? .green : .red)
                         .font(.system(size: 15, weight: .semibold))
                 }
@@ -163,7 +181,7 @@ struct StokOpnameReconcileView: View {
     }
 
     private var canSave: Bool {
-        !items.isEmpty && items.contains { $0.varianceQty != 0 }
+        !items.isEmpty
     }
 
     private func complete() async {

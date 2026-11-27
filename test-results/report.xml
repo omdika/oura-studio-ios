@@ -1,0 +1,15 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<testsuites>
+  <testsuite name="Test Suite" device="iPhone 17 Pro - iOS 26.2 - 8FA3AD06-AED5-421F-A1B6-178EFEF3D25A" tests="4" failures="3" time="175.793" timestamp="2026-11-11T17:56:56">
+    <testcase id="TC005_TambahStokSatu" name="TC005_TambahStokSatu" classname="TC005_TambahStokSatu" file="test/scripts/TC005_TambahStokSatu.yaml" time="82.058" timestamp="2026-11-11T17:56:56" status="ERROR">
+      <failure>Element not found: Id matching regex: input-Jumlah</failure>
+    </testcase>
+    <testcase id="TC006_JualHargaDiskon" name="TC006_JualHargaDiskon" classname="TC006_JualHargaDiskon" file="test/scripts/TC006_JualHargaDiskon.yaml" time="28.325" timestamp="2026-11-11T17:58:18" status="ERROR">
+      <failure>Element not found: Id matching regex: fab-tambah-penjualan</failure>
+    </testcase>
+    <testcase id="TC003_DashboardFlow" name="TC003_DashboardFlow" classname="TC003_DashboardFlow" file="test/scripts/TC003_DashboardFlow.yaml" time="11.06" timestamp="2026-11-11T17:58:46" status="SUCCESS"/>
+    <testcase id="TC004_TambahProdukManual" name="TC004_TambahProdukManual" classname="TC004_TambahProdukManual" file="test/scripts/TC004_TambahProdukManual.yaml" time="54.318" timestamp="2026-11-11T17:58:57" status="ERROR">
+      <failure>Element not found: Id matching regex: fab-tambah-produk</failure>
+    </testcase>
+  </testsuite>
+</testsuites>
