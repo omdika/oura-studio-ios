@@ -39,11 +39,18 @@ struct StokOpnameResultView: View {
                         .clipShape(RoundedRectangle(cornerRadius: OuraTheme.Radius.large))
                         .padding(.horizontal, 16)
 
-                        // Total variansi
-                        HStack(spacing: 16) {
-                            statCard(title: "Total Item", value: "\(session.itemCount)")
-                            statCard(title: "Penyesuaian ditulis", value: "\(items.filter { $0.varianceQty != 0 }.count)")
-                            statCard(title: "Total Variansi (pcs)", value: String(format: "%+d", totalVariansiQty(items)), color: totalVariansiQty(items) >= 0 ? .green : .red)
+                        // Total variansi & progress
+                        VStack(spacing: 12) {
+                            HStack(spacing: 12) {
+                                let totalCatalog = max(QRProductCache.shared.count, items.count)
+                                statCard(title: "Item Dihitung", value: "\(items.count) / \(totalCatalog)")
+                                statCard(title: "Penyesuaian", value: "\(items.filter { $0.varianceQty != 0 }.count) item")
+                            }
+                            HStack(spacing: 12) {
+                                statCard(title: "Total Variansi", value: String(format: "%+d pcs", totalVariansiQty(items)), color: totalVariansiQty(items) >= 0 ? .green : .red)
+                                let unscanned = max(0, max(QRProductCache.shared.count, items.count) - items.count)
+                                statCard(title: "Belum Dicek", value: "\(unscanned) item", color: unscanned > 0 ? .orange : .secondary)
+                            }
                         }
                         .padding(.horizontal, 16)
 
