@@ -4,27 +4,30 @@ struct ChipSingleSelect<T: Hashable>: View {
     let label: String
     @Binding var selected: T?
     let options: [(value: T, title: String)]
+    var compact: Bool = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(label)
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(OuraTheme.Colors.textSecondary)
+        VStack(alignment: .leading, spacing: compact ? 6 : 8) {
+            if !compact {
+                Text(label)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(OuraTheme.Colors.textSecondary)
+            }
 
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
+                HStack(spacing: compact ? 6 : 8) {
                     ForEach(options, id: \.value) { opt in
                         let isSelected = selected == opt.value
                         Button {
                             selected = isSelected ? nil : opt.value
                         } label: {
                             Text(opt.title)
-                                .font(.system(size: 13, weight: .semibold))
+                                .font(.system(size: compact ? 12 : 13, weight: .semibold))
                                 .foregroundStyle(
                                     isSelected ? .white : OuraTheme.Colors.textSecondary
                                 )
-                                .padding(.horizontal, 14)
-                                .padding(.vertical, 7)
+                                .padding(.horizontal, compact ? 10 : 14)
+                                .padding(.vertical, compact ? 6 : 7)
                                 .background(
                                     isSelected
                                         ? OuraTheme.Colors.accent

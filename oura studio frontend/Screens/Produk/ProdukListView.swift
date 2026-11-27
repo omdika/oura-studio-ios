@@ -575,25 +575,26 @@ struct ProdukListView: View {
         )
     }
 
-    // v3.87: Chip single-select filter kategori (pouch / scrunchie / all).
+    // v3.88: Chip single-select filter kategori (all / pouch / scrunchie) — compact, dengan tombol "All" yang bisa diklik.
     private var categoryFilterSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 6) {
             Text("Kategori")
-                .font(.system(size: 13, weight: .medium))
+                .font(.system(size: 12, weight: .regular))
                 .foregroundStyle(OuraTheme.Colors.textSecondary)
                 .padding(.horizontal, OuraTheme.Spacing.cardPad)
+                .padding(.top, 4)
 
             ChipSingleSelect(
                 label: "",
                 selected: selectedCategoryBinding,
-                options: ProductCategory.allCases.filter { $0 != .all }.map {
+                options: ProductCategory.allCases.map {
                     (value: $0, title: $0.title)
-                }
+                },
+                compact: true
             )
             .padding(.horizontal, OuraTheme.Spacing.cardPad)
-            .padding(.bottom, OuraTheme.Spacing.cardPad)
+            .padding(.bottom, 8)
         }
-        .ouraCard()
     }
 
     // v3.87: Distribusi jumlah size per varian di atas list produk.
