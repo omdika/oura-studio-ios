@@ -4,8 +4,14 @@ struct LainnyaView: View {
     @EnvironmentObject private var appState: AppState
 
     enum SegmentTab: Int, CaseIterable {
-        case laporan, pengaturan
-        var title: String { self == .laporan ? "Laporan" : "Pengaturan" }
+        case laporan, pengaturan, stokOpname
+        var title: String {
+            switch self {
+            case .laporan: return "Laporan"
+            case .pengaturan: return "Pengaturan"
+            case .stokOpname: return "Stok Opname"
+            }
+        }
     }
 
     @State private var selectedTab: SegmentTab = .laporan
@@ -26,8 +32,10 @@ struct LainnyaView: View {
             Group {
                 if selectedTab == .laporan {
                     ReportsView()
-                } else {
+                } else if selectedTab == .pengaturan {
                     SettingsView()
+                } else {
+                    StokOpnameListView()
                 }
             }
             .animation(.none, value: selectedTab)

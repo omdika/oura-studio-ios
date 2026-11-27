@@ -428,6 +428,62 @@ class APIService: ObservableObject {
         return try await getProductSizeById(id: sizeId)
     }
 
+    // MARK: - Stock Opname (v3.89)
+
+    func getStockOpnameSessions(status: String? = nil, from: Date? = nil, to: Date? = nil, page: Int = 1, limit: Int = 50) async throws -> PaginatedResponse<StockOpnameSession> {
+        if useMock { return try await MockAPIService.shared.getStockOpnameSessions() }
+        var path = "/stock-opname/sessions?page=\(page)&limit=\(limit)"
+        if let s = status { path += "&status=\(s.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? s)" }
+        if let f = from { path += "&from=\(f.timeIntervalSince1970)" }
+        if let t = to { path += "&to=\(t.timeIntervalSince1970)" }
+        return try await get(path: path)
+    }
+
+    func getStockOpnameSession(id: UUID) async throws -> StockOpnameSession {
+        if useMock { return try await MockAPIService.shared.getStockOpnameSession(id: id) }
+        return try await get(path: "/stock-opname/sessions/\(id.uuidString)")
+    }
+
+    // Note: backend returns StockOpnameSessionDetailOut which includes items enriched.
+    // Frontend model alias: StockOpnameSession with items.
+    func createStockOpnameSession(note: String?) async throws -> StockOpnameSession {
+        if useMock { return try await MockAPIService.shared.createStockOpnameSession(note: note) }
+        let req = CreateStockOpnameSessionRequest(note: note)
+        return try await post(path: "/stock-opname/sessions", body: req)
+    }
+
+    func addStockOpnameItem(sessionId: UUID, productSizeId: UUID, scannedQty: Double?, note: String?) async throws -> StockOpnameItem {
+        if useMock { return try await MockAPIService.shared.addStockOpnameItem(sessionId: sessionId, productSizeId: productSizeId, scannedQty: scannedQty, note: note) }
+        let req = AddStockOpnameItemRequest(productSizeId: productSizeId, scannedQty: scannedQty, note: note)
+        return try await post(path: "/stock-opname/sessions/\(sessionId.uuidString)/items", body: req)
+    }
+
+    func updateStockOpnameItem(sessionId: UUID, itemId: UUID, scannedQty: Double?, note: String?) async throws -> StockOpnameItem {
+        if useMock { return try await MockAPIService.shared.updateStockOpnameItem(sessionId: sessionId, itemId: itemId, scannedQty: scannedQty, note: note) }
+        let req = UpdateStockOpnameItemRequest(scannedQty: scannedQty, note: note)
+        return try await patch(path: "/stock-opname/sessions/\(sessionId.uuidString)/items/\(itemId.uuidString)", body: req)
+    }
+
+    func deleteStockOpnameItem(sessionId: UUID, itemId: UUID) async throws {
+        if useMock { return try await MockAPIService.shared.deleteStockOpnameItem(sessionId: sessionId, itemId: itemId) }
+        try await delete(path: "/stock-opname/sessions/\(sessionId.uuidString)/items/\(itemId.uuidString)")
+    }
+
+    func completeStockOpnameSession(sessionId: UUID) async throws -> CompleteStockOpnameResponse {
+        if useMock { return try await MockAPIService.shared.completeStockOpnameSession(sessionId: sessionId) }
+        return try await postNoBody(path: "/stock-opname/sessions/\(sessionId.uuidString)/complete")
+    }
+
+    func cancelStockOpnameSession(sessionId: UUID) async throws -> StockOpnameSession {
+        if useMock { return try await MockAPIService.shared.cancelStockOpnameSession(sessionId: sessionId) }
+        return try await postNoBody(path: "/stock-opname/sessions/\(sessionId.uuidString)/cancel")
+    }
+
+    func resumeStockOpnameSession(sessionId: UUID) async throws -> StockOpnameSession {
+        if useMock { return try await MockAPIService.shared.resumeStockOpnameSession(sessionId: sessionId) }
+        return try await postNoBody(path: "/stock-opname/sessions/\(sessionId.uuidString)/resume")
+    }
+
     func addStockFromBahan(sku: String, sizeId: UUID, qty: Int, specId: UUID, productName: String? = nil) async throws -> ProductSizeDetail {
         if useMock { return try await MockAPIService.shared.addStockFromBahan(sku: sku, sizeId: sizeId, qty: qty, specId: specId) }
         struct Req: Encodable { let qty: Int; let specId: UUID; enum CodingKeys: String, CodingKey { case qty; case specId = "spec_id" } }

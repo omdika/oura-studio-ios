@@ -1995,6 +1995,52 @@ class MockAPIService {
         _genericSettings.append(new)
         return new
     }
+
+    // MARK: - Stock Opname (v3.89)
+
+    func getStockOpnameSessions() async throws -> PaginatedResponse<StockOpnameSession> {
+        await delay()
+        return PaginatedResponse<StockOpnameSession>(data: [], totalItems: 0, totalPages: 0, currentPage: 1, nextPage: nil, prevPage: nil)
+    }
+
+    func getStockOpnameSession(id: UUID) async throws -> StockOpnameSession {
+        await delay()
+        return StockOpnameSession(id: id, status: "completed", startedAt: Date(), completedAt: Date(), note: "Contoh sesi opname", totalVarianceValue: 0, itemCount: 0, createdAt: Date(), items: [])
+    }
+
+    func createStockOpnameSession(note: String?) async throws -> StockOpnameSession {
+        await delay()
+        return StockOpnameSession(id: UUID(), status: "draft", startedAt: Date(), completedAt: nil, note: note, totalVarianceValue: 0, itemCount: 0, createdAt: Date(), items: [])
+    }
+
+    func addStockOpnameItem(sessionId: UUID, productSizeId: UUID, scannedQty: Double?, note: String?) async throws -> StockOpnameItem {
+        await delay()
+        return StockOpnameItem(id: UUID(), sessionId: sessionId, productSizeId: productSizeId, scannedQty: scannedQty ?? 0, systemStockQtySnapshot: 0, varianceQty: 0, note: note, createdAt: Date(), productSku: nil, productName: nil, sizeLabel: nil, fabricVariantName: nil)
+    }
+
+    func updateStockOpnameItem(sessionId: UUID, itemId: UUID, scannedQty: Double?, note: String?) async throws -> StockOpnameItem {
+        await delay()
+        return StockOpnameItem(id: itemId, sessionId: sessionId, productSizeId: UUID(), scannedQty: scannedQty ?? 0, systemStockQtySnapshot: 0, varianceQty: 0, note: note, createdAt: Date(), productSku: nil, productName: nil, sizeLabel: nil, fabricVariantName: nil)
+    }
+
+    func deleteStockOpnameItem(sessionId: UUID, itemId: UUID) async throws {
+        await delay()
+    }
+
+    func completeStockOpnameSession(sessionId: UUID) async throws -> CompleteStockOpnameResponse {
+        await delay()
+        return CompleteStockOpnameResponse(sessionId: sessionId, status: "completed", completedAt: Date(), totalVarianceValue: 0, adjustmentsWritten: 0)
+    }
+
+    func cancelStockOpnameSession(sessionId: UUID) async throws -> StockOpnameSession {
+        await delay()
+        return StockOpnameSession(id: sessionId, status: "cancelled", startedAt: Date(), completedAt: nil, note: nil, totalVarianceValue: 0, itemCount: 0, createdAt: Date(), items: [])
+    }
+
+    func resumeStockOpnameSession(sessionId: UUID) async throws -> StockOpnameSession {
+        await delay()
+        return StockOpnameSession(id: sessionId, status: "in_progress", startedAt: Date(), completedAt: nil, note: nil, totalVarianceValue: 0, itemCount: 0, createdAt: Date(), items: [])
+    }
 }
 
 
