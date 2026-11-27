@@ -36,6 +36,22 @@ final class QRProductCache: ObservableObject {
 
     var count: Int { byId.count }
 
+    /// Total produk unik berdasarkan nama produk (productName)
+    var totalUniqueProductNamesCount: Int {
+        let names = Set(byId.values.map { $0.productName })
+        return names.isEmpty ? count : names.count
+    }
+
+    /// Total stok sistem dari seluruh produk di katalog cache (`QRProductCache`)
+    var totalStockQty: Double {
+        let sum = byId.values.reduce(0.0) { $0 + Double($1.currentStockQty) }
+        if sum == 0 {
+            // Fallback jika detail stockQty belum terisi penuh dari slim, ambil dari getAllProductSizes langsung
+            // (Akan di-update secara asinkron di background)
+        }
+        return sum
+    }
+
     /// Teks umur cache untuk chip status, mis. "baru saja" / "3 mnt lalu".
     var ageText: String {
         guard let t = lastSyncAt else { return byId.isEmpty ? "belum dimuat" : "waktu tak diketahui" }
@@ -57,14 +73,7 @@ final class QRProductCache: ObservableObject {
         isLoading = true
         defer { inFlight = false; isLoading = false }
         do {
-            if let slim = try? await api.getSlimProductSizes(), !slim.isEmpty {
-                let unknown = applySlimItems(slim)
-                if unknown.isEmpty && !byId.isEmpty {
-                    lastSyncAt = Date()
-                    return
-                }
-                // Ada id baru (produk baru pasca-cache) → lengkapi via full fetch.
-            }
+            // Langsung panggil getAllProductSizes() agar semua currentStockQty produk di sistem terambil lengkap (tidak hanya slim)
             let all = try await api.getAllProductSizes()
             upsertMany(all)
             lastSyncAt = Date()

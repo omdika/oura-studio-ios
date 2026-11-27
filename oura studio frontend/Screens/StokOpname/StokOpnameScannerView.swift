@@ -49,7 +49,7 @@ struct StokOpnameScannerView: View {
                 .environmentObject(api)
         }
         .task {
-            await cache.preload(api: api)
+            await cache.preload(api: api, force: true)
             await loadItems()
         }
         .alert("Error", isPresented: .constant(errorMsg != nil)) {
@@ -119,10 +119,16 @@ struct StokOpnameScannerView: View {
     private var cartSection: some View {
         VStack(alignment: .leading, spacing: 0) {
             // Progress Header (Sudah vs Belum Dicek)
+            let totalUniqueProducts = max(cache.totalUniqueProductNamesCount, 1)
+            let scannedUniqueProducts = Set(items.compactMap { item in
+                cache.lookup(item.productSizeId)?.productName
+            }).count
             let totalCatalog = max(cache.count, items.count)
             let scannedCount = items.count
-            let unscannedCount = max(0, totalCatalog - scannedCount)
             let progressPct = totalCatalog > 0 ? Double(scannedCount) / Double(totalCatalog) : 0.0
+            let totalScannedQty = items.reduce(0.0) { $0 + $1.scannedQty }
+            let totalSystemQtyFromCache = cache.totalStockQty
+            let totalSystemQty = totalSystemQtyFromCache > 0 ? totalSystemQtyFromCache : items.reduce(0.0) { $0 + $1.systemStockQtySnapshot }
 
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
@@ -149,17 +155,19 @@ struct StokOpnameScannerView: View {
                 .frame(height: 6)
 
                 // Stats badges
-                HStack(spacing: 12) {
-                    Label("\(scannedCount) Sudah", systemImage: "checkmark.circle.fill")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(.green)
-                    Label("\(unscannedCount) Belum", systemImage: "circle")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(OuraTheme.Colors.textSecondary)
-                    Spacer()
-                    Text("Total Katalog: \(totalCatalog)")
-                        .font(.system(size: 11))
-                        .foregroundStyle(OuraTheme.Colors.textTertiary)
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Spacer()
+                        Text("Total Produk: Aktual \(scannedUniqueProducts) vs Sistem \(totalUniqueProducts)")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(OuraTheme.Colors.textPrimary)
+                    }
+                    HStack {
+                        Spacer()
+                        Text("Total Stok: Fisik \(Int(totalScannedQty)) vs Sistem \(Int(totalSystemQty))")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(OuraTheme.Colors.textSecondary)
+                    }
                 }
             }
             .padding(14)

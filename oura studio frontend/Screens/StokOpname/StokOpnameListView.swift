@@ -51,6 +51,19 @@ struct StokOpnameListView: View {
                 .background(OuraTheme.Colors.background)
             }
         }
+        .navigationTitle("Stok Opname")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    showingNewSession = true
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(OuraTheme.Colors.accent)
+                }
+            }
+        }
         .navigationDestination(for: StockOpnameSession.self) { session in
             if session.status == "completed" {
                 StokOpnameResultView(session: session)
@@ -65,6 +78,16 @@ struct StokOpnameListView: View {
         }
         .task {
             await loadSessions()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .stockOpnameDidCreateSession)) { _ in
+            Task {
+                await loadSessions()
+            }
+        }
+        .onAppear {
+            Task {
+                await loadSessions()
+            }
         }
         .alert("Error", isPresented: .constant(errorMsg != nil)) {
             Button("OK") { errorMsg = nil }

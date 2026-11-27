@@ -655,8 +655,15 @@ class APIService: ObservableObject {
 
     func getAllProductSizes() async throws -> [ProductSizeDetail] {
         if useMock { return try await MockAPIService.shared.getAllProductSizes() }
-        let res: PaginatedResponse<ProductSizeDetail> = try await get(path: "/product-sizes?page=1&limit=500")
-        return res.data
+        var all: [ProductSizeDetail] = []
+        var page = 1
+        while page <= 20 {
+            let res: PaginatedResponse<ProductSizeDetail> = try await get(path: "/product-sizes?page=\(page)&limit=500")
+            all.append(contentsOf: res.data)
+            if res.nextPage == nil || res.data.isEmpty { break }
+            page += 1
+        }
+        return all
     }
 
     func getProductSizeById(id: UUID) async throws -> ProductSizeDetail {
